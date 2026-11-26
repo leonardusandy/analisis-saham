@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analisis Saham Harian LQ45</title>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root{
+  --bg:#f6f7f9;--kartu:#fff;--teks:#1b1f24;--redup:#6b7480;--garis:#e3e6ea;
+  --hijau:#0f9d58;--merah:#d93025;--aksen:#1a56db;--kuning:#b7791f;--latar-aksen:#eaf0fd;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0f1216;--kartu:#171b21;--teks:#e6e9ed;--redup:#8b95a1;--garis:#2a3038;
+  --hijau:#34c77b;--merah:#f2685d;--aksen:#6b9bff;--kuning:#e0b354;--latar-aksen:#1c2638;}
+}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--teks)}
+header{padding:18px 20px 0;max-width:1200px;margin:auto}
+h1{font-size:22px;margin:0}
+.sub{color:var(--redup);font-size:13px}
+nav{display:flex;gap:4px;flex-wrap:wrap;margin-top:14px;border-bottom:1px solid var(--garis)}
+nav button{background:none;border:0;padding:10px 14px;font:inherit;color:var(--redup);cursor:pointer;border-bottom:2px solid transparent}
+nav button.aktif{color:var(--aksen);border-color:var(--aksen);font-weight:600}
+main{max-width:1200px;margin:auto;padding:18px 20px 60px}
+.bagian{display:none}.bagian.aktif{display:block}
+.kisi{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
+.kartu{background:var(--kartu);border:1px solid var(--garis);border-radius:10px;padding:16px}
+.kartu h3{margin:0 0 6px;font-size:15px}
+.besar{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
+.naik{color:var(--hijau)}.turun{color:var(--merah)}
+.label{color:var(--redup);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.pita{padding:12px 16px;border-radius:10px;margin-bottom:14px;border:1px solid var(--garis);background:var(--kartu)}
+.pita.waspada{border-color:var(--kuning)}
+.pita.contoh{border-color:var(--merah);color:var(--merah);font-weight:600}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;border-bottom:1px solid var(--garis);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{cursor:pointer;color:var(--redup);font-weight:600;font-size:13px;position:sticky;top:0;background:var(--kartu)}
+.gulir{overflow:auto;max-height:70vh}
+tr.klik{cursor:pointer}tr.klik:hover{background:var(--latar-aksen)}
+.lencana{display:inline-block;padding:2px 8px;border-radius:99px;background:var(--latar-aksen);color:var(--aksen);font-weight:700;font-size:13px}
+.level{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0;text-align:center}
+.level div{border:1px solid var(--garis);border-radius:8px;padding:6px}
+.level b{display:block;font-size:16px}
+ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}
+ul.alasan li.peringatan{color:var(--kuning)}
+button.tombol,input,select{font:inherit;padding:8px 10px;border:1px solid var(--garis);border-radius:8px;background:var(--kartu);color:var(--teks)}
+button.tombol{cursor:pointer;background:var(--aksen);color:#fff;border-color:var(--aksen)}
+button.tombol.kedua{background:var(--kartu);color:var(--aksen)}
+.baris{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.baris label{display:flex;flex-direction:column;font-size:12px;color:var(--redup);gap:3px}
+.grafik{height:420px}.grafik-kecil{height:140px}
+.redup{color:var(--redup);font-size:13px}
+.daftar-mini{list-style:none;padding:0;margin:0}
+.daftar-mini li{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--garis);cursor:pointer}
+details{margin-top:8px}summary{cursor:pointer;color:var(--aksen)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Analisis Saham Harian LQ45</h1>
+  <div class="sub" id="info-data">Memuat data…</div>
+  <nav id="nav">
+    <button data-b="ringkasan" class="aktif">Ringkasan</button>
+    <button data-b="kandidat">Kandidat Besok</button>
+    <button data-b="semua">Semua Saham</button>
+    <button data-b="grafik">Grafik</button>
+    <button data-b="jurnal">Jurnal Transaksi</button>
+    <button data-b="panduan">Panduan</button>
+  </nav>
+</header>
+<main>
+  <!-- RINGKASAN -->
+  <section class="bagian aktif" id="ringkasan">
+    <div id="pita-contoh"></div>
+    <div id="pita-pasar"></div>
+    <div class="kisi">
+      <div class="kartu"><div class="label">IHSG</div><div class="besar" id="ihsg-tutup">–</div><div id="ihsg-ubah"></div><div class="grafik-kecil" id="grafik-ihsg"></div></div>
+      <div class="kartu"><h3>Naik terbesar</h3><ul class="daftar-mini" id="daftar-naik"></ul></div>
+      <div class="kartu"><h3>Turun terbesar</h3><ul class="daftar-mini" id="daftar-turun"></ul></div>
+      <div class="kartu"><h3>Uji balik strategi (2 tahun, semua saham)</h3><div id="uji-gabungan"></div></div>
+    </div>
+  </section>
+
+  <!-- KANDIDAT -->
+  <section class="bagian" id="kandidat">
+    <div class="kartu" style="margin-bottom:14px">
+      <h3>Kalkulator ukuran posisi</h3>
+      <div class="baris">
+        <label>Modal (Rp)<input id="modal" type="number" value="10000000" min="0" step="100000"></label>
+        <label>Risiko per transaksi (%)<input id="risiko" type="number" value="1" min="0.1" max="5" step="0.1"></label>
+      </div>
+      <p class="redup">Jumlah lot dihitung agar kerugian bila kena batas rugi ≤ risiko yang Anda pilih. Banyak pedagang memakai 0,5–1% per transaksi.</p>
+    </div>
+    <div class="kisi" id="kisi-kandidat"></div>
+  </section>
+
+  <!-- SEMUA -->
+  <section class="bagian" id="semua">
+    <div class="kartu"><div class="gulir"><table id="tabel-semua"></table></div></div>
+  </section>
+
+  <!-- GRAFIK -->
+  <section class="bagian" id="grafik">
+    <div class="baris" style="margin-bottom:12px">
+      <label>Saham<select id="pilih-saham"></select></label>
+      <span id="info-grafik" class="redup"></span>
+    </div>
+    <div class="kartu">
+      <div class="grafik" id="grafik-utama"></div>
+      <div class="label" style="margin-top:8px">RSI (14)</div><div class="grafik-kecil" id="grafik-rsi"></div>
+      <div class="label" style="margin-top:8px">MACD (12, 26, 9)</div><div class="grafik-kecil" id="grafik-macd"></div>
+      <p class="redup">Garis biru: MA20 · oranye: MA50 · abu-abu putus-putus: pita Bollinger. Garis mendatar: masuk / target / batas rugi untuk besok.</p>
+    </div>
+    <div class="kartu" style="margin-top:14px"><h3>Riwayat sinyal di saham ini (uji balik)</h3><div class="gulir" style="max-height:300px"><table id="tabel-riwayat"></table></div></div>
+  </section>
+
+  <!-- JURNAL -->
+  <section class="bagian" id="jurnal">
+    <div class="kartu" style="margin-bottom:14px">
+      <h3>Catat transaksi</h3>
+      <div class="baris">
+        <label>Tanggal<input id="j-tgl" type="date"></label>
+        <label>Kode<input id="j-kode" placeholder="BBCA" size="6"></label>
+        <label>Harga beli<input id="j-beli" type="number" min="1"></label>
+        <label>Harga jual<input id="j-jual" type="number" min="1"></label>
+        <label>Lot<input id="j-lot" type="number" min="1" value="1"></label>
+        <label>Catatan<input id="j-catatan" placeholder="alasan masuk/keluar" size="22"></label>
+        <button class="tombol" id="j-simpan">Simpan</button>
+      </div>
+      <p class="redup">Jurnal hanya tersimpan di peramban ini. Unduh CSV secara berkala sebagai cadangan.</p>
+      <div class="baris">
+        <button class="tombol kedua" id="j-unduh">Unduh CSV</button>
+        <label class="tombol kedua" style="cursor:pointer;color:var(--aksen);display:inline-block;font-size:15px;border:1px solid var(--aksen);padding:8px 10px;border-radius:8px">Muat CSV<input id="j-muat" type="file" accept=".csv" hidden></label>
+      </div>
+    </div>
+    <div class="kisi" id="j-statistik" style="margin-bottom:14px"></div>
+    <div class="kartu"><div class="gulir"><table id="tabel-jurnal"></table></div></div>
+  </section>
+
+  <!-- PANDUAN -->
+  <section class="bagian" id="panduan">
+    <div class="kartu">
+      <h3>Cara membaca halaman ini</h3>
+      <p>Data diperbarui otomatis setiap hari bursa sekitar pukul 17.30 WIB dari Yahoo Finance (data akhir hari, tidak resmi). Periksa ulang harga di aplikasi sekuritas Anda sebelum bertransaksi.</p>
+      <h3>Skor kandidat</h3>
+      <ul>
+        <li>+2 tren naik: harga di atas MA20 dan MA20 di atas MA50</li>
+        <li>+2 harga penutupan menembus harga tertinggi 20 hari sebelumnya</li>
+        <li>+1 / +2 volume 1,5× / 2,5× di atas rata-rata 20 hari</li>
+        <li>+2 RSI baru pulih dari bawah 30</li>
+        <li>+1 RSI antara 50 dan 70</li>
+        <li>+2 MACD baru silang naik (hari ini atau kemarin)</li>
+        <li>+1 harga ditutup di 30% teratas rentang hari itu</li>
+        <li>−2 RSI di atas 75 · −2 naik lebih dari 15% dalam sehari</li>
+      </ul>
+      <p>Kandidat adalah saham dengan skor ≥ <span class="isi-skor-min">5</span> dan nilai transaksi rata-rata ≥ Rp<span class="isi-likuid">10</span> miliar per hari.</p>
+      <h3>Level transaksi</h3>
+      <p>Masuk = harga penutupan terakhir. Batas rugi = masuk − <span class="isi-stop">1</span>×ATR. Target = masuk + <span class="isi-target">1,5</span>×ATR. Semua sudah dibulatkan ke fraksi harga BEI. Persentase untung dan rugi sudah dipotong biaya beli dan jual.</p>
+      <h3>Uji balik</h3>
+      <p>Simulasi pada 2 tahun terakhir: setiap kali sinyal muncul, beli di harga pembukaan hari berikutnya, lalu keluar saat target atau batas rugi tersentuh, atau di harga penutupan hari ke-<span class="isi-hari">3</span>. Kalau target dan batas rugi tersentuh di hari yang sama, dianggap kena batas rugi. Hasil masa lalu tidak menjamin hasil di masa depan.</p>
+      <h3>Aturan yang disarankan</h3>
+      <ul>
+        <li>Selalu pasang batas rugi. Jangan pernah menurunkan batas rugi setelah masuk.</li>
+        <li>Risiko per transaksi maksimal 1% dari modal.</li>
+        <li>Saat IHSG di bawah MA20, kurangi jumlah dan ukuran transaksi.</li>
+        <li>Berhenti sehari setelah 3 kali rugi berturut-turut.</li>
+        <li>Nilai strategi dari jurnal minimal 30 transaksi, bukan dari beberapa hari saja.</li>
+      </ul>
+      <p class="redup">Halaman ini alat bantu analisis teknikal, bukan nasihat investasi. Keputusan dan risiko transaksi sepenuhnya milik Anda.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+const fmt=(x,d=0)=>x==null||isNaN(x)?"–":Number(x).toLocaleString("id-ID",{minimumFractionDigits:d,maximumFractionDigits:d});
+const pct=x=>x==null?"–":(x>0?"+":"")+fmt(x,2)+"%";
+const kelas=x=>x>0?"naik":x<0?"turun":"";
+const $=id=>document.getElementById(id);
+let RINGKAS=null,PETA={};
+
+// ---------- tab ----------
+$("nav").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;bukaTab(b.dataset.b);
+});
+function bukaTab(nama){
+  document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("aktif",x.dataset.b===nama));
+  document.querySelectorAll(".bagian").forEach(x=>x.classList.toggle("aktif",x.id===nama));
+  if(nama==="grafik"&&!grafikDimuat)muatGrafik($("pilih-saham").value);
+}
+
+// ---------- data ----------
+fetch("data/ringkasan.json?"+Date.now()).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(d=>{
+  RINGKAS=d;d.saham.forEach(s=>PETA[s.kode]=s);
+  $("info-data").textContent=`Data penutupan ${d.tanggal_data} · diperbarui ${d.dibuat} · ${d.saham.length} saham`;
+  isiPengaturan(d.pengaturan);
+  tampilRingkasan(d);tampilKandidat();tampilSemua();isiPilihan();
+}).catch(e=>{
+  $("info-data").textContent="Data belum tersedia. Jalankan alur kerja 'Analisis harian' di tab Actions GitHub. ("+e.message+")";
+});
+
+function isiPengaturan(p){
+  document.querySelectorAll(".isi-skor-min").forEach(x=>x.textContent=p.skor_minimal);
+  document.querySelectorAll(".isi-likuid").forEach(x=>x.textContent=fmt(p.nilai_transaksi_minimal_miliar));
+  document.querySelectorAll(".isi-stop").forEach(x=>x.textContent=fmt(p.kali_atr_stop,1));
+  document.querySelectorAll(".isi-target").forEach(x=>x.textContent=fmt(p.kali_atr_target,1));
+  document.querySelectorAll(".isi-hari").forEach(x=>x.textContent=p.hari_pegang_maks);
+}
+
+function tampilRingkasan(d){
+  if(d.data_contoh)$("pita-contoh").innerHTML='<div class="pita contoh">DATA CONTOH (acak) — bukan harga sebenarnya. Data asli muncul setelah GitHub Actions berjalan.</div>';
+  const i=d.ihsg;
+  if(i){
+    $("ihsg-tutup").textContent=fmt(i.tutup,2);
+    $("ihsg-ubah").innerHTML=`<span class="${kelas(i.perubahan_pct)}">${pct(i.perubahan_pct)}</span> <span class="redup">· RSI ${fmt(i.rsi,1)}</span>`;
+    const sehat=i.di_atas_ma20&&i.di_atas_ma50;
+    $("pita-pasar").innerHTML=sehat
+      ?`<div class="pita"><b>Kondisi pasar: mendukung.</b> IHSG di atas MA20 dan MA50.</div>`
+      :`<div class="pita waspada"><b>Kondisi pasar: waspada.</b> IHSG ${i.di_atas_ma20?"":"di bawah MA20"}${!i.di_atas_ma20&&!i.di_atas_ma50?" dan ":""}${i.di_atas_ma50?"":"di bawah MA50"}. Peluang sinyal beli gagal lebih besar; kurangi jumlah dan ukuran transaksi.</div>`;
+    const ch=LightweightCharts.createChart($("grafik-ihsg"),opsiGrafik({sumbu:false}));
+    const s=ch.addAreaSeries({lineColor:warna("--aksen"),topColor:"rgba(26,86,219,.25)",bottomColor:"rgba(26,86,219,0)",lineWidth:2,priceLineVisible:false});
+    s.setData(i.riwayat.map(x=>({time:x.t,value:x.c})));ch.timeScale().fitContent();
+  }
+  const isiDaftar=(id,kode)=>$(id).innerHTML=kode.map(k=>`<li data-k="${k}"><b>${k}</b><span class="${kelas(PETA[k].perubahan_pct)}">${pct(PETA[k].perubahan_pct)}</span></li>`).join("");
+  isiDaftar("daftar-naik",d.naik_terbesar);isiDaftar("daftar-turun",d.turun_terbesar);
+  document.querySelectorAll(".daftar-mini").forEach(u=>u.addEventListener("click",e=>{const li=e.target.closest("li");if(li)lihatGrafik(li.dataset.k)}));
+  const u=d.uji_balik_gabungan;
+  $("uji-gabungan").innerHTML=u.jumlah?`
+    <div class="besar ${kelas(u.rata_hasil_pct)}">${pct(u.rata_hasil_pct)}</div>
+    <div class="redup">rata-rata per transaksi, setelah biaya</div>
+    <p style="margin:8px 0 0">${fmt(u.jumlah)} transaksi · menang ${fmt(u.persen_menang,1)}%<br>
+    kena target ${u.kena_target} · kena batas rugi ${u.kena_stop} · habis waktu ${u.habis_waktu}</p>
+    <p class="redup">${u.rata_hasil_pct<=0?"Rata-rata hasilnya belum positif. Jangan memakai sinyal ini apa adanya; pilih saham yang uji baliknya bagus atau ubah pengaturan.":"Hasil masa lalu tidak menjamin hasil ke depan."}</p>`:"Belum ada sinyal.";
+}
+
+function warna(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim()}
+function opsiGrafik({sumbu=true}={}){
+  return{autoSize:true,layout:{background:{color:"transparent"},textColor:warna("--redup"),fontSize:11},
+    grid:{vertLines:{visible:false},horzLines:{color:warna("--garis")}},
+    rightPriceScale:{visible:sumbu,borderVisible:false},timeScale:{visible:sumbu,borderVisible:false},
+    localization:{priceFormatter:p=>fmt(p,p<100?2:0)},crosshair:{mode:0},handleScroll:sumbu,handleScale:sumbu};
+}
+
+// ---------- kandidat ----------
+["modal","risiko"].forEach(id=>$(id).addEventListener("input",tampilKandidat));
+function lotDisarankan(l){
+  const modal=+$("modal").value||0,risiko=(+$("risiko").value||0)/100;
+  const perLembar=l.masuk-l.stop;if(perLembar<=0)return 0;
+  let lot=Math.floor(modal*risiko/perLembar/100);
+  lot=Math.min(lot,Math.floor(modal/(l.masuk*100*1.0015)));
+  return Math.max(lot,0);
+}
+function tampilKandidat(){
+  if(!RINGKAS)return;
+  const el=$("kisi-kandidat");
+  if(!RINGKAS.kandidat.length){el.innerHTML='<div class="kartu">Tidak ada kandidat yang memenuhi syarat hari ini. Hari tanpa transaksi juga bagian dari strategi.</div>';return}
+  el.innerHTML=RINGKAS.kandidat.map(k=>{
+    const s=PETA[k],l=s.level,u=s.uji_balik,lot=lotDisarankan(l);
+    return`<div class="kartu">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="font-size:18px">${k}</h3><span class="lencana">skor ${s.skor}</span></div>
+      <div>${fmt(s.tutup)} <span class="${kelas(s.perubahan_pct)}">${pct(s.perubahan_pct)}</span> <span class="redup">· vol ${fmt(s.rasio_vol,1)}× · RSI ${fmt(s.rsi,0)}</span></div>
+      <div class="level">
+        <div><span class="label">Masuk</span><b>${fmt(l.masuk)}</b></div>
+        <div><span class="label">Target</span><b class="naik">${fmt(l.target)}</b><span class="redup">${pct(l.untung_bersih_pct)}</span></div>
+        <div><span class="label">Batas rugi</span><b class="turun">${fmt(l.stop)}</b><span class="redup">${pct(l.rugi_bersih_pct)}</span></div>
+      </div>
+      <div class="redup">Untung : rugi = ${fmt(l.rasio,2)} · ukuran disarankan <b style="color:var(--teks)">${fmt(lot)} lot</b> (≈Rp${fmt(lot*100*l.masuk)})</div>
+      <ul class="alasan">${s.alasan.map(a=>`<li class="${a.startsWith("Peringatan")?"peringatan":""}">${a}</li>`).join("")}</ul>
+      <div class="redup">Uji balik saham ini: ${u.jumlah?`${u.jumlah} sinyal, menang ${fmt(u.persen_menang,0)}%, rata-rata <span class="${kelas(u.rata_hasil_pct)}">${pct(u.rata_hasil_pct)}</span>`:"belum ada sinyal"}</div>
+      <button class="tombol kedua" style="margin-top:10px" onclick="lihatGrafik('${k}')">Lihat grafik</button>
+    </div>`}).join("");
+}
+
+// ---------- semua saham ----------
+const KOLOM=[["kode","Kode"],["tutup","Tutup"],["perubahan_pct","Ubah %"],["skor","Skor"],["rsi","RSI"],["rasio_vol","Vol ×"],["nilai_rata20_miliar","Nilai/hari (M)"],["ub_menang","Uji: menang %"],["ub_rata","Uji: rata %"]];
+let urut={k:"skor",turun:true};
+function tampilSemua(){
+  const baris=RINGKAS.saham.map(s=>({...s,ub_menang:s.uji_balik.persen_menang??null,ub_rata:s.uji_balik.rata_hasil_pct??null}));
+  baris.sort((a,b)=>{const x=a[urut.k],y=b[urut.k];if(typeof x==="string")return urut.turun?y.localeCompare(x):x.localeCompare(y);return((x??-1e9)-(y??-1e9))*(urut.turun?-1:1)});
+  $("tabel-semua").innerHTML=`<thead><tr>${KOLOM.map(([k,n])=>`<th data-k="${k}">${n}${urut.k===k?(urut.turun?" ▾":" ▴"):""}</th>`).join("")}</tr></thead><tbody>${
+    baris.map(s=>`<tr class="klik" data-k="${s.kode}"><td><b>${s.kode}</b>${RINGKAS.kandidat.includes(s.kode)?' <span class="lencana">kandidat</span>':""}</td><td>${fmt(s.tutup)}</td><td class="${kelas(s.perubahan_pct)}">${pct(s.perubahan_pct)}</td><td>${s.skor}</td><td>${fmt(s.rsi,1)}</td><td>${fmt(s.rasio_vol,2)}</td><td>${fmt(s.nilai_rata20_miliar,1)}</td><td>${s.ub_menang==null?"–":fmt(s.ub_menang,0)}</td><td class="${kelas(s.ub_rata)}">${s.ub_rata==null?"–":pct(s.ub_rata)}</td></tr>`).join("")}</tbody>`;
+}
+$("tabel-semua").addEventListener("click",e=>{
+  const th=e.target.closest("th");if(th){urut={k:th.dataset.k,turun:urut.k===th.dataset.k?!urut.turun:true};tampilSemua();return}
+  const tr=e.target.closest("tr.klik");if(tr)lihatGrafik(tr.dataset.k);
+});
+
+// ---------- grafik ----------
+let grafikDimuat=false,grafik=[];
+function isiPilihan(){
+  const kode=RINGKAS.saham.map(s=>s.kode).sort();
+  $("pilih-saham").innerHTML=kode.map(k=>`<option>${k}</option>`).join("");
+  $("pilih-saham").value=RINGKAS.kandidat[0]||kode[0];
+  $("pilih-saham").onchange=e=>muatGrafik(e.target.value);
+}
+function lihatGrafik(k){$("pilih-saham").value=k;muatGrafik(k);bukaTab("grafik")}
+async function muatGrafik(kode){
+  grafikDimuat=true;
+  grafik.forEach(g=>g.remove());grafik=[];
+  ["grafik-utama","grafik-rsi","grafik-macd"].forEach(id=>$(id).innerHTML="");
+  const d=await fetch(`data/saham/${kode}.json?`+Date.now()).then(r=>r.json());
+  const s=d.ringkas;
+  $("info-grafik").innerHTML=`${fmt(s.tutup)} <span class="${kelas(s.perubahan_pct)}">${pct(s.perubahan_pct)}</span> · skor ${s.skor} · ATR ${fmt(s.atr,0)}`;
+  const t=d.lilin.map(x=>x.t),ind=d.indikator;
+  const seri=arr=>arr.map((v,i)=>v==null?{time:t[i]}:{time:t[i],value:v});
+
+  const g1=LightweightCharts.createChart($("grafik-utama"),opsiGrafik());grafik.push(g1);
+  const lilin=g1.addCandlestickSeries({upColor:warna("--hijau"),downColor:warna("--merah"),borderVisible:false,wickUpColor:warna("--hijau"),wickDownColor:warna("--merah")});
+  lilin.setData(d.lilin.map(x=>({time:x.t,open:x.o,high:x.h,low:x.l,close:x.c})));
+  const vol=g1.addHistogramSeries({priceScaleId:"vol",priceFormat:{type:"volume"},lastValueVisible:false,priceLineVisible:false});
+  g1.priceScale("vol").applyOptions({scaleMargins:{top:.82,bottom:0}});
+  vol.setData(d.lilin.map(x=>({time:x.t,value:x.v,color:x.c>=x.o?"rgba(15,157,88,.35)":"rgba(217,48,37,.35)"})));
+  g1.priceScale("right").applyOptions({scaleMargins:{top:.05,bottom:.22}});
+  const garis=(arr,c,gaya=0,w=1.5)=>g1.addLineSeries({color:c,lineWidth:w,lineStyle:gaya,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}).setData(seri(arr));
+  garis(ind.SMA20,"#1a56db");garis(ind.SMA50,"#e8710a");garis(ind.BB_ATAS,"#9aa0a6",2,1);garis(ind.BB_BAWAH,"#9aa0a6",2,1);
+  if(s.level&&s.level.masuk){
+    lilin.createPriceLine({price:s.level.masuk,color:warna("--aksen"),lineStyle:2,title:"masuk"});
+    lilin.createPriceLine({price:s.level.target,color:warna("--hijau"),lineStyle:2,title:"target"});
+    lilin.createPriceLine({price:s.level.stop,color:warna("--merah"),lineStyle:2,title:"batas rugi"});
+  }
+  // tanda sinyal masa lalu
+  const peta={};d.riwayat_sinyal.forEach(r=>peta[r.tanggal]=r);
+  lilin.setMarkers(d.riwayat_sinyal.map(r=>({time:r.tanggal,position:"belowBar",shape:"arrowUp",color:r.hasil_pct>0?warna("--hijau"):warna("--merah"),text:""})));
+  const awal=t[Math.max(0,t.length-120)];g1.timeScale().setVisibleRange({from:awal,to:t[t.length-1]});
+
+  const g2=LightweightCharts.createChart($("grafik-rsi"),opsiGrafik());grafik.push(g2);
+  const r=g2.addLineSeries({color:"#7e57c2",lineWidth:1.5,priceLineVisible:false});r.setData(seri(ind.RSI));
+  r.createPriceLine({price:70,color:"#9aa0a6",lineStyle:2,axisLabelVisible:false});r.createPriceLine({price:30,color:"#9aa0a6",lineStyle:2,axisLabelVisible:false});
+
+  const g3=LightweightCharts.createChart($("grafik-macd"),opsiGrafik());grafik.push(g3);
+  g3.addHistogramSeries({priceLineVisible:false,lastValueVisible:false}).setData(ind.MACD_HIST.map((v,i)=>v==null?{time:t[i]}:{time:t[i],value:v,color:v>=0?"rgba(15,157,88,.5)":"rgba(217,48,37,.5)"}));
+  g3.addLineSeries({color:"#1a56db",lineWidth:1.5,priceLineVisible:false,lastValueVisible:false}).setData(seri(ind.MACD));
+  g3.addLineSeries({color:"#e8710a",lineWidth:1.5,priceLineVisible:false,lastValueVisible:false}).setData(seri(ind.MACD_SIG));
+
+  // sinkronkan geser/zoom
+  const semua=[g1,g2,g3];
+  semua.forEach(a=>a.timeScale().subscribeVisibleLogicalRangeChange(rg=>{if(!rg)return;semua.forEach(b=>{if(b!==a)b.timeScale().setVisibleLogicalRange(rg)})}));
+  g2.timeScale().setVisibleLogicalRange(g1.timeScale().getVisibleLogicalRange());
+
+  $("tabel-riwayat").innerHTML=d.riwayat_sinyal.length?`<thead><tr><th>Tanggal sinyal</th><th>Skor</th><th>Hasil</th><th>Keluar karena</th></tr></thead><tbody>${
+    d.riwayat_sinyal.slice().reverse().map(r=>`<tr><td>${r.tanggal}</td><td>${r.skor}</td><td class="${kelas(r.hasil_pct)}">${pct(r.hasil_pct)}</td><td>${{target:"kena target",stop:"kena batas rugi",waktu:"habis waktu"}[r.cara]}</td></tr>`).join("")}</tbody>`:"<tr><td>Belum ada sinyal dalam 2 tahun terakhir.</td></tr>";
+}
+
+// ---------- jurnal ----------
+const KUNCI="jurnal-saham-v1";
+function bacaJurnal(){try{return JSON.parse(localStorage.getItem(KUNCI))||[]}catch(e){return JURNAL_MEMORI}}
+let JURNAL_MEMORI=[];
+function tulisJurnal(j){JURNAL_MEMORI=j;try{localStorage.setItem(KUNCI,JSON.stringify(j))}catch(e){}}
+function biaya(){const p=RINGKAS?.pengaturan||{biaya_beli:.0015,biaya_jual:.0025};return p}
+function hitung(t){const p=biaya(),lembar=t.lot*100;const modal=t.beli*lembar*(1+p.biaya_beli);const hasil=t.jual*lembar*(1-p.biaya_jual);return{rp:hasil-modal,pct:(hasil-modal)/modal*100}}
+$("j-tgl").valueAsDate=new Date();
+$("j-simpan").onclick=()=>{
+  const t={tgl:$("j-tgl").value,kode:$("j-kode").value.trim().toUpperCase(),beli:+$("j-beli").value,jual:+$("j-jual").value,lot:+$("j-lot").value,catatan:$("j-catatan").value.trim()};
+  if(!t.tgl||!t.kode||!t.beli||!t.jual||!t.lot){alertHalus("Lengkapi tanggal, kode, harga beli, harga jual, dan lot.");return}
+  const j=bacaJurnal();j.push(t);tulisJurnal(j);["j-kode","j-beli","j-jual","j-catatan"].forEach(id=>$(id).value="");tampilJurnal();
+};
+function alertHalus(m){$("j-statistik").insertAdjacentHTML("beforebegin",`<div class="pita waspada" id="pesan">${m}</div>`);setTimeout(()=>$("pesan")?.remove(),3500)}
+function hapus(i){const j=bacaJurnal();j.splice(i,1);tulisJurnal(j);tampilJurnal()}
+function tampilJurnal(){
+  const j=bacaJurnal();
+  const h=j.map(hitung);
+  const total=h.reduce((a,b)=>a+b.rp,0),menang=h.filter(x=>x.rp>0),kalah=h.filter(x=>x.rp<=0);
+  const rata=a=>a.length?a.reduce((s,x)=>s+x.pct,0)/a.length:0;
+  const pf=kalah.length&&kalah.reduce((s,x)=>s+x.rp,0)!==0?menang.reduce((s,x)=>s+x.rp,0)/Math.abs(kalah.reduce((s,x)=>s+x.rp,0)):null;
+  $("j-statistik").innerHTML=`
+    <div class="kartu"><div class="label">Total untung/rugi bersih</div><div class="besar ${kelas(total)}">Rp${fmt(total)}</div><div class="redup">${j.length} transaksi</div></div>
+    <div class="kartu"><div class="label">Persentase menang</div><div class="besar">${j.length?fmt(menang.length/j.length*100,0):"–"}%</div><div class="redup">rata menang ${pct(rata(menang))} · rata kalah ${pct(rata(kalah))}</div></div>
+    <div class="kartu"><div class="label">Rasio laba</div><div class="besar">${pf==null?"–":fmt(pf,2)}</div><div class="redup">${j.length<30?`Butuh minimal 30 transaksi untuk menilai (kurang ${30-j.length}).`:pf>1?"Strategi Anda menghasilkan untung bersih.":"Strategi Anda masih rugi bersih. Evaluasi sebelum menambah modal."}</div></div>`;
+  $("tabel-jurnal").innerHTML=j.length?`<thead><tr><th>Tanggal</th><th>Kode</th><th>Beli</th><th>Jual</th><th>Lot</th><th>Hasil (Rp)</th><th>Hasil %</th><th style="text-align:left">Catatan</th><th></th></tr></thead><tbody>${
+    j.map((t,i)=>({t,i,h:h[i]})).reverse().map(({t,i,h})=>`<tr><td>${t.tgl}</td><td>${t.kode}</td><td>${fmt(t.beli)}</td><td>${fmt(t.jual)}</td><td>${t.lot}</td><td class="${kelas(h.rp)}">${fmt(h.rp)}</td><td class="${kelas(h.pct)}">${pct(h.pct)}</td><td style="text-align:left;white-space:normal">${escapeHtml(t.catatan||"")}</td><td><button class="tombol kedua" onclick="hapus(${i})">hapus</button></td></tr>`).join("")}</tbody>`:"<tr><td>Belum ada transaksi.</td></tr>";
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+$("j-unduh").onclick=()=>{
+  const j=bacaJurnal();const baris=["tanggal,kode,beli,jual,lot,catatan",...j.map(t=>[t.tgl,t.kode,t.beli,t.jual,t.lot,'"'+(t.catatan||"").replace(/"/g,'""')+'"'].join(","))];
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([baris.join("\n")],{type:"text/csv"}));a.download="jurnal-saham.csv";a.click();
+};
+$("j-muat").onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;const teks=await f.text();
+  const baris=teks.trim().split(/\r?\n/).slice(1);
+  const j=baris.map(b=>{const m=b.match(/^([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),"?(.*?)"?$/);if(!m)return null;return{tgl:m[1],kode:m[2],beli:+m[3],jual:+m[4],lot:+m[5],catatan:m[6].replace(/""/g,'"')}}).filter(Boolean);
+  tulisJurnal(j);tampilJurnal();
+};
+tampilJurnal();
+</script>
+</body>
+</html>
