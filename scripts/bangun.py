@@ -27,12 +27,49 @@ def jalan(nama: str, *args: str, wajib: bool = False) -> None:
             sys.exit(r.returncode)
 
 
+def hari_bursa_terakhir(kini):
+    """Tanggal hari bursa terakhir yang sudah tutup (data Yahoo biasanya tersedia ±16.30 WIB)."""
+    from datetime import timedelta
+    t = kini.date()
+    if kini.weekday() >= 5 or (kini.hour * 60 + kini.minute) < 16 * 60 + 30:
+        t -= timedelta(days=1)
+    while t.weekday() >= 5:
+        t -= timedelta(days=1)
+    return t.isoformat()
+
+
+def perlu_susulan(k: Path) -> bool:
+    """Jadwal GitHub bisa terlewat. Bila data harga tertinggal, jalankan mode harian
+    dari pemicu apa pun (berita, laptop), paling sering sekali per 3 jam."""
+    import json
+    from datetime import datetime, timedelta, timezone
+    kini = datetime.now(timezone(timedelta(hours=7)))
+    try:
+        tgl = json.loads((k / "ringkasan.json").read_text())["tanggal_data"]
+    except Exception:  # noqa: BLE001
+        return False
+    if tgl >= hari_bursa_terakhir(kini):
+        return False
+    p = k / "status_susulan.json"
+    try:
+        akhir = datetime.fromisoformat(json.loads(p.read_text())["percobaan"])
+        if kini - akhir < timedelta(hours=3):
+            return False
+    except Exception:  # noqa: BLE001
+        pass
+    p.write_text(json.dumps({"percobaan": kini.isoformat(), "data": tgl}))
+    return True
+
+
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "harian"
     k = cfg.KELUAR
     k.mkdir(parents=True, exist_ok=True)
     ada = lambda f: (k / f).exists()  # noqa: E731
     print(f"Mode: {mode}; folder terbitan: {k}")
+    if mode != "harian" and perlu_susulan(k):
+        mode = "harian"
+        print("Data harga tertinggal dari hari bursa terakhir: dijalankan sebagai mode harian (susulan).")
 
     jalan("semesta", wajib=True)
     if mode == "harian" or not ada("ringkasan.json"):

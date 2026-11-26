@@ -2,8 +2,9 @@ name: Terbitkan web
 
 on:
   schedule:
-    - cron: "30 10 * * 1-5"                   # 17.30 WIB hari bursa: semua data
-    - cron: "0 23,1,3,5,7,9,11,13 * * *"      # tiap 2 jam 06.00–20.00 WIB: berita
+    # Menit dibuat tidak bulat: jadwal GitHub di awal jam paling sering tertunda/terlewat.
+    - cron: "37 10 * * 1-5"                   # 17.37 WIB hari bursa: semua data
+    - cron: "13 23,1,3,5,7,9,11,13 * * *"     # tiap 2 jam 06.13–20.13 WIB: berita (+ susulan bila data tertinggal)
   push:
     branches: [main]
     paths:
@@ -35,7 +36,7 @@ jobs:
       DATA_KELUAR: _site/data
       # Opsional: aktifkan analisis berita dengan AI Claude (rahasia repositori ANTHROPIC_API_KEY)
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || github.event_name == 'push' && 'broker' || github.event.schedule == '30 10 * * 1-5' && 'harian' || 'berita' }}
+      MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || github.event_name == 'push' && 'broker' || github.event.schedule == '37 10 * * 1-5' && 'harian' || 'berita' }}
     steps:
       - uses: actions/checkout@v4
 
