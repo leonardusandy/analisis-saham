@@ -35,9 +35,9 @@ jobs:
         continue-on-error: true
         run: python scripts/fundamental.py
 
-      - name: Transaksi asing (situs IDX)
+      - name: Kepemilikan KSEI (di atas 1%)
         continue-on-error: true
-        run: python scripts/asing.py
+        run: python scripts/kepemilikan.py
 
       - name: Berita
         continue-on-error: true

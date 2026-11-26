@@ -19,6 +19,12 @@ Web analisis teknikal saham LQ45 yang diperbarui otomatis setiap hari bursa seki
 2. Skrip `scripts/jalankan.py` mengambil data harian dari Yahoo Finance, lalu menghitung indikator, skor, level transaksi, dan uji balik 2 tahun.
 3. Hasilnya disimpan di `docs/data/` dan ditampilkan oleh `docs/index.html` lewat GitHub Pages.
 
+## Data broker dan asing (dari laptop)
+
+Situs Indo Premier dan IDX menolak server GitHub, jadi data ringkasan broker dan transaksi
+asing diambil oleh skrip di laptop (`lokal/`). Lihat `lokal/PANDUAN-LAPTOP.md`.
+Setiap kali laptop mengirim data, alur kerja **Olah data broker** mengolahnya untuk web.
+
 ## Mengubah pengaturan
 
 Semua pengaturan ada di `scripts/config.py`:

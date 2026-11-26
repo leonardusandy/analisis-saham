@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+lokal/log.txt
+lokal/keluaran/
+lokal/jalankan_windows.bat
