@@ -161,18 +161,30 @@ def daftar_saham() -> list[str]:
     return [s["kode"] for s in r.json()["saham"]]
 
 
-def tanggal_tersedia() -> set[str]:
+def indeks_tersedia() -> dict:
     import requests
 
     url = f"https://raw.githubusercontent.com/{REPO}/{CABANG}/docs/data/broker/indeks.json"
     try:
         r = requests.get(url, timeout=30)
         if r.status_code == 200:
-            d = r.json()
-            return set(d.get("tanggal", [])) | set(d.get("libur", []))
+            return r.json()
     except Exception:  # noqa: BLE001
         pass
-    return set()
+    return {}
+
+
+def berkas_hari_lama(tgl: date) -> dict | None:
+    import requests
+
+    url = f"https://raw.githubusercontent.com/{REPO}/{CABANG}/docs/data/broker/hari/{tgl.isoformat()}.json"
+    try:
+        r = requests.get(url, timeout=30)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:  # noqa: BLE001
+        pass
+    return None
 
 
 def hari_bursa_terakhir(n: int) -> list[date]:
@@ -192,7 +204,7 @@ def hari_bursa_terakhir(n: int) -> list[date]:
 IPOT_MATI = False  # setelah Indo Premier terbukti tidak bisa diakses, hari berikutnya tidak dicoba lagi
 
 
-def ambil_hari(tgl: date, kode_list: list[str], terbaru: bool) -> dict:
+def ambil_hari(tgl: date, kode_list: list[str], terbaru: bool, perlu_broker: bool = True) -> dict:
     """Ambil satu hari bursa. Situs IDX dicoba lebih dulu (satu permintaan) karena sekaligus
     memastikan apakah hari itu libur; Indo Premier (ringkasan broker) dicoba sesudahnya."""
     global IPOT_MATI
@@ -207,7 +219,7 @@ def ambil_hari(tgl: date, kode_list: list[str], terbaru: bool) -> dict:
         data["idx"] = idx
 
     ada_transaksi, berhasil, gagal = False, 0, 0
-    if not IPOT_MATI:
+    if perlu_broker and not IPOT_MATI:
         for i, kode in enumerate(kode_list, 1):
             html = ambil(f"{IPOT_BROKER}?code={kode}&start={s}&end={s}&fd=all&board=all")
             if html is None:
@@ -234,7 +246,7 @@ def ambil_hari(tgl: date, kode_list: list[str], terbaru: bool) -> dict:
             if html:
                 data["pasar_broker"] = urai_topbroker(html)
 
-    if not idx and IPOT_MATI:
+    if not idx and not ada_transaksi and (IPOT_MATI or not perlu_broker):
         raise ConnectionError(f"Situs IDX dan Indo Premier sama-sama tidak bisa diakses ({GAGAL_TERAKHIR}).")
     data["libur"] = not idx and not ada_transaksi
     return data
@@ -424,23 +436,47 @@ def main():
         return
     log("Mulai mengumpulkan data…")
     kode_list = daftar_saham()
-    sudah = tanggal_tersedia()
-    hari = [d for d in hari_bursa_terakhir(HARI_MUNDUR) if d.isoformat() not in sudah]
+    ind = indeks_tersedia()
+    libur, ada_broker, ada_idx = set(ind.get("libur", [])), set(ind.get("broker", [])), set(ind.get("idx", []))
+    if "broker" not in ind:  # indeks versi lama: anggap hari yang tercatat sudah punya broker
+        ada_broker = set(ind.get("tanggal", []))
+    semua_hari = [d for d in hari_bursa_terakhir(HARI_MUNDUR) if d.isoformat() not in libur]
+    perlu_idx = [d for d in semua_hari if d.isoformat() not in ada_idx]
+    perlu_broker = [d for d in semua_hari if d.isoformat() not in ada_broker]
+
+    global IPOT_MATI
+    if perlu_broker:
+        t = perlu_broker[-1].strftime("%m/%d/%Y")
+        if ambil(f"{IPOT_BROKER}?code=BBCA&start={t}&end={t}&fd=all&board=all", coba=2) is None:
+            IPOT_MATI = True
+            log(f"Indo Premier belum bisa diakses ({GAGAL_TERAKHIR}); ringkasan broker dicoba lagi nanti.")
+            perlu_broker = []
+    hari = sorted(set(perlu_idx) | set(perlu_broker))
     if not hari:
-        log("Semua hari bursa terakhir sudah ada. Selesai.")
+        log("Data IDX sudah lengkap; ringkasan broker menunggu Indo Premier pulih. Selesai." if IPOT_MATI
+            else "Semua data hari bursa terakhir sudah lengkap. Selesai.")
         return
-    log(f"{len(kode_list)} saham, {len(hari)} hari akan diambil: {hari[0]} … {hari[-1]}")
-    siapkan_idx(hari)
+    log(f"{len(kode_list)} saham. Perlu data IDX: {len(perlu_idx)} hari; perlu ringkasan broker: {len(perlu_broker)} hari.")
+    siapkan_idx(perlu_idx)
     berkas = {}
     for tgl in hari:
+        lama = berkas_hari_lama(tgl) if tgl.isoformat() in (ada_idx | ada_broker) else None
         try:
-            d = ambil_hari(tgl, kode_list, terbaru=(tgl == hari[-1]))
+            d = ambil_hari(tgl, kode_list, terbaru=(tgl == hari[-1]), perlu_broker=tgl in perlu_broker)
         except ConnectionError as e:
-            log(f"BERHENTI: {e}")
-            t = tgl.strftime("%m/%d/%Y")
-            log("Uji di browser:", f"{IPOT_BROKER}?code=BBCA&start={t}&end={t}&fd=all&board=all")
-            break
-        log(f"{tgl}: {'libur bursa' if d['libur'] else str(len(d['saham'])) + ' saham'}")
+            if lama is None:
+                log(f"{tgl}: dilewati ({e})")
+                continue
+            d = {"tanggal": tgl.isoformat(), "saham": {}, "libur": False}
+        if lama:  # pertahankan bagian lama yang tidak diambil ulang
+            if not d.get("saham") and lama.get("saham"):
+                d["saham"] = lama["saham"]
+                if lama.get("pasar_broker") and not d.get("pasar_broker"):
+                    d["pasar_broker"] = lama["pasar_broker"]
+            if not d.get("idx") and lama.get("idx"):
+                d["idx"] = lama["idx"]
+            d["libur"] = d["libur"] and not d.get("idx") and not d.get("saham")
+        log(f"{tgl}: {'libur bursa' if d['libur'] else str(len(d['saham'])) + ' saham broker, ' + ('ada' if d.get('idx') else 'tanpa') + ' data IDX'}")
         berkas[f"docs/data/broker/hari/{tgl.isoformat()}.json"] = json.dumps(d, ensure_ascii=False, separators=(",", ":"))
     if not berkas:
         log("Tidak ada data yang bisa diunggah.")

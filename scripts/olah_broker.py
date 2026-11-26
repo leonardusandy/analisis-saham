@@ -65,8 +65,11 @@ def main():
             semua[d["tanggal"]] = d
     tanggal = sorted(semua)[-SIMPAN:]
     (AKAR / "broker").mkdir(parents=True, exist_ok=True)
-    (AKAR / "broker" / "indeks.json").write_text(json.dumps(
-        {"tanggal": sorted(semua), "libur": sorted(libur)}, separators=(",", ":")))
+    (AKAR / "broker" / "indeks.json").write_text(json.dumps({
+        "tanggal": sorted(semua), "libur": sorted(libur),
+        "broker": sorted(t for t, d in semua.items() if d.get("saham")),
+        "idx": sorted(t for t, d in semua.items() if d.get("idx")),
+    }, separators=(",", ":")))
     if not tanggal:
         print("Belum ada hari bursa.")
         return
