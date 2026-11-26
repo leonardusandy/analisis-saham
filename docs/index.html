@@ -80,6 +80,10 @@ button.chip.aktif{background:var(--latar-aksen);color:var(--aksen);border-color:
 .sn-positif{background:#e6f6ef;color:#00804f}.sn-negatif{background:#fdecec;color:#c62828}.sn-netral,.sn-campuran{background:var(--hover);color:var(--redup)}
 @media (prefers-color-scheme:dark){.sn-positif{background:#12291f;color:#2fc98a}.sn-negatif{background:#3a1717;color:#f2676b}}
 .dampak{font-size:12px;color:var(--redup);margin-top:2px}.dampak b{font-weight:600}
+.pk-baru{background:#fff4b3}.pk-beli{background:#d7e9fb}.pk-naik{background:#dcf2dc}.pk-turun{background:#fde2cf}
+@media (prefers-color-scheme:dark){.pk-baru{background:#4a4210}.pk-beli{background:#16324d}.pk-naik{background:#173a22}.pk-turun{background:#4a2a14}}
+.pk-tabel td,.pk-tabel th{padding:5px 8px}.pk-tabel tr.klik:hover{filter:brightness(.96)}
+.legenda span.kotak{display:inline-block;width:28px;height:14px;border-radius:3px;vertical-align:middle;margin-right:6px;border:1px solid var(--garis)}
 .saham-kepala{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
 .bintang{cursor:pointer;font-size:22px;background:none;border:1px solid var(--garis);border-radius:8px;padding:2px 10px;color:var(--kuning)}
 .level{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0;text-align:center}
@@ -100,6 +104,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
   <div class="cari"><input id="cari" placeholder="Cari kode atau nama saham…" autocomplete="off"><div class="saran" id="saran"></div></div>
   <nav class="menu" id="menu">
     <a href="#beranda" data-h="beranda">Beranda</a>
+    <a href="#pilihan" data-h="pilihan">Pilihan Harian</a>
     <a href="#pasar" data-h="pasar">Pasar</a>
     <a href="#aliran" data-h="aliran">Aliran Dana</a>
     <a href="#bandar" data-h="bandar">Bandarmologi</a>
@@ -219,6 +224,9 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
         <div class="kartu"><h3>Pergerakan pemegang saham besar <span class="redup" id="milik-tgl"></span></h3><p class="redup" style="margin-top:0">Perubahan pemegang saham ≥ 1% (data KSEI bulanan) di saham yang dianalisis.</p><div class="gulir" style="max-height:440px"><table id="t-milik-ubah"></table></div></div>
       </div>
     </section>
+
+    <!-- PILIHAN SAHAM HARIAN -->
+    <section class="halaman" id="h-pilihan"><div id="pk-isi"><div class="kosong">Memuat…</div></div></section>
 
     <!-- PASAR: SEKTOR, INDEKS, KOMODITAS, KURS -->
     <section class="halaman" id="h-pasar">
@@ -457,13 +465,13 @@ window.addEventListener("hashchange",route);
 const sudah={};
 function route(){
   if(!R)return;const h=(location.hash||"#beranda").slice(1);const [hal,arg]=h.split("/");
-  const nama=["beranda","saham","pasar","aliran","bandar","broker","penyaring","kandidat","bandingkan","berita","jurnal","panduan"].includes(hal)?hal:"beranda";
+  const nama=["beranda","saham","pilihan","pasar","aliran","bandar","broker","penyaring","kandidat","bandingkan","berita","jurnal","panduan"].includes(hal)?hal:"beranda";
   document.querySelectorAll(".halaman").forEach(x=>x.classList.toggle("aktif",x.id==="h-"+nama));
   document.querySelectorAll("nav.menu a").forEach(x=>x.classList.toggle("aktif",x.dataset.h===nama));
   document.querySelectorAll(".pantau a").forEach(x=>x.classList.toggle("aktif",nama==="saham"&&x.dataset.k===arg));
   if(nama==="saham")tampilSaham((arg||"BBCA").toUpperCase());
   else if(nama==="broker"&&R){sudah.broker=1;tampilPelacak()}
-  else if(!sudah[nama]){sudah[nama]=1;({beranda:tampilBeranda,pasar:tampilPasar,aliran:tampilAliran,bandar:tampilBandar,broker:tampilPelacak,penyaring:tampilPenyaring,kandidat:tampilKandidat,bandingkan:tampilBandingkan,berita:tampilBerita,jurnal:tampilJurnal}[nama]||(()=>{}))()}
+  else if(!sudah[nama]){sudah[nama]=1;({beranda:tampilBeranda,pilihan:tampilPilihan,pasar:tampilPasar,aliran:tampilAliran,bandar:tampilBandar,broker:tampilPelacak,penyaring:tampilPenyaring,kandidat:tampilKandidat,bandingkan:tampilBandingkan,berita:tampilBerita,jurnal:tampilJurnal}[nama]||(()=>{}))()}
   window.scrollTo(0,0);
 }
 function bukaSaham(k){location.hash="#saham/"+k}
@@ -884,6 +892,45 @@ function tampilAliran(){
 }
 
 
+
+
+// ================= Pilihan saham harian =================
+const BLN=["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+const tglPendek=t=>{const[y,m,d]=String(t).slice(0,10).split("-");return`${+d}-${BLN[+m-1]}`};
+let SP=null;
+async function tampilPilihan(){
+  const el=$("pk-isi");
+  try{SP??=await ambil("data/stockpick.json")}catch(e){el.innerHTML='<div class="kartu kosong">Data pilihan harian belum tersedia. Dibuat setiap hari bursa pukul 17.30.</div>';return}
+  const tanda=b=>`${"^".repeat(b.tingkat||0)}`;
+  const kodeSel=b=>`<b>${b.kode}${tanda(b)}</b>${b.sk?` <span class="redup">(${b.sk})</span>`:""}${b.murah?' <span title="Murah">◌</span>':""}`;
+  const sr=b=>`${fmt(b.support)}${b.kuat?"*":""}/${fmt(b.resistance)}`;
+  const tabel=(judul,arr)=>`<div class="kartu" style="padding:12px"><h3 style="margin:0 0 8px">${judul} <span class="redup">(${arr.length})</span></h3><div class="gulir" style="max-height:560px"><table class="pk-tabel"><thead><tr><th>Kode</th><th>S/R</th><th>Sejak</th><th>Harga</th><th>Hari ini</th></tr></thead><tbody>${
+    arr.map(b=>`<tr class="klik pk-${b.warna||"x"}" data-k="${b.kode}" title="${esc(b.nama||"")} · ${b.sektor} · Lapis ${b.lapis||"–"}${b.grup?" · Grup "+esc(b.grup):""}"><td>${kodeSel(b)}</td><td>${sr(b)}</td><td>${tglPendek(b.sejak)}</td><td>${fmt(b.tutup)}</td><td class="${kelas(b.ubah)}">${pct(b.ubah)}</td></tr>`).join("")||'<tr><td colspan="5" class="kosong">Tidak ada.</td></tr>'}</tbody></table></div></div>`;
+  const NS={up:"uptrend",side:"sideways",down:"downtrend",lain:"tanpa tren jelas"};
+  const sek=a=>SP.sektor.filter(x=>x.arah===a);
+  const kartuSek=(j,w,arr)=>`<div class="kartu" style="padding:12px"><h3 style="margin:0 0 6px;color:${w}">${j}</h3>${arr.map(x=>`<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--garis)"><span>${esc(x.nama)} <span class="redup">(${x.kode||"–"})</span></span><span class="${kelas(x.ubah20)}">${pct(x.ubah20)}</span></div>`).join("")||'<div class="redup">–</div>'}</div>`;
+  el.innerHTML=`
+   <div class="kartu" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="margin:0">Pilihan saham harian · ${tglPendek(SP.tanggal)} ${SP.tanggal.slice(0,4)}</h3><span class="redup">dibuat ${SP.dibuat} · hanya saham ramai (≥ Rp1 M/hari)</span></div>
+     <p class="redup" style="margin:6px 0 0">Disusun otomatis dari aturan teknikal di bawah. Ini informasi, bukan perintah beli atau jual; risiko dan keputusan transaksi ada pada Anda.</p></div>
+   <div class="kartu" style="margin-bottom:14px"><h3>Analisa harian</h3>
+     <div class="kisi" style="grid-template-columns:repeat(auto-fill,minmax(250px,1fr))">${SP.analisa.map(a=>`<div class="kartu klik" data-k="${a.kode}" style="padding:12px;text-align:center;cursor:pointer">
+       <div style="font-weight:800;font-size:16px">${a.kode}${"^".repeat(a.tingkat)} <span class="redup" style="font-size:12px">${a.sk?"("+a.sk+")":""} · ${NS[a.status]}</span></div>
+       <div style="margin-top:6px">Entry <b>${fmt(a.entry[0])}${a.entry[1]!==a.entry[0]?" – "+fmt(a.entry[1]):""}</b></div>
+       <div>R1: <b class="naik">${fmt(a.r1)}</b> <span class="redup">(${pct(a.untung_r1_pct)})</span> · R2: <b class="naik">${fmt(a.r2)}</b></div>
+       <div>CL: <b class="turun">${fmt(a.cl)}</b> <span class="redup">(${pct(a.rugi_cl_pct)})</span></div>
+       <div class="redup" style="font-size:12px;margin-top:4px">untung:rugi ${fmt(a.rasio,2)} · ${esc(a.alasan)}</div></div>`).join("")||'<div class="redup">Tidak ada saham yang memenuhi syarat hari ini.</div>'}</div></div>
+   <div class="kisi2" style="margin-bottom:14px">${tabel("Saham uptrend",SP.uptrend)}${tabel("Saham sideways",SP.sideways)}</div>
+   <div class="kisi" style="margin-bottom:14px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))">
+     <div class="kartu" style="padding:12px"><h3 style="margin:0 0 6px">Keluar tabel hari ini</h3>${SP.keluar.map(x=>`<span class="kode-kecil klik" data-k="${x.kode}" style="cursor:pointer;margin-bottom:4px">${x.kode}${x.sektor?" ("+x.sektor+")":""} <span class="redup">${NS[x.dari]} → ${NS[x.ke]}</span></span>`).join(" ")||'<div class="redup">Tidak ada.</div>'}</div>
+     ${kartuSek("Sektor menguat",warna("--hijau"),sek("better"))}${kartuSek("Sektor melemah",warna("--merah"),sek("worst"))}
+     <div class="kartu legenda" style="padding:12px"><h3 style="margin:0 0 6px">Keterangan</h3>
+       <div><span class="kotak pk-baru"></span>Baru masuk (≤ 2 hari)</div><div><span class="kotak pk-beli"></span>Sinyal beli</div><div><span class="kotak pk-naik"></span>Naik pangkat</div><div><span class="kotak pk-turun"></span>Turun pangkat</div>
+       <div style="margin-top:6px"><b>*</b> support kuat · <b>^</b> kekuatan tren (1–3) · <b>◌</b> murah</div>
+       <div class="redup" style="font-size:12px;margin-top:4px">Huruf sektor: C konsumen primer, CC konsumen nonprimer, F keuangan, E energi, B bahan baku, IN perindustrian, I infrastruktur/telekomunikasi/utilitas, H kesehatan, P properti, T teknologi.</div></div>
+   </div>
+   <div class="kartu"><details><summary>Aturan yang dipakai</summary><pre style="white-space:pre-wrap;font:13px/1.5 inherit;margin:8px 0 0">${esc(SP.aturan)}</pre></details></div>`;
+  el.onclick=e=>{const t=e.target.closest("[data-k]");if(t&&PETA[t.dataset.k])bukaSaham(t.dataset.k)};
+}
 
 // ================= Pasar: sektor, indeks, komoditas, kurs =================
 const PERIODE={perubahan_pct:"Hari ini",ubah_5h:"1 minggu",ubah_20h:"1 bulan",ubah_60h:"3 bulan",ubah_ytd:"Sejak awal tahun"};
