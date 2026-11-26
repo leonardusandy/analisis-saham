@@ -14,7 +14,7 @@ ATURAN (juga ditampilkan di web):
   S/R       : support = level tertinggi di bawah harga dari {terendah 10 hari, MA20, MA50};
               resistance = tertinggi 20 hari (atau 60 hari) di atas harga, atau harga + 2 ATR.
   * kuat    : harga terendah menyentuh area support (±1%) minimal 3 kali terpisah (berjarak
-              >= 3 hari) dalam 60 hari terakhir.
+              >= 3 hari) pada 60 sampai 5 hari terakhir.
   Murah     : PER positif < 80% median PER sektornya, atau PBV < 1 dengan ROE > 8%.
   Warna     : Baru masuk (status berlangsung <= 2 hari), Sinyal beli (memantul di support
               atau menembus resistance dengan volume >= 1,5x), Naik/turun pangkat (tingkat
@@ -119,7 +119,8 @@ def main():
         r1 = next((x for x in [r20, r60, r120] if x > c * 1.005), c + 2 * atr)
         r2 = next((x for x in [r60, r120] if x > r1 * 1.01), r1 + 1.5 * atr)
         # sentuhan terpisah: hari ketika harga terendah berada ±1% dari support, berjarak >= 3 hari
-        dekat = np.where(((df["l"].tail(60) - support).abs() / support <= 0.01).to_numpy())[0]
+        lama_l = df["l"].iloc[-60:-5]  # abaikan 5 hari terakhir (support biasanya dibentuk dari sana)
+        dekat = np.where(((lama_l - support).abs() / support <= 0.01).to_numpy())[0]
         sentuh, terakhir = 0, -10
         for i in dekat:
             if i - terakhir >= 3:
@@ -205,7 +206,9 @@ def main():
     }
     (k / "stockpick.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":"), default=str))
     print(f"Stockpick: uptrend {len(data['uptrend'])}, sideways {len(data['sideways'])}, keluar {len(keluar)}, "
-          f"analisa {len(analisa)}, sektor better {len(lebih_baik)}")
+          f"analisa {len(analisa)}, sektor better {len(lebih_baik)}, support kuat {sum(b['kuat'] for b in baris)}, "
+          f"murah {sum(b['murah'] for b in baris)}, ^^^ {sum(b['tingkat'] == 3 for b in baris)}; "
+          f"analisa: {[(a['kode'], a['entry'], a['r1'], a['cl']) for a in analisa]}")
 
 
 if __name__ == "__main__":
