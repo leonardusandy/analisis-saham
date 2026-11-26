@@ -86,11 +86,48 @@ def persen(x):
     return round(x * 100, 2) if abs(x) < 1.5 else round(x, 2)
 
 
+KURS = {}
+
+
+def kurs(mata_uang: str | None) -> float:
+    """Kurs ke Rupiah untuk emiten yang melapor dalam mata uang asing (mis. USD)."""
+    if not mata_uang or mata_uang == "IDR":
+        return 1.0
+    if mata_uang not in KURS:
+        import yfinance as yf
+
+        try:
+            KURS[mata_uang] = float(yf.Ticker(f"{mata_uang}IDR=X").history(period="5d")["Close"].iloc[-1])
+        except Exception as e:  # noqa: BLE001
+            print(f"  ! kurs {mata_uang}: {e}")
+            KURS[mata_uang] = float("nan")
+    return KURS[mata_uang]
+
+
+def kali(lap: dict, k: float, kecuali=("Laba per saham",)) -> dict:
+    if k == 1.0 or not lap.get("data"):
+        return lap
+    for n, v in lap["data"].items():
+        if n not in kecuali:
+            lap["data"][n] = [None if x is None else round(x * k) for x in v]
+    return lap
+
+
 def ambil_satu(kode: str) -> dict:
     import yfinance as yf
 
     t = yf.Ticker(f"{kode}.JK")
     info = t.info or {}
+    mu = info.get("financialCurrency") or "IDR"
+    k = kurs(mu)
+    harga = angka(info.get("currentPrice") or info.get("regularMarketPrice") or info.get("previousClose"))
+    nilai_buku = angka(info.get("bookValue"), 2)
+    if nilai_buku is not None and math.isfinite(k):
+        nilai_buku = round(nilai_buku * k, 2)
+    pbv = round(harga / nilai_buku, 2) if harga and nilai_buku and nilai_buku > 0 else None
+    per_maju = angka(info.get("forwardPE"), 2)
+    if per_maju is not None and (per_maju <= 0 or per_maju > 300):
+        per_maju = None
     ringkas = {
         "kode": kode,
         "nama": info.get("longName") or info.get("shortName") or kode,
@@ -98,8 +135,8 @@ def ambil_satu(kode: str) -> dict:
         "industri": info.get("industry"),
         "kapitalisasi": angka(info.get("marketCap"), 0),
         "per": angka(info.get("trailingPE"), 2),
-        "per_maju": angka(info.get("forwardPE"), 2),
-        "pbv": angka(info.get("priceToBook"), 2),
+        "per_maju": per_maju,
+        "pbv": pbv,
         "roe": persen(info.get("returnOnEquity")),
         "roa": persen(info.get("returnOnAssets")),
         "der": angka((info.get("debtToEquity") or 0) / 100, 2) if info.get("debtToEquity") is not None else None,
@@ -108,7 +145,8 @@ def ambil_satu(kode: str) -> dict:
         "tumbuh_laba": persen(info.get("earningsGrowth")),
         "imbal_dividen": persen(info.get("dividendYield")),
         "eps": angka(info.get("trailingEps"), 2),
-        "nilai_buku": angka(info.get("bookValue"), 2),
+        "nilai_buku": nilai_buku,
+        "mata_uang_laporan": mu,
         "beta": angka(info.get("beta"), 2),
         "tertinggi_52m": angka(info.get("fiftyTwoWeekHigh"), 0),
         "terendah_52m": angka(info.get("fiftyTwoWeekLow"), 0),
@@ -117,12 +155,13 @@ def ambil_satu(kode: str) -> dict:
     }
     detail = dict(ringkas)
     detail["profil"] = info.get("longBusinessSummary")
+    detail["kurs_konversi"] = None if k == 1.0 else round(k, 2)
     for nama, fungsi, n in [
         ("laba_rugi_tahunan", lambda: t.income_stmt, 4),
         ("laba_rugi_kuartal", lambda: t.quarterly_income_stmt, 6),
     ]:
         try:
-            detail[nama] = baris_laporan(fungsi(), LAPORAN_LABA, n)
+            detail[nama] = kali(baris_laporan(fungsi(), LAPORAN_LABA, n), k if math.isfinite(k) else 1.0)
         except Exception as e:  # noqa: BLE001
             print(f"  ! {kode} {nama}: {e}")
     for nama, fungsi, baris in [
@@ -130,7 +169,7 @@ def ambil_satu(kode: str) -> dict:
         ("arus_kas_tahunan", lambda: t.cashflow, ARUS_KAS),
     ]:
         try:
-            detail[nama] = baris_laporan(fungsi(), baris, 4)
+            detail[nama] = kali(baris_laporan(fungsi(), baris, 4), k if math.isfinite(k) else 1.0)
         except Exception as e:  # noqa: BLE001
             print(f"  ! {kode} {nama}: {e}")
     try:

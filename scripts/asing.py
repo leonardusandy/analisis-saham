@@ -88,8 +88,10 @@ def main():
     hari_ini = datetime.now(WIB).replace(hour=0, minute=0, second=0, microsecond=0)
     # Isi riwayat sampai 60 hari ke belakang bila masih kosong, selain itu cukup 7 hari terakhir
     mundur = 90 if len(data["harian"]) < 10 else 7
-    berhasil = 0
+    berhasil, gagal_beruntun = 0, 0
     for i in range(mundur, -1, -1):
+        if gagal_beruntun >= 3:
+            break
         tgl = hari_ini - timedelta(days=i)
         if tgl.weekday() >= 5:
             continue
@@ -100,10 +102,10 @@ def main():
             isi = ambil_tanggal(s, tgl)
         except Exception as e:  # noqa: BLE001
             print(f"  ! {kunci}: {e}")
-            if berhasil == 0 and i == mundur:
-                pass
+            gagal_beruntun += 1
             time.sleep(2)
             continue
+        gagal_beruntun = 0
         if not isi:
             continue  # hari libur
         per_saham, pasar = ringkas_hari(isi)

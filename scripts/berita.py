@@ -28,11 +28,12 @@ GN = "https://news.google.com/rss/search?hl=id&gl=ID&ceid=ID:id&q="
 
 SUMBER_PASAR = [
     ("CNBC Indonesia", "https://www.cnbcindonesia.com/market/rss"),
-    ("Kontan", "https://rss.kontan.co.id/news/investasi"),
-    ("Bisnis.com", "https://market.bisnis.com/rss"),
     ("Antara", "https://www.antaranews.com/rss/ekonomi-bursa.xml"),
     ("Investortrust", "https://investortrust.id/rss/market.rss"),
-    ("Google News", GN + quote_plus("IHSG OR saham OR emiten when:2d")),
+    ("Google News", GN + quote_plus(
+        "(IHSG OR saham OR emiten OR bursa) when:2d (site:kontan.co.id OR site:bisnis.com OR "
+        "site:idxchannel.com OR site:emitennews.com OR site:investor.id OR site:katadata.co.id OR "
+        "site:cnbcindonesia.com OR site:idnfinancials.com)")),
 ]
 
 # Nama lain yang sering dipakai media untuk emiten LQ45
@@ -73,11 +74,16 @@ def bersihkan_judul(judul: str, sumber: str) -> tuple[str, str]:
 
 
 def baca_rss(sumber: str, url: str) -> list[dict]:
-    try:
-        f = feedparser.parse(url, agent=AGEN)
-    except Exception as e:  # noqa: BLE001
-        print(f"  ! {sumber}: {e}")
-        return []
+    f = None
+    for coba in range(3):
+        try:
+            f = feedparser.parse(url, agent=AGEN)
+        except Exception as e:  # noqa: BLE001
+            print(f"  ! {sumber}: {e}")
+            return []
+        if getattr(f, "status", 200) != 429:
+            break
+        time.sleep(10 * (coba + 1))
     hasil = []
     for e in f.entries[:60]:
         judul = (e.get("title") or "").strip()
@@ -90,6 +96,8 @@ def baca_rss(sumber: str, url: str) -> list[dict]:
         else:
             waktu = datetime.now(WIB)
         judul, nama_media = bersihkan_judul(judul, sumber)
+        if len(judul) < 20:
+            continue
         hasil.append(
             {
                 "judul": judul,
@@ -139,7 +147,7 @@ def main():
             if kode not in h["kode"]:
                 h["kode"] = [kode] + h["kode"]
         per_saham[kode] = hasil
-        time.sleep(1.2)
+        time.sleep(2)
 
     # Berita pasar yang menyebut kode saham juga masuk ke daftar saham itu
     for b in pasar:
