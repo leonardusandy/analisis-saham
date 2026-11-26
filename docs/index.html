@@ -98,6 +98,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
   <nav class="menu" id="menu">
     <a href="#beranda" data-h="beranda">Beranda</a>
     <a href="#aliran" data-h="aliran">Aliran Dana</a>
+    <a href="#bandar" data-h="bandar">Bandarmologi</a>
     <a href="#broker" data-h="broker">Pelacak Broker</a>
     <a href="#penyaring" data-h="penyaring">Penyaring</a>
     <a href="#kandidat" data-h="kandidat">Kandidat Besok</a>
@@ -172,7 +173,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
           <button data-p="dividen">Dividen</button>
           <button data-p="tv">TradingView</button>
           <button data-p="brokersaham">Broker</button>
-          <button data-p="asing">Aliran Asing</button>
+          <button data-p="asing">Ringkasan Aliran</button>
           <button data-p="milik">Kepemilikan</button>
           <button data-p="beritasaham">Berita</button>
           <button data-p="sinyal">Sinyal & Uji Balik</button>
@@ -212,6 +213,21 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
       <div class="kisi2" style="margin-bottom:14px">
         <div class="kartu"><h3>Aktivitas broker seluruh pasar <span class="redup" id="pasar-broker-tgl"></span></h3><div class="gulir" style="max-height:480px"><table id="t-pasar-broker"></table></div></div>
         <div class="kartu"><h3>Pergerakan pemegang saham besar <span class="redup" id="milik-tgl"></span></h3><p class="redup" style="margin-top:0">Perubahan pemegang saham ≥ 1% (data KSEI bulanan) di saham yang dianalisis.</p><div class="gulir" style="max-height:440px"><table id="t-milik-ubah"></table></div></div>
+      </div>
+    </section>
+
+    <!-- BANDARMOLOGI -->
+    <section class="halaman" id="h-bandar">
+      <div class="kartu">
+        <div class="tab" id="bd-tab" style="margin-top:0">
+          <button data-b="analisis" class="aktif">Analisis Aliran</button>
+          <button data-b="beruntun">Akumulasi Beruntun</button>
+          <button data-b="dalam">Pergerakan Orang Dalam</button>
+          <button data-b="aktivitas">Aktivitas Broker</button>
+        </div>
+        <div id="bd-info" class="redup" style="margin-bottom:8px"></div>
+        <div class="baris" id="bd-kontrol" style="margin-bottom:10px"></div>
+        <div class="gulir"><table id="t-bandar"></table></div>
       </div>
     </section>
 
@@ -393,8 +409,14 @@ Promise.allSettled([ambil("data/ringkasan.json"),ambil("data/fundamental.json"),
   $("info-data").textContent=`Harga penutupan ${R.tanggal_data} · diperbarui ${R.dibuat}`+(B?` · berita ${B.dibuat}`:"");
   isiPengaturan(R.pengaturan);tampilPantau();route();
 });
+function asingBeruntun(kode){
+  if(!A)return BR?.metrik?.[kode]?.asing_beruntun??null;
+  const t=Object.keys(A.harian).sort();let n=0,tanda=0;
+  for(let i=t.length-1;i>=0;i--){const d=A.harian[t[i]][kode];if(!d)break;const v=(d[0]-d[1]);if(!v)break;const s=v>0?1:-1;if(!tanda)tanda=s;if(s!==tanda)break;n++}
+  return n*tanda;
+}
 function asingSaham(kode,hari){
-  if(BR&&BR.metrik[kode]){const m=BR.metrik[kode];return{1:m.fnet1,5:m.fnet5,20:m.fnet20}[hari]??null}
+  if(!A&&BR&&BR.metrik[kode]){const m=BR.metrik[kode];return{1:m.fnet1,5:m.fnet5,20:m.fnet20}[hari]??null}
   if(!A)return null;const tgl=Object.keys(A.harian).sort().slice(-hari);let total=0,ada=false;
   tgl.forEach(t=>{const d=A.harian[t][kode];if(d){total+=(d[0]-d[1])*d[2];ada=true}});return ada?total:null;
 }
@@ -402,7 +424,7 @@ function gabungSaham(kode){
   const s=PETA[kode],f=F[kode]||{};
   return{...f,...s,nama:f.nama||kode,sektor:f.sektor||"–",ub_menang:s.uji_balik.persen_menang??null,ub_rata:s.uji_balik.rata_hasil_pct??null,
     asing1:asingSaham(kode,1),asing5:asingSaham(kode,5),asing20:asingSaham(kode,20),
-    akum1:BR?.metrik[kode]?.top5_1??null,akum5:BR?.metrik[kode]?.top5_5??null,akum_b:BR?.metrik[kode]?.akum_beruntun??null,asing_b:BR?.metrik[kode]?.asing_beruntun??null,
+    akum1:BR?.metrik[kode]?.top5_1??null,akum5:BR?.metrik[kode]?.top5_5??null,akum_b:BR?.metrik[kode]?.akum_beruntun??null,asing_b:asingBeruntun(kode),
     jarak52:f.tertinggi_52m?(s.tutup/f.tertinggi_52m-1)*100:null};
 }
 const G=kode=>GABUNG.find(x=>x.kode===kode);
@@ -417,13 +439,13 @@ window.addEventListener("hashchange",route);
 const sudah={};
 function route(){
   if(!R)return;const h=(location.hash||"#beranda").slice(1);const [hal,arg]=h.split("/");
-  const nama=["beranda","saham","aliran","broker","penyaring","kandidat","bandingkan","berita","jurnal","panduan"].includes(hal)?hal:"beranda";
+  const nama=["beranda","saham","aliran","bandar","broker","penyaring","kandidat","bandingkan","berita","jurnal","panduan"].includes(hal)?hal:"beranda";
   document.querySelectorAll(".halaman").forEach(x=>x.classList.toggle("aktif",x.id==="h-"+nama));
   document.querySelectorAll("nav.menu a").forEach(x=>x.classList.toggle("aktif",x.dataset.h===nama));
   document.querySelectorAll(".pantau a").forEach(x=>x.classList.toggle("aktif",nama==="saham"&&x.dataset.k===arg));
   if(nama==="saham")tampilSaham((arg||"BBCA").toUpperCase());
   else if(nama==="broker"&&R){sudah.broker=1;tampilPelacak()}
-  else if(!sudah[nama]){sudah[nama]=1;({beranda:tampilBeranda,aliran:tampilAliran,broker:tampilPelacak,penyaring:tampilPenyaring,kandidat:tampilKandidat,bandingkan:tampilBandingkan,berita:tampilBerita,jurnal:tampilJurnal}[nama]||(()=>{}))()}
+  else if(!sudah[nama]){sudah[nama]=1;({beranda:tampilBeranda,aliran:tampilAliran,bandar:tampilBandar,broker:tampilPelacak,penyaring:tampilPenyaring,kandidat:tampilKandidat,bandingkan:tampilBandingkan,berita:tampilBerita,jurnal:tampilJurnal}[nama]||(()=>{}))()}
   window.scrollTo(0,0);
 }
 function bukaSaham(k){location.hash="#saham/"+k}
@@ -551,7 +573,7 @@ function saringBerita(){
 // ================= halaman saham =================
 let GRAFIK=[],DETAIL=null,PANEL="grafik",RENTANG=66;
 document.querySelectorAll("#s-tab button").forEach(b=>b.onclick=()=>bukaPanel(b.dataset.p));
-function bukaPanel(p){PANEL=p;if(p==="tv"&&DETAIL)pasangTV(DETAIL.kode);requestAnimationFrame(()=>[gBroker,gAsing].forEach(g=>g&&g.timeScale().fitContent()));document.querySelectorAll("#s-tab button").forEach(x=>x.classList.toggle("aktif",x.dataset.p===p));document.querySelectorAll("#h-saham .panel").forEach(x=>x.classList.toggle("aktif",x.id==="p-"+p))}
+function bukaPanel(p){PANEL=p;if(p==="tv"&&DETAIL)pasangTV(DETAIL.kode);requestAnimationFrame(()=>[gAksi,gAsing,...gAliran].forEach(g=>g&&g.timeScale().fitContent()));document.querySelectorAll("#s-tab button").forEach(x=>x.classList.toggle("aktif",x.dataset.p===p));document.querySelectorAll("#h-saham .panel").forEach(x=>x.classList.toggle("aktif",x.id==="p-"+p))}
 $("rentang").onclick=e=>{const b=e.target.closest("button");if(!b)return;RENTANG=+b.dataset.r;document.querySelectorAll("#rentang button").forEach(x=>x.classList.toggle("aktif",x===b));aturRentang()};
 function aturRentang(){if(!DETAIL||!GRAFIK[0])return;const n=DETAIL.h.lilin.length;GRAFIK[0].timeScale().setVisibleLogicalRange({from:n-RENTANG,to:n+2})}
 async function tampilSaham(kode){
@@ -627,7 +649,7 @@ function panelDividen(){
 let gAsing=null;
 function panelAsing(kode){
   if(gAsing){gAsing.remove();gAsing=null}
-  if(BR&&BR.seri[kode])return panelAsingBR(kode);
+  if(A||BR)return panelAsingBR(kode);
   if(!A){$("p-asing").innerHTML='<div class="kosong">Data transaksi asing dari situs IDX belum tersedia.</div>';return}
   const tgl=Object.keys(A.harian).sort();const baris=tgl.map(t=>{const d=A.harian[t][kode];return d?{t,beli:d[0],jual:d[1],tutup:d[2],nilai:d[3],frek:d[4],bersih:(d[0]-d[1])*d[2]}:null}).filter(Boolean);
   if(!baris.length){$("p-asing").innerHTML='<div class="kosong">Tidak ada data asing untuk saham ini.</div>';return}
@@ -669,81 +691,135 @@ function pasangTV(kode){
 
 // ================= aliran asing (data broker) =================
 const beruntunTeks=n=>n==null||n===0?"–":`<span class="${n>0?"naik":"turun"}">${n>0?"beli":"jual"} ${Math.abs(n)} hari</span>`;
-function panelAsingBR(kode){
-  const t=BR.tanggal,sr=BR.seri[kode],m=BR.metrik[kode];let kum=0,kumA=0;
-  const baris=t.map((d,i)=>{const f=sr.fnet[i],a=sr.top5[i];if(f!=null)kum+=f;if(a!=null)kumA+=a;return{t:d,f,a,tv:sr.tval[i],kum,kumA}}).filter(b=>b.f!=null||b.a!=null);
-  $("p-asing").innerHTML=`<div class="statistik" style="margin-bottom:12px">${[["Asing bersih 1 hari",m.fnet1],["5 hari",m.fnet5],["20 hari",m.fnet20],[`${t.length} hari (posisi)`,m.fnet60]].map(([a,v])=>`<div><span class="label">${a}</span><b class="${kelas(v)}">Rp${rp(v)}</b></div>`).join("")}<div><span class="label">Asing beruntun</span><b>${beruntunTeks(m.asing_beruntun)}</b></div><div><span class="label">Akumulasi 5 broker teratas, 5 hari</span><b class="${kelas(m.top5_5)}">Rp${rp(m.top5_5)}</b></div><div><span class="label">Akumulasi beruntun</span><b>${beruntunTeks(m.akum_beruntun)}</b></div></div>
-   <div class="grafik-sedang" id="g-asing"></div>
-   <p class="redup">Batang: asing bersih harian · garis biru: posisi bersih asing (akumulasi) · garis oranye: akumulasi 5 broker teratas. Sumber: ringkasan broker Indo Premier, ${BR.tanggal_terakhir}.</p>
-   <div class="gulir" style="max-height:320px"><table><thead><tr><th>Tanggal</th><th>Nilai transaksi</th><th>Asing bersih</th><th>Akumulasi 5 broker</th><th>Posisi asing</th></tr></thead><tbody>${
-     baris.slice().reverse().map(b=>`<tr><td>${b.t}</td><td>Rp${rp(b.tv)}</td><td class="${kelas(b.f)}">Rp${rp(b.f)}</td><td class="${kelas(b.a)}">Rp${rp(b.a)}</td><td class="${kelas(b.kum)}">Rp${rp(b.kum)}</td></tr>`).join("")}</tbody></table></div>`;
-  gAsing=LightweightCharts.createChart($("g-asing"),{...opsiGrafik(),localization:{priceFormatter:p=>rp(p)}});
-  gAsing.addHistogramSeries({priceLineVisible:false,lastValueVisible:false}).setData(baris.filter(b=>b.f!=null).map(b=>({time:b.t,value:b.f,color:b.f>=0?"rgba(0,168,107,.6)":"rgba(229,72,77,.6)"})));
-  gAsing.addLineSeries({color:"#2f6fed",lineWidth:2,priceScaleId:"kum",priceLineVisible:false}).setData(baris.map(b=>({time:b.t,value:b.kum})));
-  gAsing.addLineSeries({color:"#e8710a",lineWidth:2,priceScaleId:"kumA",priceLineVisible:false}).setData(baris.map(b=>({time:b.t,value:b.kumA})));
-  gAsing.priceScale("kum").applyOptions({visible:false});gAsing.priceScale("kumA").applyOptions({visible:false});gAsing.timeScale().fitContent();
+let gAliran=[];
+async function panelAsingBR(kode){
+  gAliran.forEach(g=>g.remove());gAliran=[];
+  // Asing dari situs IDX (lengkap), ritel & institusi dari ringkasan broker (10 besar)
+  const tglA=A?Object.keys(A.harian).sort():[];
+  const asing=tglA.map(t=>{const d=A.harian[t][kode];return d?{t,v:(d[0]-d[1])*d[2],nilai:d[3]}:null}).filter(Boolean);
+  let brk=[];try{BRS[kode]??=await ambil(`data/broker/saham/${kode}.json`);brk=BRS[kode].hari}catch(e){}
+  const kat=brk.map(h=>{const r={t:h.t,ritel:0,institusi:0,asing:0};bersihPeriode([h]).forEach(x=>r[kategoriBroker(x.k,x.c)]+=x.val);return r});
+  const m=BR?.metrik?.[kode]||{};let kum=0;asing.forEach(a=>{kum+=a.v;a.kum=kum});
+  const jml=(arr,n)=>arr.slice(-n).reduce((s,x)=>s+(x.v||0),0);
+  $("p-asing").innerHTML=`<div class="statistik" style="margin-bottom:12px">${[["Asing 1 hari",jml(asing,1)],["Asing 5 hari",jml(asing,5)],["Asing 20 hari",jml(asing,20)],[`Posisi asing ${asing.length} hari`,kum]].map(([a,v])=>`<div><span class="label">${a}</span><b class="${kelas(v)}">Rp${rp(v)}</b></div>`).join("")}<div><span class="label">Asing beruntun</span><b>${beruntunTeks(asingBeruntun(kode))}</b></div></div>
+   <div class="rentang" id="ra-n"><button class="tombol kedua chip" data-n="10">10 hari</button><button class="tombol kedua chip aktif" data-n="20">20 hari</button><button class="tombol kedua chip" data-n="60">60 hari</button></div>
+   <h3 style="margin:10px 0 0">Aliran asing</h3><div class="grafik-kecil" id="g-ra1" style="height:150px"></div>
+   <h3 style="margin:10px 0 0">Aliran ritel</h3><div class="grafik-kecil" id="g-ra2" style="height:150px"></div>
+   <h3 style="margin:10px 0 0">Aliran institusi lokal</h3><div class="grafik-kecil" id="g-ra3" style="height:150px"></div>
+   <p class="redup">Asing: seluruh transaksi asing dari situs IDX (lembar bersih × harga penutupan). Ritel dan institusi lokal: dari 10 pembeli dan 10 penjual terbesar Indo Premier${brk.length?"":" — <b>belum tersedia</b> karena situs itu sedang galat"}.</p>
+   <div class="gulir" style="max-height:300px"><table><thead><tr><th>Tanggal</th><th>Nilai transaksi</th><th>Asing bersih</th><th>Posisi asing</th></tr></thead><tbody>${asing.slice().reverse().map(a=>`<tr><td>${a.t}</td><td>Rp${rp(a.nilai)}</td><td class="${kelas(a.v)}">Rp${rp(a.v)}</td><td class="${kelas(a.kum)}">Rp${rp(a.kum)}</td></tr>`).join("")}</tbody></table></div>`;
+  const gambar=n=>{gAliran.forEach(g=>g.remove());gAliran=[];
+    const bar=(id,data,warnaPos)=>{const g=LightweightCharts.createChart($(id),{...opsiGrafik(),localization:{priceFormatter:p=>rp(p)}});gAliran.push(g);
+      g.addHistogramSeries({priceLineVisible:false,lastValueVisible:false}).setData(data.slice(-n).map(d=>({time:d.t,value:d.v,color:d.v>=0?warnaPos:"rgba(229,72,77,.7)"})));g.timeScale().fitContent()};
+    bar("g-ra1",asing,"rgba(126,87,194,.8)");bar("g-ra2",kat.map(x=>({t:x.t,v:x.ritel})),"rgba(232,113,10,.8)");bar("g-ra3",kat.map(x=>({t:x.t,v:x.institusi})),"rgba(47,111,237,.8)")};
+  $("ra-n").onclick=e=>{const b=e.target.closest("button");if(!b)return;document.querySelectorAll("#ra-n button").forEach(x=>x.classList.toggle("aktif",x===b));gambar(+b.dataset.n)};
+  gambar(20);
 }
-
 // ================= broker per saham =================
 const KELAS_BROKER={A:["Asing","#2f6fed"],L:["Lokal","#8a6d1e"],B:["BUMN","#00a86b"]};
 const namaBroker=k=>BR?.nama_broker?.[k]||"";
 const lencanaBroker=(k,c)=>`<b style="color:${(KELAS_BROKER[c]||KELAS_BROKER.L)[1]}">${k}</b>`;
-let BRS={},gBroker=null;
+
+const kategoriBroker=(kode,kelas)=>kelas==="A"?"asing":(BR?.ritel||[]).includes(kode)?"ritel":"institusi";
+const NAMA_KAT={asing:"Asing",ritel:"Ritel",institusi:"Institusi lokal"};
+function bersihBroker(h,br){const b=h.b.find(x=>x[0]===br),s=h.s.find(x=>x[0]===br);if(!b&&!s)return null;return{val:(b?.[3]||0)-(s?.[3]||0),lot:(b?.[2]||0)-(s?.[2]||0),kelas:(b||s)[1]}}
+function bersihPeriode(hari){const m={};hari.forEach(h=>{[...h.b.map(x=>[x,1]),...h.s.map(x=>[x,-1])].forEach(([x,t])=>{const r=m[x[0]]??={k:x[0],c:x[1],val:0,lot:0,bv:0,bl:0,sv:0,sl:0};r.val+=t*(x[3]||0);r.lot+=t*(x[2]||0);if(t>0){r.bv+=x[3]||0;r.bl+=x[2]||0}else{r.sv+=x[3]||0;r.sl+=x[2]||0}})});return Object.values(m)}
+let BRS={},gAksi=null;
 async function panelBrokerSaham(kode){
   const el=$("p-brokersaham");
-  if(!BR){el.innerHTML='<div class="kosong">Data broker belum tersedia. Pasang pengumpul data di laptop (panduan di folder <code>lokal</code> repositori).</div>';return}
-  try{BRS[kode]??=await ambil(`data/broker/saham/${kode}.json`)}catch(e){el.innerHTML='<div class="kosong">Tidak ada data broker untuk saham ini.</div>';return}
+  if(!BR||!BR.tanggal?.length){el.innerHTML='<div class="kosong">Data broker belum tersedia.</div>';return}
+  try{BRS[kode]??=await ambil(`data/broker/saham/${kode}.json`)}catch(e){el.innerHTML='<div class="kosong">Belum ada data ringkasan broker untuk saham ini. Data broker diambil dari Indo Premier lewat laptop; saat ini situs itu sedang galat.</div>';return}
   const hari=BRS[kode].hari;if(!hari.length){el.innerHTML='<div class="kosong">Tidak ada data broker.</div>';return}
-  el.innerHTML=`<div class="baris" style="margin-bottom:10px"><span class="rentang" id="bs-periode">${[["1","1 hari"],["5","5 hari"],["20","20 hari"],[String(hari.length),hari.length+" hari"]].map(([v,n],i)=>`<button class="tombol kedua chip ${i===0?"aktif":""}" data-n="${v}">${n}</button>`).join("")}</span>
-    <label>Sampai tanggal<select id="bs-tgl">${hari.map(h=>h.t).reverse().map(t=>`<option>${t}</option>`).join("")}</select></label></div>
-    <div id="bs-isi"></div>
-    <h3 style="margin-top:16px">Tren broker di ${kode}</h3>
-    <div class="baris"><label>Broker<select id="bs-broker"></select></label><span class="redup" id="bs-broker-info"></span></div>
-    <div class="grafik-sedang" id="g-broker"></div>
-    <p class="redup">Batang: nilai beli bersih broker per hari (hanya hari ketika broker masuk 10 besar pembeli/penjual) · garis: akumulasinya.</p>`;
-  let n=1;const gambar=()=>tabelBrokerSaham(kode,n,$("bs-tgl").value);
-  $("bs-periode").onclick=e=>{const b=e.target.closest("button");if(!b)return;n=+b.dataset.n;document.querySelectorAll("#bs-periode button").forEach(x=>x.classList.toggle("aktif",x===b));gambar()};
-  $("bs-tgl").onchange=gambar;gambar();
-  const semua={};hari.forEach(h=>[...h.b,...h.s].forEach(x=>{semua[x[0]]=(semua[x[0]]||0)+(x[3]||0)}));
-  const urut=Object.keys(semua).sort((a,b)=>semua[b]-semua[a]);
-  $("bs-broker").innerHTML=urut.map(k=>`<option value="${k}">${k} ${esc(namaBroker(k))}</option>`).join("");
-  $("bs-broker").onchange=()=>trenBroker(kode,$("bs-broker").value);trenBroker(kode,urut[0]);
+  const tgl=hari.map(h=>h.t),opsi=sel=>tgl.map(t=>`<option ${t===sel?"selected":""}>${t}</option>`).join("");
+  const n=tgl.length,a0=tgl[Math.max(0,n-10)],a1=tgl[Math.max(0,n-6)],b0=tgl[Math.max(0,n-5)],b1=tgl[n-1];
+  el.innerHTML=`
+   <h3>Pelacak dua rentang</h3>
+   <p class="redup" style="margin-top:0">Bandingkan siapa yang membeli dan menjual pada dua rentang waktu, dan berapa lot yang berpindah dari ritel ke asing atau institusi.</p>
+   <div class="baris" style="margin-bottom:8px"><label>Rentang A dari<select id="ra0">${opsi(a0)}</select></label><label>sampai<select id="ra1">${opsi(a1)}</select></label>
+     <label>Rentang B dari<select id="rb0">${opsi(b0)}</select></label><label>sampai<select id="rb1">${opsi(b1)}</select></label></div>
+   <div id="bs-dua"></div>
+   <h3 style="margin-top:18px">Tren broker</h3>
+   <div class="baris" style="margin-bottom:6px"><span class="rentang" id="tb-kat">${["semua","ritel","asing","institusi"].map((k,i)=>`<button class="tombol kedua chip ${i===0?"aktif":""}" data-k="${k}">${k==="semua"?"Semua":NAMA_KAT[k]}</button>`).join("")}</span>
+     <span class="redup">Hijau = beli bersih, merah = jual bersih, abu-abu = di luar 10 besar. Klik satu kotak lalu kotak lain untuk melihat ringkasan rentang itu.</span></div>
+   <div id="bs-peta" style="overflow:auto"></div><div id="bs-pilihan"></div>
+   <h3 style="margin-top:18px">Aksi broker</h3>
+   <div class="baris" style="margin-bottom:6px"><span id="ab-pilih" class="baris"></span><span class="rentang" id="ab-rentang"><button class="tombol kedua chip" data-n="22">1B</button><button class="tombol kedua chip" data-n="66">3B</button><button class="tombol kedua chip aktif" data-n="9999">Semua</button></span></div>
+   <div class="grafik" id="g-aksi" style="height:340px"></div>
+   <p class="redup">Garis berwarna: lot bersih kumulatif tiap broker (skala kiri) · garis hitam putus-putus: harga penutupan (skala kanan).</p>`;
+  const dua=()=>tabelDuaRentang(kode,[$("ra0").value,$("ra1").value],[$("rb0").value,$("rb1").value]);
+  ["ra0","ra1","rb0","rb1"].forEach(id=>$(id).onchange=dua);dua();
+  let kat="semua";$("tb-kat").onclick=e=>{const b=e.target.closest("button");if(!b)return;kat=b.dataset.k;document.querySelectorAll("#tb-kat button").forEach(x=>x.classList.toggle("aktif",x===b));petaTren(kode,kat)};petaTren(kode,kat);
+  const total=bersihPeriode(hari).sort((x,y)=>(y.bv+y.sv)-(x.bv+x.sv));
+  let pilih=total.slice(0,4).map(x=>x.k),rn=9999;
+  const gambarPilih=()=>{$("ab-pilih").innerHTML=total.slice(0,14).map(x=>`<button class="tombol kedua chip ${pilih.includes(x.k)?"aktif":""}" data-b="${x.k}">${x.k}</button>`).join("");aksiBroker(kode,pilih,rn)};
+  $("ab-pilih").onclick=e=>{const b=e.target.closest("button");if(!b)return;const k=b.dataset.b;pilih=pilih.includes(k)?pilih.filter(x=>x!==k):[...pilih,k].slice(-6);gambarPilih()};
+  $("ab-rentang").onclick=e=>{const b=e.target.closest("button");if(!b)return;rn=+b.dataset.n;document.querySelectorAll("#ab-rentang button").forEach(x=>x.classList.toggle("aktif",x===b));aksiBroker(kode,pilih,rn)};
+  gambarPilih();
 }
-function tabelBrokerSaham(kode,n,sampai){
-  const hari=BRS[kode].hari,i=hari.findIndex(h=>h.t===sampai),pilih=hari.slice(Math.max(0,i-n+1),i+1);
-  const gab=(sisi)=>{const m={};pilih.forEach(h=>h[sisi].forEach(x=>{const r=m[x[0]]??={k:x[0],c:x[1],lot:0,val:0};r.lot+=x[2]||0;r.val+=x[3]||0}));return Object.values(m).sort((a,b)=>b.val-a.val).slice(0,15)};
-  const b=gab("b"),s=gab("s"),tv=pilih.reduce((a,h)=>a+(h.tval||0),0),fn=pilih.reduce((a,h)=>a+(h.fnet||0),0);
-  const netto={};b.forEach(x=>netto[x.k]=(netto[x.k]||0)+x.val);s.forEach(x=>netto[x.k]=(netto[x.k]||0)-x.val);
-  const baris=(x,naik)=>`<td>${lencanaBroker(x.k,x.c)} <span class="redup">${esc(namaBroker(x.k).slice(0,18))}</span></td><td>${fmt(x.lot)}</td><td class="${naik?"naik":"turun"}">${rp(x.val)}</td><td>${fmt(x.lot?x.val/x.lot/100:null)}</td>`;
-  const top5=b.slice(0,5).reduce((a,x)=>a+x.val,0)-s.slice(0,5).reduce((a,x)=>a+x.val,0);
-  $("bs-isi").innerHTML=`<div class="statistik" style="margin-bottom:10px"><div><span class="label">Periode</span><b>${pilih[0].t}${pilih.length>1?" – "+pilih.at(-1).t:""}</b></div><div><span class="label">Nilai transaksi</span><b>Rp${rp(tv)}</b></div><div><span class="label">Asing bersih</span><b class="${kelas(fn)}">Rp${rp(fn)}</b></div><div><span class="label">Akumulasi 5 broker teratas</span><b class="${kelas(top5)}">Rp${rp(top5)} ${tv?`<span class="redup">(${fmt(top5/tv*100,1)}%)</span>`:""}</b></div></div>
-   <div class="gulir"><table><thead><tr><th>Pembeli</th><th>Lot</th><th>Nilai</th><th>Rata-rata</th><th style="border-left:1px solid var(--garis)">Penjual</th><th>Lot</th><th>Nilai</th><th>Rata-rata</th></tr></thead><tbody>${
-     Array.from({length:Math.max(b.length,s.length)},(_,i)=>`<tr>${b[i]?baris(b[i],1):"<td></td><td></td><td></td><td></td>"}${s[i]?baris(s[i],0).replace("<td>",'<td style="border-left:1px solid var(--garis)">'):"<td></td><td></td><td></td><td></td>"}</tr>`).join("")}</tbody></table></div>
-   <p class="redup">Warna kode: <b style="color:#2f6fed">asing</b>, <b style="color:#8a6d1e">lokal</b>, <b style="color:#00a86b">BUMN</b>. ${pilih.length>1?"Untuk beberapa hari, angka dijumlahkan dari 10 besar harian, jadi broker di luar 10 besar pada hari tertentu tidak terhitung.":"Sumber hanya menampilkan 10 pembeli dan 10 penjual terbesar."}</p>`;
+function potongHari(kode,r){const h=BRS[kode].hari;let [a,b]=r;if(a>b)[a,b]=[b,a];return h.filter(x=>x.t>=a&&x.t<=b)}
+function tabelDuaRentang(kode,ra,rb){
+  const A=potongHari(kode,ra),B=potongHari(kode,rb),pA=bersihPeriode(A),pB=bersihPeriode(B);
+  const kat=(p)=>{const r={asing:0,ritel:0,institusi:0};p.forEach(x=>r[kategoriBroker(x.k,x.c)]+=x.lot);return r};
+  const kA=kat(pA),kB=kat(pB);
+  const sisi=(p,judul,r)=>{const beli=p.filter(x=>x.val>0).sort((a,b)=>b.val-a.val).slice(0,8),jual=p.filter(x=>x.val<0).sort((a,b)=>a.val-b.val).slice(0,8);
+    const baris=(x)=>`<td>${lencanaBroker(x.k,x.c)}</td><td class="${kelas(x.val)}">${rp(x.val)}</td><td>${fmt(x.lot)}</td><td>${fmt(x.lot?Math.abs(x.val/x.lot/100):null)}</td>`;
+    return`<div><div class="label" style="margin-bottom:4px">${judul}: ${r[0]} – ${r[1]}</div><table><thead><tr><th>Beli bersih</th><th>Nilai</th><th>Lot</th><th>Rata</th><th>Jual bersih</th><th>Nilai</th><th>Lot</th><th>Rata</th></tr></thead><tbody>${Array.from({length:Math.max(beli.length,jual.length)},(_,i)=>`<tr>${beli[i]?baris(beli[i]):"<td></td><td></td><td></td><td></td>"}${jual[i]?baris(jual[i]):"<td></td><td></td><td></td><td></td>"}</tr>`).join("")}</tbody></table></div>`};
+  const tanda=v=>`<span class="${kelas(v)}">${v>0?"+":""}${fmt(v)}</span>`;
+  const rit=kA.ritel+kB.ritel;
+  $("bs-dua").innerHTML=`<table style="margin-bottom:10px"><thead><tr><th>Lot bersih</th><th>Asing</th><th>Institusi lokal</th><th>Ritel</th></tr></thead><tbody>
+     <tr><td>Rentang A (${ra[0]} – ${ra[1]})</td><td>${tanda(kA.asing)}</td><td>${tanda(kA.institusi)}</td><td>${tanda(kA.ritel)}</td></tr>
+     <tr><td>Rentang B (${rb[0]} – ${rb[1]})</td><td>${tanda(kB.asing)}</td><td>${tanda(kB.institusi)}</td><td>${tanda(kB.ritel)}</td></tr></tbody></table>
+   <p style="margin:0 0 10px">Ritel selama kedua rentang: <b class="${kelas(rit)}">${rit>0?"menampung":"melepas"} ${fmt(Math.abs(rit))} lot</b>${rit<0?" — barang ritel berkurang, cenderung diserap asing/institusi.":" — barang menumpuk di ritel, waspadai distribusi."}</p>
+   <div class="gulir" style="margin-bottom:10px">${sisi(pA,"Rentang A",ra)}</div><div class="gulir">${sisi(pB,"Rentang B",rb)}</div>
+   <p class="redup">Dihitung dari 10 pembeli dan 10 penjual terbesar setiap hari; broker di luar 10 besar pada hari tertentu tidak terhitung. "Ritel" memakai daftar perkiraan broker ritel (bisa diubah di scripts/data/kelas_broker.json).</p>`;
 }
-function trenBroker(kode,br){
-  if(gBroker){gBroker.remove();gBroker=null}
-  const hari=BRS[kode].hari;let kum=0;
-  const d=hari.map(h=>{const bv=h.b.find(x=>x[0]===br),sv=h.s.find(x=>x[0]===br);if(!bv&&!sv)return{t:h.t,v:null,kum};const v=(bv?.[3]||0)-(sv?.[3]||0);kum+=v;return{t:h.t,v,kum}});
-  const hadir=d.filter(x=>x.v!=null).length;
-  $("bs-broker-info").textContent=`${esc(namaBroker(br))} · masuk 10 besar ${hadir} dari ${hari.length} hari · akumulasi Rp${rp(kum)}`;
-  gBroker=LightweightCharts.createChart($("g-broker"),{...opsiGrafik(),localization:{priceFormatter:p=>rp(p)}});
-  gBroker.addHistogramSeries({priceLineVisible:false,lastValueVisible:false}).setData(d.map(x=>x.v==null?{time:x.t}:{time:x.t,value:x.v,color:x.v>=0?"rgba(0,168,107,.6)":"rgba(229,72,77,.6)"}));
-  gBroker.addLineSeries({color:"#2f6fed",lineWidth:2,priceScaleId:"kum",priceLineVisible:false}).setData(d.map(x=>({time:x.t,value:x.kum})));
-  gBroker.priceScale("kum").applyOptions({visible:false});gBroker.timeScale().fitContent();
+let selTren=null;
+function petaTren(kode,kat){
+  const hari=BRS[kode].hari,semua=bersihPeriode(hari).filter(x=>kat==="semua"||kategoriBroker(x.k,x.c)===kat).sort((a,b)=>(b.bv+b.sv)-(a.bv+a.sv)).slice(0,14);
+  const lebar=Math.max(14,Math.min(26,Math.floor(900/hari.length)));
+  $("bs-peta").innerHTML=`<table style="width:auto;border-collapse:separate;border-spacing:2px"><thead><tr><th></th>${hari.map((h,i)=>`<th style="font-size:10px;padding:0;writing-mode:vertical-rl;transform:rotate(180deg);height:46px">${i%3===0||i===hari.length-1?h.t.slice(5):""}</th>`).join("")}</tr></thead><tbody>${
+    semua.map(x=>`<tr><td style="padding:2px 6px">${lencanaBroker(x.k,x.c)}</td>${hari.map((h,i)=>{const v=bersihBroker(h,x.k);const w=v==null?"var(--hover)":v.val>0?"var(--hijau)":v.val<0?"var(--merah)":"var(--hover)";return`<td data-i="${i}" data-b="${x.k}" title="${x.k} ${h.t}: ${v==null?"di luar 10 besar":"Rp"+rp(v.val)+", "+fmt(v.lot)+" lot"}" style="padding:0;width:${lebar}px;height:20px;background:${w};cursor:pointer;opacity:${v==null?1:Math.min(1,.45+Math.abs(v.val)/((h.tval||1)*0.08))}"></td>`}).join("")}</tr>`).join("")}</tbody></table>`;
+  selTren=null;$("bs-pilihan").innerHTML="";
+  $("bs-peta").onclick=e=>{const td=e.target.closest("td[data-i]");if(!td)return;const i=+td.dataset.i;
+    if(selTren==null){selTren=i;$("bs-pilihan").innerHTML=`<p class="redup">Awal: ${hari[i].t}. Klik kotak lain untuk tanggal akhir.</p>`;return}
+    let [a,b]=[selTren,i].sort((x,y)=>x-y);selTren=null;const p=bersihPeriode(hari.slice(a,b+1)).filter(x=>semua.some(y=>y.k===x.k)).sort((x,y)=>y.val-x.val);
+    $("bs-pilihan").innerHTML=`<div class="kartu" style="margin-top:8px"><h3>Ringkasan ${hari[a].t} – ${hari[b].t}</h3><table><thead><tr><th>Broker</th><th>Lot bersih</th><th>Nilai bersih</th><th>Rata-rata</th></tr></thead><tbody>${p.map(x=>`<tr><td>${lencanaBroker(x.k,x.c)} <span class="redup">${esc(namaBroker(x.k).slice(0,20))}</span></td><td class="${kelas(x.lot)}">${fmt(x.lot)}</td><td class="${kelas(x.val)}">Rp${rp(x.val)}</td><td>${fmt(x.lot?Math.abs(x.val/x.lot/100):null)}</td></tr>`).join("")}</tbody></table></div>`};
 }
-
+async function aksiBroker(kode,pilih,rn){
+  if(gAksi){gAksi.remove();gAksi=null}
+  const hari=BRS[kode].hari.slice(-rn);if(!hari.length)return;
+  let harga=[];try{const d=DETAIL?.kode===kode?DETAIL.h:await ambil(`data/saham/${kode}.json`);const m={};d.lilin.forEach(x=>m[x.t]=x.c);harga=hari.filter(h=>m[h.t]).map(h=>({time:h.t,value:m[h.t]}))}catch(e){}
+  gAksi=LightweightCharts.createChart($("g-aksi"),{...opsiGrafik(),leftPriceScale:{visible:true,borderVisible:false},localization:{priceFormatter:p=>fmt(p)}});
+  const warnaG=["#2f6fed","#00a86b","#e8710a","#c2185b","#7e57c2","#00838f"];
+  pilih.forEach((br,i)=>{let kum=0;gAksi.addLineSeries({color:warnaG[i%6],lineWidth:2,priceScaleId:"left",title:br,priceLineVisible:false}).setData(hari.map(h=>{const v=bersihBroker(h,br);kum+=v?v.lot:0;return{time:h.t,value:kum}}))});
+  if(harga.length)gAksi.addLineSeries({color:warna("--teks"),lineWidth:1,lineStyle:2,priceScaleId:"right",title:"harga",priceLineVisible:false}).setData(harga);
+  gAksi.timeScale().fitContent();
+}
 // ================= kepemilikan =================
+const WARNA_JENIS=["#2f6fed","#e8710a","#00a86b","#7e57c2","#c2185b","#00838f","#8a6d1e","#5c6bc0","#ef6c00","#43a047","#6d4c41","#9e9d24"];
 function panelMilik(kode){
   const el=$("p-milik");const d=K?.saham?.[kode];
   if(!d){el.innerHTML='<div class="kosong">Data kepemilikan belum tersedia.</div>';return}
-  const publik=Math.max(0,100-d.persen_terdata);
-  const bar=(n,v,w)=>`<div style="flex:${Math.max(v,0.5)};background:${w};color:#fff;padding:6px 8px;font-size:12px;white-space:nowrap;overflow:hidden">${n} ${fmt(v,1)}%</div>`;
+  const kini=d.pemegang.filter(h=>!h.keluar);
+  const kartu=kini.map(h=>`<div class="kartu" style="padding:12px"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="lencana" style="background:var(--hover);color:var(--teks)">${esc(h.jenis||"–")}</span>${h.asal==="Asing"?'<span class="lencana">Asing</span>':""}${h.status?`<span class="lencana" style="background:#e8f0fe;color:#2f6fed">${h.status}</span>`:""}${h.baru?'<span class="lencana">baru</span>':""}</div>
+     <div style="font-weight:700;margin:6px 0 2px;font-size:13px">${esc(h.nama)}</div><div class="redup">${rp(h.lembar)} lembar${h.ubah_lembar&&!h.baru?` · <span class="${kelas(h.ubah_lembar)}">${h.ubah_lembar>0?"+":""}${rp(h.ubah_lembar)}</span> dari bulan lalu`:""}</div>
+     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:6px"><span class="redup">kepemilikan</span><b style="font-size:20px">${fmt(h.persen,2)}%</b></div>
+     <div style="height:6px;background:var(--hover);border-radius:3px;margin-top:4px"><div style="height:6px;width:${Math.min(100,h.persen)}%;background:var(--aksen);border-radius:3px"></div></div></div>`).join("");
+  const keluar=d.pemegang.filter(h=>h.keluar);
+  // posisi saldo: komposisi per bulan
+  const kom=K.komposisi?.[kode]||[];const jenis=[...new Set(kom.flatMap(x=>Object.keys(x.jenis)))];
+  const tinggi=220;
+  const batang=kom.map(x=>{const bag=jenis.map((j,i)=>({j,v:x.jenis[j]||0,w:WARNA_JENIS[i%WARNA_JENIS.length]})).filter(b=>b.v>0);const publik=Math.max(0,100-x.total);
+    return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:40px"><div style="height:${tinggi}px;width:70%;display:flex;flex-direction:column-reverse;border-radius:4px;overflow:hidden;background:var(--hover)" title="${x.t}">${bag.map(b=>`<div title="${esc(b.j)} ${fmt(b.v,2)}%" style="height:${b.v/100*tinggi}px;background:${b.w}"></div>`).join("")}<div title="Publik <1% ${fmt(publik,2)}%" style="height:${publik/100*tinggi}px;background:#cfd4da"></div></div><div class="redup" style="font-size:11px;margin-top:4px">${x.t.slice(2,7)}</div><div style="font-size:11px">${fmt(x.asing,1)}% A</div></div>`}).join("");
   el.innerHTML=`<p class="redup" style="margin-top:0">Pemegang saham ≥ 1% per ${K.per_tanggal} (dibandingkan ${K.pembanding||"–"}). Sumber: KSEI melalui BEI.</p>
-   <div style="display:flex;border-radius:8px;overflow:hidden;margin-bottom:12px">${bar("Pengendali & afiliasi",d.pengendali,"#2f6fed")}${bar("Pemegang ≥1% lain",d.persen_terdata-d.pengendali,"#7e57c2")}${bar("Publik <1%",publik,"#9aa0a6")}</div>
-   <div class="statistik" style="margin-bottom:12px"><div><span class="label">Tercatat ≥1%</span><b>${fmt(d.persen_terdata,2)}%</b></div><div><span class="label">Pengendali & afiliasi</span><b>${fmt(d.pengendali,2)}%</b></div><div><span class="label">Asing ≥1%</span><b>${fmt(d.asing,2)}%</b></div><div><span class="label">Publik (perkiraan)</span><b>${fmt(publik,2)}%</b></div></div>
-   <div class="gulir"><table><thead><tr><th>Pemegang</th><th>Jenis</th><th>Asal</th><th>Status</th><th>Lembar</th><th>% kini</th><th>% bulan lalu</th><th>Perubahan lembar</th></tr></thead><tbody>${
-     d.pemegang.map(h=>`<tr><td style="white-space:normal">${esc(h.nama)}${h.baru?' <span class="lencana">baru</span>':""}${h.keluar?' <span class="lencana" style="background:var(--hover);color:var(--merah)">keluar</span>':""}</td><td>${esc(h.jenis||"–")}</td><td>${h.asal}</td><td>${h.status||"–"}</td><td>${rp(h.lembar)}</td><td>${h.persen==null?"–":fmt(h.persen,2)+"%"}</td><td>${h.persen_lalu==null?"–":fmt(h.persen_lalu,2)+"%"}</td><td class="${kelas(h.ubah_lembar)}">${h.ubah_lembar?(h.ubah_lembar>0?"+":"")+rp(h.ubah_lembar):"–"}</td></tr>`).join("")}</tbody></table></div>
+   <div class="statistik" style="margin-bottom:12px"><div><span class="label">Tercatat ≥1%</span><b>${fmt(d.persen_terdata,2)}%</b></div><div><span class="label">Pengendali & afiliasi</span><b>${fmt(d.pengendali,2)}%</b></div><div><span class="label">Asing ≥1%</span><b>${fmt(d.asing,2)}%</b></div><div><span class="label">Publik (perkiraan)</span><b>${fmt(Math.max(0,100-d.persen_terdata),2)}%</b></div></div>
+   <h3>Struktur kepemilikan</h3>
+   <div class="kisi" style="grid-template-columns:repeat(auto-fill,minmax(230px,1fr));margin-bottom:10px">${kartu}</div>
+   ${keluar.length?`<p class="redup">Keluar dari daftar ≥1% sejak bulan lalu: ${keluar.map(h=>`${esc(h.nama)} (${fmt(h.persen_lalu,2)}%)`).join(", ")}.</p>`:""}
+   <h3 style="margin-top:16px">Posisi saldo per bulan</h3>
+   <p class="redup" style="margin-top:0">Komposisi pemegang ≥1% menurut jenis investor; abu-abu = publik di bawah 1%. Angka "A" = porsi asing ≥1%.</p>
+   ${kom.length?`<div style="display:flex;gap:4px;align-items:flex-end;overflow-x:auto">${batang}</div>
+   <div class="baris" style="margin-top:8px;font-size:12px">${jenis.map((j,i)=>`<span><span style="display:inline-block;width:10px;height:10px;background:${WARNA_JENIS[i%WARNA_JENIS.length]};border-radius:2px"></span> ${esc(j)}</span>`).join("")}<span><span style="display:inline-block;width:10px;height:10px;background:#cfd4da;border-radius:2px"></span> Publik &lt;1%</span></div>`:'<div class="redup">Riwayat belum tersedia.</div>'}
    <p class="redup">"Baru" atau "keluar" juga bisa berarti nama pemegang ditulis berbeda antarbulan, atau kepemilikan melewati batas 1%.</p>`;
 }
 
@@ -768,6 +844,67 @@ function tampilAliran(){
   if(K){$("milik-tgl").textContent=`· ${K.pembanding} → ${K.per_tanggal}`;
     $("t-milik-ubah").innerHTML=`<thead><tr><th>Kode</th><th>Pemegang</th><th>% lalu</th><th>% kini</th><th>Lembar</th></tr></thead><tbody>${K.perubahan.slice(0,80).map(p=>`<tr class="klik" data-k="${p.kode}"><td><b>${p.kode}</b></td><td style="white-space:normal">${esc(p.nama)} <span class="redup">${esc(p.jenis||"")}${p.asal?" · "+p.asal:""}</span>${p.baru?' <span class="lencana">baru</span>':""}${p.keluar?' <span class="lencana" style="color:var(--merah)">keluar</span>':""}</td><td>${p.persen_lalu==null?"–":fmt(p.persen_lalu,2)}</td><td>${p.persen==null?"–":fmt(p.persen,2)}</td><td class="${kelas(p.ubah_lembar)}">${(p.ubah_lembar>0?"+":"")+rp(p.ubah_lembar)}</td></tr>`).join("")}</tbody>`;
     $("t-milik-ubah").onclick=e=>{const t=e.target.closest("tr.klik");if(t)bukaSaham(t.dataset.k)};
+  }
+}
+
+
+// ================= Bandarmologi =================
+let bdTab="analisis",bdCari="",bdPreset="Semua",bdArah="beli",SARING_BD={likuid:"1"};
+const PRESET_ANALISIS={
+  "Semua":()=>true,
+  "Asing beli 5 hari (total)":s=>s.f5>0,
+  "Asing beli 3 hari beruntun":s=>s.asing_b>=3,
+  "Asing berbalik beli hari ini":s=>s.d[0]>0&&s.d[1]<0,
+  "Asing jual 3 hari beruntun":s=>s.asing_b<=-3,
+  "Akumulasi broker beruntun ≥3 hari":s=>s.akum_b>=3,
+};
+function tampilBandar(){
+  $("bd-tab").onclick=e=>{const b=e.target.closest("button");if(!b)return;bdTab=b.dataset.b;bdCari="";document.querySelectorAll("#bd-tab button").forEach(x=>x.classList.toggle("aktif",x===b));isiBandar()};
+  isiBandar();
+}
+function seriAsingHarian(n){const t=A?Object.keys(A.harian).sort().slice(-n).reverse():[];return t}
+function isiBandar(){
+  const cari=`<label>Cari<input id="bd-cari" placeholder="kode / nama" size="14" value="${esc(bdCari)}"></label>`;
+  const pasangCari=()=>{const c=$("bd-cari");if(c){c.oninput=()=>{bdCari=c.value.trim().toUpperCase();isiTabelBandar()};}};
+  if(bdTab==="analisis"){
+    $("bd-info").innerHTML=`Saham yang sedang dikumpulkan atau dilepas asing, hari per hari (data IDX${A?", "+A.tanggal_terakhir:""}). Kolom D = hari terakhir, D-1 = sehari sebelumnya, dst.`;
+    $("bd-kontrol").innerHTML=`<label>Saringan<select id="bd-preset">${Object.keys(PRESET_ANALISIS).map(n=>`<option ${n===bdPreset?"selected":""}>${n}</option>`).join("")}</select></label>${cari}<span id="bd-lapis" class="baris"></span>`;
+    $("bd-preset").onchange=e=>{bdPreset=e.target.value;isiTabelBandar()};pasangSaringLapis($("bd-lapis"),SARING_BD,isiTabelBandar);
+  }else if(bdTab==="beruntun"){
+    $("bd-info").innerHTML=`Saham yang dibeli (atau dijual) bersih oleh <b>broker yang sama</b> beberapa hari berturut-turut sampai hari terakhir${BR?.tanggal_terakhir?" ("+BR.tanggal_terakhir+")":""}. Dihitung dari 10 pembeli/penjual terbesar Indo Premier.`;
+    $("bd-kontrol").innerHTML=`<span class="rentang" id="bd-arah"><button class="tombol kedua chip ${bdArah==="beli"?"aktif":""}" data-a="beli">Akumulasi (beli)</button><button class="tombol kedua chip ${bdArah==="jual"?"aktif":""}" data-a="jual">Distribusi (jual)</button></span>${cari}`;
+    $("bd-arah").onclick=e=>{const b=e.target.closest("button");if(!b)return;bdArah=b.dataset.a;isiBandar()};
+  }else if(bdTab==="dalam"){
+    $("bd-info").innerHTML=`Perubahan kepemilikan pemegang saham ≥1% (termasuk pengendali, direksi/komisaris yang memegang langsung, dan investor besar) antara ${K?.pembanding||"–"} dan ${K?.per_tanggal||"–"}. Sumber: KSEI melalui BEI, diperbarui bulanan.`;
+    $("bd-kontrol").innerHTML=`${cari}<span id="bd-lapis" class="baris"></span>`;pasangSaringLapis($("bd-lapis"),SARING_BD,isiTabelBandar);
+  }else{
+    $("bd-info").innerHTML=`Semua anggota bursa. Klik baris untuk melihat saham apa saja yang dibeli/dijual broker itu.${BR?.pasar_broker_tanggal?" Aktivitas pasar per "+BR.pasar_broker_tanggal+".":""}`;
+    $("bd-kontrol").innerHTML=cari;
+  }
+  pasangCari();isiTabelBandar();
+}
+function isiTabelBandar(){
+  const el=$("t-bandar"),c=bdCari,cocok=(...x)=>!c||x.some(v=>String(v||"").toUpperCase().includes(c));
+  const uang=v=>v==null?"–":`<span class="${kelas(v)}">${rp(v)}</span>`;
+  if(bdTab==="analisis"){
+    if(!A){el.innerHTML='<tr><td class="kosong">Data asing IDX belum tersedia.</td></tr>';return}
+    const t=seriAsingHarian(5);
+    const baris=GABUNG.filter(s=>lolosLapis(s,SARING_BD)&&cocok(s.kode,s.nama)).map(s=>{const d=t.map(x=>{const r=A.harian[x]?.[s.kode];return r?(r[0]-r[1])*r[2]:null});return{...s,d,d0:d[0],d1:d[1],d2:d[2],d3:d[3],d4:d[4],f5:d.reduce((a,v)=>a+(v||0),0)}}).filter(PRESET_ANALISIS[bdPreset]);
+    tabelUrut(el,[["kode","Saham",(v,s)=>`<b>${v}</b> ${lencanaLapis(s)}`],["tutup","Harga",v=>fmt(v)],["perubahan_pct","Ubah",v=>`<span class="${kelas(v)}">${pct(v)}</span>`],
+      ...["D","D-1","D-2","D-3","D-4"].map((n,i)=>["d"+i,`${n} <span class="redup">${(t[i]||"").slice(5)}</span>`,uang]),["f5","Total 5 hari",uang],["asing_b","Asing beruntun",beruntunTeks],["akum5","Akumulasi broker 5h",uang]],baris,{k:"f5",turun:true});
+  }else if(bdTab==="beruntun"){
+    const d=(BR?.beruntun_broker||[]).filter(x=>(bdArah==="beli"?x.hari>0:x.hari<0)&&cocok(x.kode,x.broker,namaBroker(x.broker))).map(x=>({...x,hari_abs:Math.abs(x.hari),harga:PETA[x.kode]?.tutup,selisih:PETA[x.kode]&&x.rata?(PETA[x.kode].tutup/x.rata-1)*100:null}));
+    if(!d.length){el.innerHTML='<tr><td class="kosong">Belum ada data broker (Indo Premier sedang galat). Daftar ini terisi otomatis begitu data broker masuk.</td></tr>';return}
+    tabelUrut(el,[["kode","Saham",(v,s)=>`<b>${v}</b> ${PETA[v]?lencanaLapis(G(v)):""}`],["broker","Broker",(v)=>`${lencanaBroker(v,BR.kelas_broker[v])} <span class="redup">${esc(namaBroker(v).slice(0,22))}</span>`],["hari_abs","Beruntun",v=>`<b>${v} hari</b>`],["sejak","Sejak"],["nilai","Nilai bersih",uang],["lot","Lot bersih",v=>fmt(v)],["rata","Harga rata-rata",v=>fmt(v)],["harga","Harga kini",v=>fmt(v)],["selisih","Selisih",v=>v==null?"–":`<span class="${kelas(v)}">${pct(v)}</span>`]],d,{k:"hari_abs",turun:true});
+  }else if(bdTab==="dalam"){
+    if(!K){el.innerHTML='<tr><td class="kosong">Data kepemilikan belum tersedia.</td></tr>';return}
+    const d=K.perubahan.filter(p=>(!PETA[p.kode]||lolosLapis(G(p.kode),SARING_BD))&&cocok(p.kode,p.nama)).map(p=>({...p,selisih:(p.persen||0)-(p.persen_lalu||0),ket:p.baru?"baru":p.keluar?"keluar":p.ubah_lembar>0?"tambah":"kurang"}));
+    tabelUrut(el,[["kode","Saham",(v)=>`<b>${v}</b>`],["nama","Pemegang",(v,p)=>`<span style="white-space:normal">${esc(v)}</span>`],["jenis","Jenis",v=>esc(v||"–")],["asal","Asal"],["status","Status",v=>v||"–"],["persen_lalu","% lalu",v=>v==null?"–":fmt(v,2)],["persen","% kini",v=>v==null?"–":fmt(v,2)],["selisih","Selisih %",v=>`<span class="${kelas(v)}">${v>0?"+":""}${fmt(v,2)}</span>`],["ubah_lembar","Perubahan lembar",uang],["ket","Ket.",v=>`<span class="lencana" style="${v==="keluar"||v==="kurang"?"color:var(--merah);background:var(--hover)":""}">${v}</span>`]],d,{k:"selisih",turun:true});
+  }else{
+    const pb={};(BR?.pasar_broker||[]).forEach(b=>pb[b.kode]=b);
+    const nama=BR?.nama_broker||{};
+    const d=Object.keys(nama).filter(k=>cocok(k,nama[k])).map(k=>({kode:k,nama:nama[k],kelas:BR.kelas_broker?.[k]||pb[k]?.kelas,ritel:(BR.ritel||[]).includes(k),tval:pb[k]?.tval??null,nval:pb[k]?.nval??null,freq:pb[k]?.freq??null}));
+    tabelUrut(el,[["kode","Kode",(v,s)=>lencanaBroker(v,s.kelas)],["nama","Nama broker",v=>esc(v)],["kelas","Golongan",(v,s)=>(s.kelas==="A"?"Asing":s.kelas==="B"?"BUMN":"Lokal")+(s.ritel?" · ritel":"")],["tval","Total transaksi",v=>v==null?"–":rp(v)],["nval","Beli bersih",uang],["freq","Frekuensi",v=>fmt(v)]],d,{k:"tval",turun:true},k=>{location.hash="#broker/"+k});
   }
 }
 

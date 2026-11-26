@@ -73,12 +73,33 @@ def ringkas(r: dict) -> dict:
 
 def main():
     indeks = json.loads(unduh("index.json"))
-    rilis = sorted(indeks["releases"], key=lambda r: r["as_of"], reverse=True)[:2]
-    if not rilis:
+    semua_rilis = sorted(indeks["releases"], key=lambda r: r["as_of"], reverse=True)[:9]
+    if not semua_rilis:
         print("Tidak ada rilis kepemilikan.")
         return
-    kini = baca_rilis(rilis[0])
-    lalu = baca_rilis(rilis[1]) if len(rilis) > 1 else []
+    rilis = semua_rilis[:2]
+    isi_rilis = {r["as_of"]: baca_rilis(r) for r in semua_rilis}
+    kini = isi_rilis[rilis[0]["as_of"]]
+    lalu = isi_rilis[rilis[1]["as_of"]] if len(rilis) > 1 else []
+
+    # Komposisi pemegang >= 1% per bulan (untuk grafik posisi saldo)
+    komposisi = {}
+    for r in sorted(semua_rilis, key=lambda r: r["as_of"]):
+        per = {}
+        for b in isi_rilis[r["as_of"]]:
+            h = ringkas(b)
+            d = per.setdefault(b["symbol"], {"t": r["as_of"], "jenis": {}, "asing": 0.0, "lokal": 0.0, "pengendali": 0.0, "total": 0.0})
+            pc = h["persen"] or 0
+            jn = h["jenis"] or "Jenis tidak tercatat"
+            d["jenis"][jn] = round(d["jenis"].get(jn, 0) + pc, 2)
+            d["asing" if h["asal"] == "Asing" else "lokal"] += pc
+            if h["status"]:
+                d["pengendali"] += pc
+            d["total"] += pc
+        for k, d in per.items():
+            for f in ("asing", "lokal", "pengendali", "total"):
+                d[f] = round(d[f], 2)
+            komposisi.setdefault(k, []).append(d)
 
     def per_saham(baris):
         d = {}
@@ -125,7 +146,8 @@ def main():
         "pembanding": rilis[1]["as_of"] if len(rilis) > 1 else None,
         "sumber": rilis[0].get("source_url"),
         "saham": saham,
-        "perubahan": perubahan[:300],
+        "komposisi": komposisi,
+        "perubahan": perubahan[:600],
     }
     BERKAS.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
     print(f"Kepemilikan per {data['per_tanggal']}: {len(saham)} saham, {len(perubahan)} perubahan.")

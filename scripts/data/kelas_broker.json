@@ -1,0 +1,4 @@
+{
+ "keterangan": "Pengelompokan broker untuk Ringkasan Aliran. 'asing' diambil otomatis dari tanda Indo Premier. 'ritel' adalah PERKIRAAN broker yang nasabahnya didominasi investor ritel (berdasarkan anggapan umum pelaku pasar, bukan data resmi) dan bisa Anda ubah. Broker lokal/BUMN lain dianggap 'institusi lokal'.",
+ "ritel": ["YP", "PD", "XL", "XC", "KK", "NI", "CC", "SQ", "EP", "GR", "AG", "BQ", "CP", "DH", "IF", "LG", "MG", "AZ", "SS", "TP"]
+}

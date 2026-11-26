@@ -114,6 +114,39 @@ def main():
             "rasio_akum5": round(jumlah(top5, 5) / tv5 * 100, 1) if tv5 and jumlah(top5, 5) is not None else None,
         }
 
+    # ----- akumulasi beruntun per broker: broker yang sama membeli/menjual bersih berhari-hari -----
+    beruntun_broker = []
+    for kode in kode_list:
+        hari = [semua[t]["saham"].get(kode) for t in tanggal]
+        bersih = defaultdict(list)  # broker -> [(nilai bersih, lot bersih) per hari, None jika di luar 10 besar]
+        brokers = {b[0] for h in hari if h for b in h["b"] + h["s"]}
+        for h in hari:
+            for br in brokers:
+                if not h:
+                    bersih[br].append(None)
+                    continue
+                bv = next((x for x in h["b"] if x[0] == br), None)
+                sv = next((x for x in h["s"] if x[0] == br), None)
+                if not bv and not sv:
+                    bersih[br].append(None)
+                else:
+                    bersih[br].append(((bv[3] if bv else 0) - (sv[3] if sv else 0), (bv[2] if bv else 0) - (sv[2] if sv else 0)))
+        terbaik = {}
+        for br, seri_br in bersih.items():
+            n = beruntun([x[0] if x else None for x in seri_br])
+            if abs(n) < 2:
+                continue
+            potong = seri_br[-abs(n):]
+            nilai = sum(x[0] for x in potong)
+            lot = sum(x[1] for x in potong)
+            arah = "beli" if n > 0 else "jual"
+            if arah not in terbaik or abs(n) > abs(terbaik[arah]["hari"]) or (
+                    abs(n) == abs(terbaik[arah]["hari"]) and abs(nilai) > abs(terbaik[arah]["nilai"])):
+                terbaik[arah] = {"kode": kode, "broker": br, "hari": n, "nilai": round(nilai), "lot": round(lot),
+                                 "rata": round(abs(nilai / lot / 100)) if lot else None, "sejak": tanggal[-abs(n)]}
+        beruntun_broker += terbaik.values()
+    beruntun_broker.sort(key=lambda x: (-abs(x["hari"]), -abs(x["nilai"])))
+
     # ----- pelacak broker: broker -> saham (dari daftar 10 teratas) -----
     def per_broker(daftar_tgl):
         hasil = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0, 0.0, 0.0]))  # beli val, jual val, beli lot, jual lot
@@ -146,6 +179,8 @@ def main():
         "pasar_broker": next((semua[t]["pasar_broker"] for t in reversed(tanggal) if semua[t].get("pasar_broker")), None),
         "pasar_broker_tanggal": next((t for t in reversed(tanggal) if semua[t].get("pasar_broker")), None),
         "nama_broker": nama,
+        "beruntun_broker": beruntun_broker[:400],
+        "ritel": json.loads((Path(__file__).parent / "data" / "kelas_broker.json").read_text(encoding="utf-8"))["ritel"],
         "kelas_broker": kelas,
     }
     (AKAR / "broker" / "ringkasan.json").write_text(json.dumps(ringkasan, ensure_ascii=False, separators=(",", ":")))
