@@ -26,6 +26,8 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 REPO = "leonardusandy/analisis-saham"
+SITUS = "https://leonardusandy.github.io/analisis-saham/"
+HARI_BROKER_PENUH = 5   # ringkasan broker semua saham ramai untuk 5 hari terakhir; hari lebih lama hanya LQ45
 CABANG = "main"
 WIB = timezone(timedelta(hours=7))
 FOLDER = Path(__file__).resolve().parent
@@ -152,25 +154,36 @@ def ambil(url: str, coba: int = 3) -> str | None:
     return None
 
 
-def daftar_saham() -> list[str]:
+def daftar_saham() -> tuple[list[str], list[str]]:
+    """(saham ramai untuk ringkasan broker, saham LQ45) dari situs web Anda."""
     import requests
 
-    url = f"https://raw.githubusercontent.com/{REPO}/{CABANG}/docs/data/ringkasan.json"
-    r = requests.get(url, timeout=30)
-    r.raise_for_status()
-    return [s["kode"] for s in r.json()["saham"]]
+    try:
+        r = requests.get(SITUS + "data/semesta.json", timeout=30)
+        r.raise_for_status()
+        sm = r.json()["saham"]
+        ramai = [x["kode"] for x in sm if x.get("likuid") or (x.get("likuid") is None and x.get("lq45"))]
+        lq45 = [x["kode"] for x in sm if x.get("lq45")]
+        return ramai, lq45
+    except Exception as e:  # noqa: BLE001
+        log("  (daftar saham dari situs belum tersedia, memakai LQ45:", e, ")")
+        url = f"https://raw.githubusercontent.com/{REPO}/{CABANG}/scripts/config.py"
+        teks = requests.get(url, timeout=30).text
+        kode = re.findall(r'"([A-Z]{4})"', teks.split("SAHAM = [", 1)[1].split("]", 1)[0])
+        return kode, kode
 
 
 def indeks_tersedia() -> dict:
     import requests
 
-    url = f"https://raw.githubusercontent.com/{REPO}/{CABANG}/docs/data/broker/indeks.json"
-    try:
-        r = requests.get(url, timeout=30)
-        if r.status_code == 200:
-            return r.json()
-    except Exception:  # noqa: BLE001
-        pass
+    for url in [SITUS + "data/broker/indeks.json",
+                f"https://raw.githubusercontent.com/{REPO}/{CABANG}/docs/data/broker/indeks.json"]:
+        try:
+            r = requests.get(url, timeout=30)
+            if r.status_code == 200:
+                return r.json()
+        except Exception:  # noqa: BLE001
+            pass
     return {}
 
 
@@ -268,6 +281,7 @@ def ubah_idx(js: dict) -> dict:
             float(d.get("ForeignBuy") or 0), float(d.get("ForeignSell") or 0),
             float(d.get("Close") or 0), float(d.get("Previous") or 0),
             float(d.get("Value") or 0), int(d.get("Frequency") or 0),
+            float(d.get("ListedShares") or 0),
         ]
     aktif = sum(1 for v in hasil.values() if v[4] > 0)
     return hasil if aktif else {}
@@ -435,7 +449,8 @@ def main():
         log("GAGAL terhubung ke IDX." if hasil is None else ("IDX: tidak ada perdagangan pada tanggal itu." if not hasil else "BERHASIL terhubung ke IDX."))
         return
     log("Mulai mengumpulkan data…")
-    kode_list = daftar_saham()
+    kode_ramai, kode_lq45 = daftar_saham()
+    kode_list = kode_ramai
     ind = indeks_tersedia()
     libur, ada_broker, ada_idx = set(ind.get("libur", [])), set(ind.get("broker", [])), set(ind.get("idx", []))
     if "broker" not in ind:  # indeks versi lama: anggap hari yang tercatat sudah punya broker
@@ -456,13 +471,15 @@ def main():
         log("Data IDX sudah lengkap; ringkasan broker menunggu Indo Premier pulih. Selesai." if IPOT_MATI
             else "Semua data hari bursa terakhir sudah lengkap. Selesai.")
         return
-    log(f"{len(kode_list)} saham. Perlu data IDX: {len(perlu_idx)} hari; perlu ringkasan broker: {len(perlu_broker)} hari.")
+    baru = set(hari_bursa_terakhir(HARI_BROKER_PENUH))
+    log(f"{len(kode_ramai)} saham ramai ({len(kode_lq45)} LQ45). Perlu data IDX: {len(perlu_idx)} hari; perlu ringkasan broker: {len(perlu_broker)} hari.")
     siapkan_idx(perlu_idx)
     berkas = {}
     for tgl in hari:
         lama = berkas_hari_lama(tgl) if tgl.isoformat() in (ada_idx | ada_broker) else None
         try:
-            d = ambil_hari(tgl, kode_list, terbaru=(tgl == hari[-1]), perlu_broker=tgl in perlu_broker)
+            d = ambil_hari(tgl, kode_ramai if tgl in baru else kode_lq45, terbaru=(tgl == hari[-1]),
+                           perlu_broker=tgl in perlu_broker)
         except ConnectionError as e:
             if lama is None:
                 log(f"{tgl}: dilewati ({e})")

@@ -18,7 +18,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 import config as cfg  # noqa: E402
 
 DASAR = "https://github.com/fzn0x/idx/releases/download/ownership-data/"
-BERKAS = Path(__file__).resolve().parent.parent / "docs" / "data" / "kepemilikan.json"
+BERKAS = cfg.KELUAR / "kepemilikan.json"
+SEMESTA = set(cfg.kode_semesta())
 WIB = timezone(timedelta(hours=7))
 JENIS = {
     "CORPORATE": "Korporasi", "INDIVIDUAL": "Perorangan", "INSURANCE": "Asuransi",
@@ -54,7 +55,7 @@ def baca_rilis(rilis: dict) -> list[dict]:
         isi = unduh(bagian["file"])
         if hashlib.sha256(isi).hexdigest() != bagian["sha256"]:
             raise RuntimeError(f"Hash tidak cocok: {bagian['file']}")
-        baris += [r for r in json.loads(isi) if r.get("symbol") in cfg.SAHAM]
+        baris += [r for r in json.loads(isi) if r.get("symbol") in SEMESTA]
     return baris
 
 
@@ -87,8 +88,10 @@ def main():
 
     pk, pl = per_saham(kini), per_saham(lalu)
     saham, perubahan = {}, []
-    for kode in cfg.SAHAM:
+    for kode in sorted(SEMESTA):
         a, b = pk.get(kode, {}), pl.get(kode, {})
+        if not a and not b:
+            continue
         daftar = []
         for kunci, h in a.items():
             sebelum = b.get(kunci)

@@ -19,7 +19,7 @@ import feedparser
 sys.path.insert(0, str(Path(__file__).parent))
 import config as cfg  # noqa: E402
 
-BERKAS = Path(__file__).resolve().parent.parent / "docs" / "data" / "berita.json"
+BERKAS = cfg.KELUAR / "berita.json"
 WIB = timezone(timedelta(hours=7))
 UMUR_MAKS_HARI = 14
 AGEN = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
@@ -55,9 +55,11 @@ ALIAS = {
     "MAPI": ["Mitra Adiperkasa"], "NCKL": ["Trimegah Bangun", "Harita Nickel"],
     "AKRA": ["AKR Corporindo"], "ESSA": ["ESSA Industries"], "WIFI": ["Solusi Sinergi Digital"],
 }
+SEMESTA = cfg.kode_semesta()
+# Kode saham dicocokkan persis huruf besar (mis. "BBCA"); nama lain hanya untuk emiten yang dikenal
 POLA = {
     k: re.compile(r"\b(" + "|".join(re.escape(x) for x in [k] + ALIAS.get(k, [])) + r")\b")
-    for k in cfg.SAHAM
+    for k in sorted(set(SEMESTA) | set(cfg.SAHAM))
 }
 
 
@@ -158,7 +160,8 @@ def main():
         "dibuat": datetime.now(WIB).strftime("%Y-%m-%d %H:%M WIB"),
         "pasar": gabung(pasar, lama.get("pasar", []), 120),
         "per_saham": {
-            k: gabung(per_saham.get(k, []), lama.get("per_saham", {}).get(k, []), 25) for k in cfg.SAHAM
+            k: v for k in sorted(set(per_saham) | set(lama.get("per_saham", {})))
+            if (v := gabung(per_saham.get(k, []), lama.get("per_saham", {}).get(k, []), 25))
         },
     }
     BERKAS.parent.mkdir(parents=True, exist_ok=True)

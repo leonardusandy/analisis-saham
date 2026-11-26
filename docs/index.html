@@ -135,7 +135,8 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
         </div>
       </div>
       <div class="kartu" style="margin-bottom:14px">
-        <h3>Peta pasar LQ45 <span class="redup">— luas kotak = kapitalisasi, warna = perubahan hari ini</span></h3>
+        <h3>Peta pasar <span class="redup">— luas kotak = kapitalisasi, warna = perubahan hari ini</span></h3>
+        <div class="rentang" id="peta-pilih" style="margin-bottom:8px"><button class="tombol kedua chip aktif" data-p="1">Lapis 1 per sektor</button><button class="tombol kedua chip" data-p="2">Lapis 2 per sektor</button><button class="tombol kedua chip" data-p="k">Konglomerat per grup</button></div>
         <div class="peta" id="peta"></div>
       </div>
       <div class="kisi" style="margin-bottom:14px">
@@ -155,7 +156,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
       <div class="kartu">
         <div class="saham-kepala">
           <div>
-            <div style="display:flex;gap:10px;align-items:center"><span style="font-size:24px;font-weight:800" id="s-kode"></span><span class="lencana" id="s-sektor"></span></div>
+            <div style="display:flex;gap:10px;align-items:center"><span style="font-size:24px;font-weight:800" id="s-kode"></span><span class="lencana" id="s-sektor"></span><span class="lencana" id="s-lapis"></span><span class="lencana" id="s-grup" style="background:var(--hover);color:var(--teks)"></span></div>
             <div class="redup" id="s-nama"></div>
           </div>
           <div style="text-align:right">
@@ -202,14 +203,15 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
     <section class="halaman" id="h-aliran">
       <div id="aliran-info"></div>
       <div class="kartu" style="margin-bottom:14px">
-        <h3>Aliran dana LQ45 <span class="redup" id="aliran-tgl"></span></h3>
+        <h3>Aliran dana <span class="redup" id="aliran-tgl"></span></h3>
         <div class="baris" id="aliran-preset" style="margin-bottom:10px"></div>
+        <div class="baris" id="aliran-saring" style="margin-bottom:10px"></div>
         <p class="redup" style="margin-top:0"><b>Asing</b>: nilai beli bersih investor asing. <b>Akumulasi</b>: nilai beli 5 broker pembeli terbesar dikurangi nilai jual 5 broker penjual terbesar (positif = cenderung dikumpulkan, negatif = cenderung dilepas). <b>Beruntun</b>: berapa hari berturut-turut ke belakang arahnya sama (+ beli, − jual). <b>Akum./nilai</b>: akumulasi 5 hari dibagi nilai transaksi 5 hari.</p>
         <div class="gulir"><table id="t-aliran"></table></div>
       </div>
       <div class="kisi2" style="margin-bottom:14px">
         <div class="kartu"><h3>Aktivitas broker seluruh pasar <span class="redup" id="pasar-broker-tgl"></span></h3><div class="gulir" style="max-height:480px"><table id="t-pasar-broker"></table></div></div>
-        <div class="kartu"><h3>Pergerakan pemegang saham besar <span class="redup" id="milik-tgl"></span></h3><p class="redup" style="margin-top:0">Perubahan pemegang saham ≥ 1% (data KSEI bulanan) di saham LQ45.</p><div class="gulir" style="max-height:440px"><table id="t-milik-ubah"></table></div></div>
+        <div class="kartu"><h3>Pergerakan pemegang saham besar <span class="redup" id="milik-tgl"></span></h3><p class="redup" style="margin-top:0">Perubahan pemegang saham ≥ 1% (data KSEI bulanan) di saham yang dianalisis.</p><div class="gulir" style="max-height:440px"><table id="t-milik-ubah"></table></div></div>
       </div>
     </section>
 
@@ -221,7 +223,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
           <label>Broker<select id="pilih-broker"></select></label>
           <span class="rentang" id="periode-broker"><button class="tombol kedua chip aktif" data-p="1h">1 hari</button><button class="tombol kedua chip" data-p="5h">5 hari</button><button class="tombol kedua chip" data-p="20h">20 hari</button></span>
         </div>
-        <p class="redup" id="info-broker">Saham LQ45 tempat broker ini masuk 10 pembeli atau 10 penjual terbesar. Saham yang tidak muncul berarti transaksinya di luar 10 besar.</p>
+        <p class="redup" id="info-broker">Saham tempat broker ini masuk 10 pembeli atau 10 penjual terbesar. Saham yang tidak muncul berarti transaksinya di luar 10 besar.</p>
         <div class="gulir"><table id="t-broker"></table></div>
       </div>
     </section>
@@ -244,9 +246,11 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
         <h3>Kalkulator ukuran posisi</h3>
         <div class="baris">
           <label>Modal (Rp)<input id="modal" type="number" value="10000000" min="0" step="100000"></label>
-          <label>Risiko per transaksi (%)<input id="risiko" type="number" value="1" min="0.1" max="5" step="0.1"></label>
+          <label>Risiko lapis 1 (%)<input id="risiko" type="number" value="1" min="0.1" max="5" step="0.1"></label>
+          <label>Risiko lapis 2–3 (%)<input id="risiko2" type="number" value="0.5" min="0.1" max="5" step="0.1"></label>
         </div>
-        <p class="redup">Jumlah lot dihitung agar kerugian bila kena batas rugi tidak melebihi risiko yang Anda pilih.</p>
+        <p class="redup">Jumlah lot dihitung agar kerugian bila kena batas rugi tidak melebihi risiko yang Anda pilih. Saham lapis 2–3 bergerak lebih liar, jadi risikonya dibuat lebih kecil.</p>
+        <div class="baris" id="kandidat-saring" style="margin-top:8px"></div>
       </div>
       <div class="kisi" id="kisi-kandidat"></div>
     </section>
@@ -461,7 +465,7 @@ function tampilBeranda(){
   }
   // statistik pasar
   const lq=GABUNG,naikN=lq.filter(s=>s.perubahan_pct>0).length,turunN=lq.filter(s=>s.perubahan_pct<0).length;
-  let st=`<div><span class="label">LQ45 naik / turun</span><b><span class="naik">${naikN}</span> / <span class="turun">${turunN}</span></b></div>`;
+  let st=`<div><span class="label">Saham dianalisis naik / turun</span><b><span class="naik">${naikN}</span> / <span class="turun">${turunN}</span></b></div>`;
   if(A&&A.pasar){const p=A.pasar;$("tgl-pasar").textContent="· "+A.tanggal_terakhir;
     st+=`<div><span class="label">Seluruh bursa naik / turun / tetap</span><b><span class="naik">${p.naik}</span> / <span class="turun">${p.turun}</span> / ${p.tetap}</b></div>
     <div><span class="label">Nilai transaksi</span><b>Rp${rp(p.nilai_total)}</b></div>
@@ -471,7 +475,7 @@ function tampilBeranda(){
   $("uji-gabungan").innerHTML=u.jumlah?`<span class="besar ${kelas(u.rata_hasil_pct)}">${pct(u.rata_hasil_pct)}</span> rata-rata per transaksi setelah biaya · ${fmt(u.jumlah)} transaksi · menang ${fmt(u.persen_menang,1)}%`+(u.rata_hasil_pct<=0?`<div style="margin-top:6px">Rata-rata masih rugi: jangan ikuti sinyal kandidat apa adanya.</div>`:""):"Belum ada sinyal.";
   gambarPeta();
   const kecil=(id,arr,f)=>{$(id).innerHTML=arr.map(s=>`<tr class="klik" data-k="${s.kode}"><td><b>${s.kode}</b></td><td>${fmt(s.tutup)}</td><td>${f(s)}</td></tr>`).join("");$(id).onclick=e=>{const t=e.target.closest("tr");if(t&&PETA[t.dataset.k])bukaSaham(t.dataset.k)}};
-  const urut=(k,t)=>[...GABUNG].filter(s=>s[k]!=null).sort((a,b)=>t?b[k]-a[k]:a[k]-b[k]).slice(0,6);
+  const urut=(k,t)=>[...GABUNG].filter(s=>s[k]!=null&&s.likuid).sort((a,b)=>t?b[k]-a[k]:a[k]-b[k]).slice(0,6);
   kecil("t-naik",urut("perubahan_pct",1),s=>`<span class="naik">${pct(s.perubahan_pct)}</span>`);
   kecil("t-turun",urut("perubahan_pct",0),s=>`<span class="turun">${pct(s.perubahan_pct)}</span>`);
   GABUNG.forEach(s=>s.nilai_hari=s.tutup*s.volume);
@@ -483,7 +487,7 @@ function tampilBeranda(){
     const arr=GABUNG.filter(s=>s.asing1!=null);
     const t=(id,a)=>{$(id).innerHTML=a.map(s=>`<tr class="klik" data-k="${s.kode}"><td><b>${s.kode}</b></td><td class="${kelas(s.perubahan_pct)}">${pct(s.perubahan_pct)}</td><td class="${kelas(s.asing1)}">Rp${rp(s.asing1)}</td></tr>`).join("");$(id).onclick=e=>{const r=e.target.closest("tr.klik");if(r)bukaSaham(r.dataset.k)}};
     t("t-asing-beli",[...arr].sort((a,b)=>b.asing1-a.asing1).slice(0,8));t("t-asing-jual",[...arr].sort((a,b)=>a.asing1-b.asing1).slice(0,8));
-    document.querySelectorAll("#blok-asing .redup").forEach(x=>x.textContent=`(LQ45, ${BR.tanggal_terakhir})`);
+    document.querySelectorAll("#blok-asing .redup").forEach(x=>x.textContent=`(saham dianalisis, ${BR.tanggal_terakhir})`);
   }else $("blok-asing").innerHTML='<div class="kartu redup">Data transaksi asing belum tersedia. Pasang pengumpul data di laptop (lihat menu Aliran Dana).</div>';
   $("berita-beranda").innerHTML=daftarBerita((B?.pasar||[]).slice(0,12));
 }
@@ -503,18 +507,21 @@ function squarify(item,x,y,w,h){
   return hasil;
   function rasio(b,p){const s=b.reduce((t,a)=>t+a.luas,0),mx=Math.max(...b.map(a=>a.luas)),mn=Math.min(...b.map(a=>a.luas));return Math.max(p*p*mx/(s*s),s*s/(p*p*mn))}
 }
+let modePeta="1";
 function gambarPeta(){
   const el=$("peta"),W=el.clientWidth,H=el.clientHeight;
-  const ada=GABUNG.filter(s=>s.kapitalisasi);
-  if(!ada.length){el.innerHTML='<div class="kosong">Peta pasar muncul setelah data fundamental (kapitalisasi) tersedia.</div>';el.style.height="auto";return}
-  const sektor={};ada.forEach(s=>(sektor[s.sektor]??=[]).push(s));
-  const kotakSektor=squarify(Object.entries(sektor).map(([n,a])=>({nama:n,anggota:a,nilai:a.reduce((t,s)=>t+s.kapitalisasi,0)})),0,0,W,H);
+  $("peta-pilih").onclick=e=>{const b=e.target.closest("button");if(!b)return;modePeta=b.dataset.p;document.querySelectorAll("#peta-pilih button").forEach(x=>x.classList.toggle("aktif",x===b));gambarPeta()};
+  const kap=s=>s.kap||s.kapitalisasi;
+  const ada=GABUNG.filter(s=>kap(s)&&(modePeta==="k"?s.grup:String(s.lapis)===modePeta));
+  if(!ada.length){el.innerHTML='<div class="kosong">Belum ada data kapitalisasi.</div>';return}
+  const kel={};ada.forEach(s=>(kel[modePeta==="k"?s.grup:(s.sektor&&s.sektor!=="–"?s.sektor:"Lainnya")]??=[]).push(s));
+  const kotakKel=squarify(Object.entries(kel).map(([n,a])=>({nama:n,anggota:a,nilai:a.reduce((t,s)=>t+kap(s),0)})),0,0,W,H);
   let html="";
-  kotakSektor.forEach(ks=>{
+  kotakKel.forEach(ks=>{
     html+=`<div class="sektor" style="left:${ks.x}px;top:${ks.y}px;max-width:${ks.w}px">${esc(ks.nama)}</div>`;
-    squarify(ks.anggota.map(s=>({...s,nilai:s.kapitalisasi})),ks.x,ks.y,ks.w,ks.h).forEach(k=>{
+    squarify(ks.anggota.map(s=>({...s,nilai:kap(s)})),ks.x,ks.y,ks.w,ks.h).forEach(k=>{
       const kecil=k.w<46||k.h<30;
-      html+=`<div class="sel" data-k="${k.kode}" title="${k.kode} ${pct(k.perubahan_pct)}" style="left:${k.x}px;top:${k.y}px;width:${k.w}px;height:${k.h}px;background:${warnaUbah(k.perubahan_pct)}">${kecil?"":`<b>${k.kode}</b><span>${pct(k.perubahan_pct)}</span>`}</div>`;
+      html+=`<div class="sel" data-k="${k.kode}" title="${k.kode} ${pct(k.perubahan_pct)} · Rp${rp(kap(k))}" style="left:${k.x}px;top:${k.y}px;width:${k.w}px;height:${k.h}px;background:${warnaUbah(k.perubahan_pct)}">${kecil?"":`<b>${k.kode}</b><span>${pct(k.perubahan_pct)}</span>`}</div>`;
     });
   });
   el.innerHTML=html;el.onclick=e=>{const c=e.target.closest(".sel");if(c)bukaSaham(c.dataset.k)};
@@ -548,9 +555,9 @@ function bukaPanel(p){PANEL=p;if(p==="tv"&&DETAIL)pasangTV(DETAIL.kode);requestA
 $("rentang").onclick=e=>{const b=e.target.closest("button");if(!b)return;RENTANG=+b.dataset.r;document.querySelectorAll("#rentang button").forEach(x=>x.classList.toggle("aktif",x===b));aturRentang()};
 function aturRentang(){if(!DETAIL||!GRAFIK[0])return;const n=DETAIL.h.lilin.length;GRAFIK[0].timeScale().setVisibleLogicalRange({from:n-RENTANG,to:n+2})}
 async function tampilSaham(kode){
-  if(!PETA[kode]){$("s-kode").textContent=kode;$("s-nama").textContent="Saham ini tidak ada di daftar pantauan analisis (LQ45).";return}
+  if(!PETA[kode]){$("s-kode").textContent=kode;$("s-nama").textContent="Saham ini di luar cakupan analisis (lapis 1–2 dan konglomerat).";return}
   const s=G(kode);
-  $("s-kode").textContent=kode;$("s-nama").textContent=s.nama+(s.industri?" · "+s.industri:"");$("s-sektor").textContent=s.sektor;
+  $("s-kode").textContent=kode;$("s-nama").textContent=s.nama+(s.industri?" · "+s.industri:"");$("s-sektor").textContent=s.sektor;$("s-lapis").textContent="Lapis "+(s.lapis||"–")+(s.likuid?"":" · sepi");$("s-grup").textContent=s.grup?"Grup "+s.grup:"";$("s-grup").style.display=s.grup?"":"none";
   $("s-harga").textContent=fmt(s.tutup);$("s-ubah").innerHTML=`<span class="${kelas(s.perubahan_pct)}">${pct(s.perubahan_pct)}</span>`;
   $("s-bintang").textContent=PANTAU.includes(kode)?"★":"☆";$("s-bintang").onclick=()=>togglePantau(kode);
   $("s-statcepat").innerHTML=[["Kapitalisasi","Rp"+rp(s.kapitalisasi)],["PER",fmt(s.per,1)],["PBV",fmt(s.pbv,2)],["ROE",s.roe==null?"–":fmt(s.roe,1)+"%"],["Imbal dividen",s.imbal_dividen==null?"–":fmt(s.imbal_dividen,2)+"%"],["RSI",fmt(s.rsi,0)],["Skor sinyal",s.skor],["Asing 5 hari",s.asing5==null?"–":`<span class="${kelas(s.asing5)}">Rp${rp(s.asing5)}</span>`]].map(([a,b])=>`<div><span class="label">${a}</span><b>${b}</b></div>`).join("");
@@ -742,15 +749,16 @@ function panelMilik(kode){
 
 // ================= halaman aliran dana =================
 const PRESET_ALIRAN={"Semua":()=>true,"Akumulasi beruntun ≥3 hari":s=>s.akum_b>=3,"Asing beli beruntun ≥3 hari":s=>s.asing_b>=3,"Asing & akumulasi positif 5 hari":s=>s.asing5>0&&s.akum5>0,"Distribusi beruntun ≥3 hari":s=>s.akum_b<=-3};
-let presetAliran="Semua",urutAliran={k:"akum5",turun:true};
+let presetAliran="Semua",urutAliran={k:"asing5",turun:true},SARING_A={likuid:"1"};
 function tampilAliran(){
   if(!BR)$("aliran-info").innerHTML='<div class="pita waspada"><b>Data broker belum ada.</b> Pasang pengumpul data di laptop Anda: unduh folder <code>lokal</code> dari repositori GitHub lalu ikuti PANDUAN-LAPTOP.md.</div>';
   else $("aliran-tgl").textContent=`· data ${BR.tanggal_terakhir} · ${BR.tanggal.length} hari tersimpan`;
   $("aliran-preset").innerHTML=Object.keys(PRESET_ALIRAN).map(n=>`<button class="tombol kedua chip ${n===presetAliran?"aktif":""}" data-p="${n}">${n}</button>`).join("");
   $("aliran-preset").onclick=e=>{const b=e.target.closest("button");if(!b)return;presetAliran=b.dataset.p;tampilAliran()};
-  const r=GABUNG.filter(PRESET_ALIRAN[presetAliran]).map(s=>({...s,rasio:BR?.metrik[s.kode]?.rasio_akum5??null}));
+  pasangSaringLapis($("aliran-saring"),SARING_A,tampilAliran);
+  const r=GABUNG.filter(s=>lolosLapis(s,SARING_A)).filter(PRESET_ALIRAN[presetAliran]).map(s=>({...s,rasio:BR?.metrik[s.kode]?.rasio_akum5??null}));
   const uang=v=>v==null?"–":`<span class="${kelas(v)}">${rp(v)}</span>`;
-  tabelUrut($("t-aliran"),[["kode","Kode",(v,s)=>`<b>${v}</b>`],["tutup","Harga",v=>fmt(v)],["perubahan_pct","Ubah",v=>`<span class="${kelas(v)}">${pct(v)}</span>`],
+  tabelUrut($("t-aliran"),[["kode","Kode",(v,s)=>`<b>${v}</b> ${lencanaLapis(s)}`],["tutup","Harga",v=>fmt(v)],["perubahan_pct","Ubah",v=>`<span class="${kelas(v)}">${pct(v)}</span>`],
     ["asing1","Asing 1h",uang],["asing5","Asing 5h",uang],["asing20","Asing 20h",uang],["asing_b","Asing beruntun",beruntunTeks],
     ["akum1","Akumulasi 1h",uang],["akum5","Akumulasi 5h",uang],["akum_b","Akumulasi beruntun",beruntunTeks],["rasio","Akum./nilai 5h",v=>v==null?"–":`<span class="${kelas(v)}">${fmt(v,1)}%</span>`]],r,urutAliran);
   const pb=BR?.pasar_broker;
@@ -781,6 +789,24 @@ function isiPelacak(){
   tabelUrut($("t-broker"),[["kode","Saham",v=>`<b>${v}</b>`],["ubah","Ubah hari ini",v=>`<span class="${kelas(v)}">${pct(v)}</span>`],["beli","Nilai beli",v=>rp(v)],["jual","Nilai jual",v=>rp(v)],["bersih","Bersih",v=>`<span class="${kelas(v)}">${rp(v)}</span>`],["lotb","Lot beli",v=>fmt(v)],["lots","Lot jual",v=>fmt(v)]],data,{k:"bersih",turun:true});
 }
 
+
+// ================= saringan lapis / grup / likuid (dipakai beberapa halaman) =================
+function daftarGrup(){return[...new Set(GABUNG.map(s=>s.grup).filter(Boolean))].sort()}
+function htmlSaringLapis(id,st){
+  return `<label>Lapis<select data-f="lapis" data-id="${id}"><option value="">Semua</option><option value="1" ${st.lapis==="1"?"selected":""}>Lapis 1</option><option value="2" ${st.lapis==="2"?"selected":""}>Lapis 2</option><option value="3" ${st.lapis==="3"?"selected":""}>Lapis 3 (konglo)</option></select></label>
+  <label>Grup<select data-f="grup" data-id="${id}"><option value="">Semua</option><option value="*" ${st.grup==="*"?"selected":""}>Semua konglomerat</option><option value="-" ${st.grup==="-"?"selected":""}>Bukan konglomerat</option>${daftarGrup().map(g=>`<option ${st.grup===g?"selected":""}>${esc(g)}</option>`).join("")}</select></label>
+  <label>Likuiditas<select data-f="likuid" data-id="${id}"><option value="">Semua</option><option value="1" ${st.likuid==="1"?"selected":""}>Ramai (≥ Rp1 M/hari)</option><option value="0" ${st.likuid==="0"?"selected":""}>Sepi</option></select></label>`;
+}
+function lolosLapis(s,st){
+  if(st.lapis&&String(s.lapis)!==st.lapis)return false;
+  if(st.grup==="*"&&!s.grup)return false;if(st.grup==="-"&&s.grup)return false;
+  if(st.grup&&st.grup!=="*"&&st.grup!=="-"&&s.grup!==st.grup)return false;
+  if(st.likuid==="1"&&!s.likuid)return false;if(st.likuid==="0"&&s.likuid)return false;
+  return true;
+}
+function pasangSaringLapis(el,st,ulang){el.innerHTML=htmlSaringLapis(el.id,st);el.onchange=e=>{const t=e.target;if(!t.dataset.f)return;st[t.dataset.f]=t.value;ulang()}}
+const lencanaLapis=s=>`<span class="redup">L${s.lapis||"–"}${s.grup?" · "+esc(s.grup):""}</span>`;
+
 // ================= penyaring =================
 const FILTER=[["per","PER"],["pbv","PBV"],["roe","ROE %"],["imbal_dividen","Imbal dividen %"],["der","DER"],["rsi","RSI"],["perubahan_pct","Ubah hari ini %"],["rasio_vol","Volume ×"],["skor","Skor sinyal"],["jarak52","Jarak dari tertinggi 52m %"],["asing5","Asing bersih 5h (Rp M)"],["akum_b","Akumulasi beruntun (hari)"]];
 const PRESET={
@@ -795,40 +821,44 @@ const PRESET={
   "Akumulasi broker beruntun ≥3":{akum_b:[3,null]},
   "Dekat tertinggi 52m (<5%)":{jarak52:[-5,null]},
 };
-let SARING={},urutSaring={k:"kapitalisasi",turun:true};
+let SARING={},SARING_L={likuid:"1"},urutSaring={k:"kap",turun:true};
 function tampilPenyaring(){
   $("preset").innerHTML=Object.keys(PRESET).map((n,i)=>`<button class="tombol kedua chip ${i===0?"aktif":""}" data-p="${n}">${n}</button>`).join("");
   $("preset").onclick=e=>{const b=e.target.closest("button");if(!b)return;document.querySelectorAll("#preset button").forEach(x=>x.classList.toggle("aktif",x===b));SARING=JSON.parse(JSON.stringify(PRESET[b.dataset.p]));isiFilter();jalankanSaring()};
   isiFilter();jalankanSaring();
 }
 function isiFilter(){
-  $("filter").innerHTML=FILTER.map(([k,n])=>{const [a,b]=SARING[k]||[];return`<label>${n}<span style="display:flex;gap:4px"><input data-k="${k}" data-i="0" type="number" step="any" placeholder="min" style="width:76px" value="${a??""}"><input data-k="${k}" data-i="1" type="number" step="any" placeholder="maks" style="width:76px" value="${b??""}"></span></label>`}).join("")+`<button class="tombol kedua" id="reset-saring">Hapus filter</button>`;
+  $("filter").innerHTML=`<span id="saring-lapis" class="baris" style="width:100%"></span>`+FILTER.map(([k,n])=>{const [a,b]=SARING[k]||[];return`<label>${n}<span style="display:flex;gap:4px"><input data-k="${k}" data-i="0" type="number" step="any" placeholder="min" style="width:76px" value="${a??""}"><input data-k="${k}" data-i="1" type="number" step="any" placeholder="maks" style="width:76px" value="${b??""}"></span></label>`}).join("")+`<button class="tombol kedua" id="reset-saring">Hapus filter</button>`;
   $("filter").oninput=e=>{const i=e.target;if(!i.dataset.k)return;const r=SARING[i.dataset.k]||[null,null];r[+i.dataset.i]=i.value===""?null:+i.value;SARING[i.dataset.k]=r;jalankanSaring()};
-  $("reset-saring").onclick=()=>{SARING={};isiFilter();jalankanSaring()};
+  $("reset-saring").onclick=()=>{SARING={};SARING_L={};isiFilter();jalankanSaring()};
+  pasangSaringLapis($("saring-lapis"),SARING_L,jalankanSaring);
 }
 function jalankanSaring(){
-  const hasil=GABUNG.filter(s=>Object.entries(SARING).every(([k,[a,b]])=>{let v=s[k];if(k==="asing5"&&v!=null)v=v/1e9;if(a==null&&b==null)return true;if(v==null)return false;return(a==null||v>=a)&&(b==null||v<=b)}));
+  const hasil=GABUNG.filter(s=>lolosLapis(s,SARING_L)).filter(s=>Object.entries(SARING).every(([k,[a,b]])=>{let v=s[k];if(k==="asing5"&&v!=null)v=v/1e9;if(a==null&&b==null)return true;if(v==null)return false;return(a==null||v>=a)&&(b==null||v<=b)}));
   $("info-saring").textContent=`${hasil.length} dari ${GABUNG.length} saham cocok.`;
-  tabelUrut($("t-saring"),[["kode","Kode",(v,s)=>`<b>${v}</b> <span class="redup">${esc((s.nama||"").slice(0,22))}</span>`],["sektor","Sektor"],["tutup","Harga",v=>fmt(v)],["perubahan_pct","Ubah",v=>`<span class="${kelas(v)}">${pct(v)}</span>`],
-    ["kapitalisasi","Kapitalisasi",v=>rp(v)],["per","PER",v=>fmt(v,1)],["pbv","PBV",v=>fmt(v,2)],["roe","ROE",v=>v==null?"–":fmt(v,1)+"%"],["imbal_dividen","Div.",v=>v==null?"–":fmt(v,1)+"%"],
+  tabelUrut($("t-saring"),[["kode","Kode",(v,s)=>`<b>${v}</b> <span class="redup">${esc((s.nama||"").slice(0,22))}</span>`],["lapis","Lapis",(v,s)=>`${v||"–"}${s.likuid?"":' <span class="redup">sepi</span>'}`],["grup","Grup",v=>v?esc(v):"–"],["sektor","Sektor"],["tutup","Harga",v=>fmt(v)],["perubahan_pct","Ubah",v=>`<span class="${kelas(v)}">${pct(v)}</span>`],
+    ["kap","Kapitalisasi",v=>rp(v)],["per","PER",v=>fmt(v,1)],["pbv","PBV",v=>fmt(v,2)],["roe","ROE",v=>v==null?"–":fmt(v,1)+"%"],["imbal_dividen","Div.",v=>v==null?"–":fmt(v,1)+"%"],
     ["rsi","RSI",v=>fmt(v,0)],["rasio_vol","Vol ×",v=>fmt(v,1)],["skor","Skor"],["asing5","Asing 5h",v=>v==null?"–":`<span class="${kelas(v)}">${rp(v)}</span>`],["ub_rata","Uji balik",v=>v==null?"–":`<span class="${kelas(v)}">${pct(v)}</span>`]],hasil,urutSaring);
 }
 
 // ================= kandidat =================
-["modal","risiko"].forEach(id=>$(id).addEventListener("input",tampilKandidat));
+["modal","risiko","risiko2"].forEach(id=>$(id).addEventListener("input",tampilKandidat));
+let SARING_K={};
 function tampilKandidat(){
   const u=R.uji_balik_gabungan;
   if(u.jumlah&&u.rata_hasil_pct<=0)$("pita-uji").innerHTML=`<div class="pita waspada"><b>Perhatian:</b> pada uji balik 2 tahun, sinyal ini rata-rata <b>${pct(u.rata_hasil_pct)}</b> per transaksi (menang ${fmt(u.persen_menang,0)}%). Jangan dipakai dengan uang sungguhan sebelum aturannya diperbaiki.</div>`;
   const el=$("kisi-kandidat");
-  if(!R.kandidat.length){el.innerHTML='<div class="kartu">Tidak ada kandidat yang memenuhi syarat hari ini.</div>';return}
-  const modal=+$("modal").value||0,risiko=(+$("risiko").value||0)/100;
-  el.innerHTML=R.kandidat.map(k=>{const s=G(k),l=s.level,u=s.uji_balik;
+  if(!$("kandidat-saring").innerHTML)pasangSaringLapis($("kandidat-saring"),SARING_K,tampilKandidat);
+  const daftarK=R.kandidat.filter(k=>lolosLapis(G(k),SARING_K));
+  if(!daftarK.length){el.innerHTML='<div class="kartu">Tidak ada kandidat yang memenuhi syarat hari ini.</div>';return}
+  const modal=+$("modal").value||0;
+  el.innerHTML=daftarK.map(k=>{const s=G(k),l=s.level,u=s.uji_balik,risiko=(+(s.lapis===1?$("risiko").value:$("risiko2").value)||0)/100;
     let lot=l.masuk>l.stop?Math.floor(modal*risiko/(l.masuk-l.stop)/100):0;lot=Math.max(0,Math.min(lot,Math.floor(modal/(l.masuk*100*1.0015))));
-    return`<div class="kartu"><div style="display:flex;justify-content:space-between;align-items:center"><a href="#saham/${k}" style="font-size:18px;font-weight:800;color:var(--teks)">${k}</a><span class="lencana">skor ${s.skor}</span></div>
-      <div class="redup">${esc(s.nama)}</div>
+    return`<div class="kartu"><div style="display:flex;justify-content:space-between;align-items:center"><a href="#saham/${k}" style="font-size:18px;font-weight:800;color:var(--teks)">${k}</a><span><span class="lencana" style="background:var(--hover);color:var(--teks)">Lapis ${s.lapis||"–"}</span> <span class="lencana">skor ${s.skor}</span></span></div>
+      <div class="redup">${esc(s.nama)}${s.grup?" · Grup "+esc(s.grup):""}</div>
       <div>${fmt(s.tutup)} <span class="${kelas(s.perubahan_pct)}">${pct(s.perubahan_pct)}</span> <span class="redup">· vol ${fmt(s.rasio_vol,1)}× · RSI ${fmt(s.rsi,0)}${s.asing5!=null?` · asing 5h <span class="${kelas(s.asing5)}">${rp(s.asing5)}</span>`:""}</span></div>
       <div class="level"><div><span class="label">Masuk</span><b>${fmt(l.masuk)}</b></div><div><span class="label">Target</span><b class="naik">${fmt(l.target)}</b><span class="redup">${pct(l.untung_bersih_pct)}</span></div><div><span class="label">Batas rugi</span><b class="turun">${fmt(l.stop)}</b><span class="redup">${pct(l.rugi_bersih_pct)}</span></div></div>
-      <div class="redup">Ukuran disarankan <b style="color:var(--teks)">${fmt(lot)} lot</b> (≈Rp${fmt(lot*100*l.masuk)})</div>
+      <div class="redup">Ukuran disarankan <b style="color:var(--teks)">${fmt(lot)} lot</b> (≈Rp${fmt(lot*100*l.masuk)}, risiko ${fmt(risiko*100,1)}%)</div>
       <ul class="alasan">${s.alasan.map(a=>`<li class="${a.startsWith("Peringatan")?"peringatan":""}">${a}</li>`).join("")}</ul>
       <div class="redup">Uji balik saham ini: ${u.jumlah?`${u.jumlah} sinyal, menang ${fmt(u.persen_menang,0)}%, rata-rata <span class="${kelas(u.rata_hasil_pct)}">${pct(u.rata_hasil_pct)}</span>`:"belum ada sinyal"}</div></div>`}).join("");
 }

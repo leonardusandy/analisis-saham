@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import config as cfg  # noqa: E402
 from analisis import analisis_saham, tambah_indikator  # noqa: E402
 
-FOLDER_DATA = Path(__file__).resolve().parent.parent / "docs" / "data"
+FOLDER_DATA = cfg.KELUAR
 WIB = timezone(timedelta(hours=7))
 
 
@@ -26,9 +26,9 @@ WIB = timezone(timedelta(hours=7))
 # Sumber data
 # ---------------------------------------------------------------------------
 def ambil_yahoo(kode_list: list[str]) -> dict[str, pd.DataFrame]:
-    import yfinance as yf
-
     import time
+
+    import yfinance as yf
 
     simbol = [f"{k}.JK" for k in kode_list] + [cfg.KODE_IHSG]
     hasil = {}
@@ -42,19 +42,22 @@ def ambil_yahoo(kode_list: list[str]) -> dict[str, pd.DataFrame]:
         hasil[kode] = df
         return True
 
-    # 1) unduh sekaligus
-    try:
-        mentah = yf.download(
-            simbol, period=cfg.PERIODE, interval="1d", auto_adjust=False,
-            group_by="ticker", threads=True, progress=False,
-        )
-        for s in simbol:
-            try:
-                simpan(s, mentah[s])
-            except KeyError:
-                pass
-    except Exception as e:  # noqa: BLE001
-        print("  ! unduhan gabungan gagal:", e)
+    # 1) unduh per kelompok 100 saham
+    for i in range(0, len(simbol), 100):
+        kelompok = simbol[i:i + 100]
+        try:
+            mentah = yf.download(
+                kelompok, period=cfg.PERIODE, interval="1d", auto_adjust=False,
+                group_by="ticker", threads=True, progress=False,
+            )
+            for s in kelompok:
+                try:
+                    simpan(s, mentah[s])
+                except KeyError:
+                    pass
+        except Exception as e:  # noqa: BLE001
+            print("  ! unduhan kelompok gagal:", e)
+        time.sleep(2)
 
     # 2) ulangi satu per satu untuk yang gagal
     for s in simbol:
@@ -97,20 +100,29 @@ def data_contoh(kode_list: list[str]) -> dict[str, pd.DataFrame]:
 # ---------------------------------------------------------------------------
 def main() -> None:
     contoh = "--contoh" in sys.argv
-    print("Mengambil data", "(CONTOH)" if contoh else "dari Yahoo Finance", "...")
-    data = data_contoh(cfg.SAHAM) if contoh else ambil_yahoo(cfg.SAHAM)
+    semesta = {s["kode"]: s for s in cfg.semesta()}
+    SAHAM = list(semesta)
+    print(f"Mengambil data {len(SAHAM)} saham", "(CONTOH)" if contoh else "dari Yahoo Finance", "...")
+    data = data_contoh(SAHAM) if contoh else ambil_yahoo(SAHAM)
 
     (FOLDER_DATA / "saham").mkdir(parents=True, exist_ok=True)
     semua = []
 
-    for kode in cfg.SAHAM:
+    gagal = []
+    for kode in SAHAM:
         if kode not in data:
+            gagal.append(kode)
             continue
         out = analisis_saham(kode, data[kode])
         if out is None:
-            print(f"  ! {kode}: data kurang")
+            gagal.append(kode)
             continue
         ringkas, detail = out
+        info = semesta[kode]
+        ringkas.update({"lapis": info.get("lapis"), "grup": info.get("grup"), "kap": info.get("kap"), "lq45": info.get("lq45")})
+        if info.get("likuid") is not None:  # likuiditas dari data IDX 20 hari lebih akurat
+            ringkas["likuid"] = bool(info["likuid"])
+        detail["ringkas"] = ringkas
         semua.append(ringkas)
         with open(FOLDER_DATA / "saham" / f"{kode}.json", "w") as f:
             json.dump(detail, f, separators=(",", ":"))
@@ -182,7 +194,7 @@ def main() -> None:
     with open(FOLDER_DATA / "ringkasan.json", "w") as f:
         json.dump(ringkasan, f, ensure_ascii=False, separators=(",", ":"))
 
-    print(f"Selesai: {len(semua)} saham, {len(kandidat)} kandidat, data {tanggal_data}.")
+    print(f"Selesai: {len(semua)} saham, {len(kandidat)} kandidat, data {tanggal_data}. Tanpa data: {len(gagal)} {gagal[:20]}")
 
 
 if __name__ == "__main__":

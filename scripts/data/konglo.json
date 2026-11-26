@@ -1,0 +1,144 @@
+{
+ "keterangan": "Pemetaan saham ke grup konglomerat. Sumber utama: Fortune IDN (27 Jul 2026) dan Investortrust (Nov 2026); grup Aguan, Bakrie, MNC, Adaro/AlamTri, Emtek, Happy Hapsoro ditambahkan dari pengetahuan umum dan perlu dicek. Ubah sesuai kebutuhan.",
+ "grup": {
+  "Djarum": [
+   "BBCA",
+   "BELI",
+   "DATA",
+   "RANC",
+   "SUPR",
+   "TOWR",
+   "SSIA"
+  ],
+  "Salim": [
+   "BINA",
+   "DCII",
+   "DNET",
+   "ICBP",
+   "IMAS",
+   "IMJS",
+   "INDF",
+   "LSIP",
+   "MEDC",
+   "META",
+   "SIMP",
+   "ROTI",
+   "FAST"
+  ],
+  "Sinar Mas": [
+   "BSDE",
+   "BSIM",
+   "DMAS",
+   "DSSA",
+   "GEMS",
+   "INKP",
+   "SMMA",
+   "SMAR",
+   "DUTI",
+   "TKIM",
+   "LIFE",
+   "MORA"
+  ],
+  "Barito (Prajogo)": [
+   "BREN",
+   "BRPT",
+   "CDIA",
+   "CUAN",
+   "PTRO",
+   "TPIA"
+  ],
+  "Astra": [
+   "AALI",
+   "ACST",
+   "ARKO",
+   "ASGR",
+   "ASII",
+   "AUTO",
+   "HEAL",
+   "UNTR"
+  ],
+  "Lippo": [
+   "GMTD",
+   "LPCK",
+   "LPKR",
+   "MLPL",
+   "MLPT",
+   "MPPA",
+   "NOBU",
+   "LPGI",
+   "SILO"
+  ],
+  "CT Corp": [
+   "MEGA",
+   "BBHI"
+  ],
+  "Mayapada": [
+   "MAYA",
+   "SRAJ",
+   "MPRO"
+  ],
+  "Saratoga": [
+   "SRTG",
+   "PALM"
+  ],
+  "Harita": [
+   "NCKL",
+   "CITA"
+  ],
+  "Jhonlin (Haji Isam)": [
+   "JARR",
+   "PGUN"
+  ],
+  "Low Tuck Kwong": [
+   "BYAN",
+   "MYOH",
+   "TRJA"
+  ],
+  "Hermanto Tanoko": [
+   "CLEO",
+   "RISE",
+   "PEVE",
+   "BLES"
+  ],
+  "MAP": [
+   "MAPI"
+  ],
+  "Aguan": [
+   "PANI",
+   "CBDK"
+  ],
+  "Bakrie": [
+   "ALII",
+   "BUMI",
+   "BRMS",
+   "BNBR",
+   "DEWA",
+   "ENRG",
+   "UNSP",
+   "VKTR"
+  ],
+  "MNC": [
+   "BHIT",
+   "BMTR",
+   "MNCN",
+   "KPIG",
+   "IPTV",
+   "BCAP",
+   "BABP",
+   "MSIN"
+  ],
+  "Adaro/AlamTri": [
+   "ADRO",
+   "AADI",
+   "ADMR"
+  ],
+  "Emtek": [
+   "EMTK",
+   "SCMA"
+  ],
+  "Happy Hapsoro": [
+   "RAJA",
+   "RATU"
+  ]
+ }
+}

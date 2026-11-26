@@ -12,10 +12,14 @@ import csv
 import json
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+import sys
 from pathlib import Path
 
-AKAR = Path(__file__).resolve().parent.parent / "docs" / "data"
-HARI = AKAR / "broker" / "hari"
+sys.path.insert(0, str(Path(__file__).parent))
+import config as cfg  # noqa: E402
+
+AKAR = cfg.KELUAR
+HARI = cfg.HARI_BROKER
 WIB = timezone(timedelta(hours=7))
 SIMPAN = 60
 TOPN = 5
@@ -75,10 +79,7 @@ def main():
         return
 
     kode_list = sorted({k for t in tanggal for k in semua[t]["saham"]})
-    try:
-        lq45 = {x["kode"] for x in json.loads((AKAR / "ringkasan.json").read_text())["saham"]}
-    except Exception:  # noqa: BLE001
-        lq45 = set(kode_list)
+    lq45 = set(cfg.kode_semesta()) | set(kode_list)  # semua saham yang dianalisis
     nama = nama_broker()
     for t in tanggal:
         for b in semua[t].get("pasar_broker") or []:

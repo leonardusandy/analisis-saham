@@ -3,3 +3,4 @@ __pycache__/
 lokal/log.txt
 lokal/keluaran/
 lokal/jalankan_windows.bat
+_site/

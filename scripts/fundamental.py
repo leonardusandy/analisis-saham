@@ -16,7 +16,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import config as cfg  # noqa: E402
 
-FOLDER = Path(__file__).resolve().parent.parent / "docs" / "data"
+FOLDER = cfg.KELUAR
+MAKS_PER_JALAN = 120      # jumlah saham yang diperbarui per hari (bergilir)
+UMUR_MAKS_HARI = 6        # data fundamental dianggap basi setelah sekian hari
 WIB = timezone(timedelta(hours=7))
 
 SEKTOR = {
@@ -155,6 +157,7 @@ def ambil_satu(kode: str) -> dict:
     }
     detail = dict(ringkas)
     detail["profil"] = info.get("longBusinessSummary")
+    detail["diperbarui"] = datetime.now(WIB).strftime("%Y-%m-%d")
     detail["kurs_konversi"] = None if k == 1.0 else round(k, 2)
     for nama, fungsi, n in [
         ("laba_rugi_tahunan", lambda: t.income_stmt, 4),
@@ -183,43 +186,58 @@ def ambil_satu(kode: str) -> dict:
     return ringkas, detail
 
 
+KUNCI_RINGKAS = None
+
+
 def main():
     (FOLDER / "fundamental").mkdir(parents=True, exist_ok=True)
-    berkas_ringkas = FOLDER / "fundamental.json"
-    lama = {}
-    if berkas_ringkas.exists():
-        try:
-            lama = {s["kode"]: s for s in json.loads(berkas_ringkas.read_text())["saham"]}
-        except Exception:  # noqa: BLE001
-            lama = {}
+    kode_list = cfg.kode_semesta()
+    hari_ini = datetime.now(WIB).date()
 
-    hasil, gagal = {}, []
-    for kode in cfg.SAHAM:
+    def umur(kode):
+        f = FOLDER / "fundamental" / f"{kode}.json"
+        if not f.exists():
+            return 10_000
+        try:
+            t = json.loads(f.read_text()).get("diperbarui")
+            return (hari_ini - datetime.strptime(t, "%Y-%m-%d").date()).days if t else 9_999
+        except Exception:  # noqa: BLE001
+            return 10_000
+
+    umur_map = {k: umur(k) for k in kode_list}
+    kosong = sum(1 for v in umur_map.values() if v >= 10_000)
+    batas = len(kode_list) if kosong > len(kode_list) // 2 else MAKS_PER_JALAN
+    perlu = sorted([k for k in kode_list if umur_map[k] >= UMUR_MAKS_HARI], key=lambda k: -umur_map[k])[:batas]
+    print(f"Fundamental: {len(perlu)} dari {len(kode_list)} saham diperbarui hari ini.")
+
+    gagal = []
+    for kode in perlu:
         for coba in range(2):
             try:
-                ringkas, detail = ambil_satu(kode)
-                hasil[kode] = ringkas
+                _, detail = ambil_satu(kode)
                 (FOLDER / "fundamental" / f"{kode}.json").write_text(
-                    json.dumps(detail, ensure_ascii=False, separators=(",", ":"))
-                )
+                    json.dumps(detail, ensure_ascii=False, separators=(",", ":")))
                 break
             except Exception as e:  # noqa: BLE001
                 print(f"  ! {kode} percobaan {coba + 1}: {e}")
                 time.sleep(5)
         else:
             gagal.append(kode)
-            if kode in lama:
-                hasil[kode] = lama[kode]
         time.sleep(0.7)
 
-    berkas_ringkas.write_text(
-        json.dumps(
-            {"dibuat": datetime.now(WIB).strftime("%Y-%m-%d %H:%M WIB"), "saham": list(hasil.values())},
-            ensure_ascii=False,
-            separators=(",", ":"),
-        )
-    )
-    print(f"Fundamental: {len(hasil) - len(gagal)} berhasil, {len(gagal)} gagal {gagal}")
+    kunci = ["kode", "nama", "sektor", "industri", "kapitalisasi", "per", "per_maju", "pbv", "roe", "roa", "der",
+             "margin_laba", "tumbuh_pendapatan", "tumbuh_laba", "imbal_dividen", "eps", "nilai_buku", "mata_uang_laporan",
+             "beta", "tertinggi_52m", "terendah_52m", "jumlah_saham", "situs", "diperbarui"]
+    semua = []
+    for kode in kode_list:
+        f = FOLDER / "fundamental" / f"{kode}.json"
+        if f.exists():
+            d = json.loads(f.read_text())
+            semua.append({k: d.get(k) for k in kunci})
+    (FOLDER / "fundamental.json").write_text(json.dumps(
+        {"dibuat": datetime.now(WIB).strftime("%Y-%m-%d %H:%M WIB"), "saham": semua},
+        ensure_ascii=False, separators=(",", ":")))
+    print(f"Fundamental: {len(semua)} saham tersedia, {len(gagal)} gagal {gagal[:15]}")
 
 
 if __name__ == "__main__":
