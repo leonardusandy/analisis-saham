@@ -4,19 +4,19 @@ on:
   schedule:
     # 10:30 UTC = 17:30 WIB, Senin–Jumat (setelah bursa tutup)
     - cron: "30 10 * * 1-5"
-  workflow_dispatch: {}   # tombol "Run workflow" untuk menjalankan manual
+  workflow_dispatch: {}
 
 permissions:
   contents: write
 
 concurrency:
-  group: analisis-harian
+  group: data-repo
   cancel-in-progress: false
 
 jobs:
   analisis:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -28,8 +28,20 @@ jobs:
       - name: Pasang pustaka
         run: pip install -r requirements.txt
 
-      - name: Ambil data dan analisis
+      - name: Harga dan analisis teknikal
         run: python scripts/jalankan.py
+
+      - name: Data fundamental, keuangan, dividen
+        continue-on-error: true
+        run: python scripts/fundamental.py
+
+      - name: Transaksi asing (situs IDX)
+        continue-on-error: true
+        run: python scripts/asing.py
+
+      - name: Berita
+        continue-on-error: true
+        run: python scripts/berita.py
 
       - name: Simpan hasil ke repositori
         run: |
@@ -40,5 +52,6 @@ jobs:
             echo "Tidak ada data baru."
           else
             git commit -m "Data harian $(TZ=Asia/Jakarta date +'%Y-%m-%d')"
+            git pull --rebase origin main
             git push
           fi
