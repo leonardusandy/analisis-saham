@@ -35,8 +35,17 @@ nav.menu a.aktif{background:var(--latar-aksen);color:var(--aksen)}nav.menu a:hov
 @media(max-width:900px){.tata{grid-template-columns:1fr}.samping{order:2}}
 .samping .kartu{position:sticky;top:70px;padding:0;max-height:calc(100vh - 90px);overflow:auto}
 .pantau-judul{padding:12px 14px;font-weight:700;border-bottom:1px solid var(--garis);display:flex;justify-content:space-between}
-.pantau a{display:grid;grid-template-columns:1fr auto;padding:8px 14px;border-bottom:1px solid var(--garis);color:var(--teks)}
+.pantau a{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--garis);color:var(--teks)}
 .pantau a:hover{background:var(--hover);text-decoration:none}.pantau a.aktif{background:var(--latar-aksen)}
+.pantau .hapus{border:0;background:none;color:var(--redup);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;border-radius:4px;visibility:hidden}
+.pantau a:hover .hapus{visibility:visible}.pantau .hapus:hover{color:var(--merah);background:var(--hover)}
+@media (hover:none){.pantau .hapus{visibility:visible}}
+.tambah-pantau{display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid var(--garis)}
+.tambah-pantau input{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--garis);border-radius:6px;background:var(--latar);color:var(--teks);text-transform:uppercase;font:inherit;font-size:13px}
+.tambah-pantau button{padding:6px 10px;border:0;border-radius:6px;background:var(--aksen);color:#fff;font-weight:600;cursor:pointer}
+.pesan-pantau{padding:0 14px 8px;font-size:12px;color:var(--merah)}
+.jam{margin-left:auto;text-align:right;font-size:12px;line-height:1.3;color:var(--redup);white-space:nowrap;font-variant-numeric:tabular-nums}
+.jam b{color:var(--teks);font-size:13px}.jam .buka{color:var(--hijau)}
 .pantau small{color:var(--redup);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
 .kartu{background:var(--kartu);border:1px solid var(--garis);border-radius:12px;padding:16px}
 .kartu h3{margin:0 0 10px;font-size:15px}
@@ -102,6 +111,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
 <div class="kepala"><div class="kepala-isi">
   <a class="logo" href="#beranda"><i></i>Analisis Saham</a>
   <div class="cari"><input id="cari" placeholder="Cari kode atau nama saham…" autocomplete="off"><div class="saran" id="saran"></div></div>
+  <div class="jam" id="jam" title="Waktu Jakarta (WIB)"></div>
   <nav class="menu" id="menu">
     <a href="#beranda" data-h="beranda">Beranda</a>
     <a href="#pilihan" data-h="pilihan">Pilihan Harian</a>
@@ -121,6 +131,9 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
 <div class="tata">
   <aside class="samping"><div class="kartu">
     <div class="pantau-judul">Daftar Pantau <span class="redup" id="jml-pantau"></span></div>
+    <form class="tambah-pantau" id="form-pantau" autocomplete="off"><input id="isi-pantau" list="daftar-kode" placeholder="Kode, mis. BBCA" maxlength="6" aria-label="Kode saham yang ditambahkan"><button type="submit">Tambah</button></form>
+    <datalist id="daftar-kode"></datalist>
+    <div class="pesan-pantau" id="pesan-pantau" hidden></div>
     <div class="pantau" id="pantau"></div>
     <div class="redup" style="padding:10px 14px">Tambah saham dengan tombol ☆ di halaman saham.</div>
   </div></aside>
@@ -433,7 +446,7 @@ Promise.allSettled([ambil("data/ringkasan.json"),ambil("data/fundamental.json"),
   R.saham.forEach(s=>PETA[s.kode]=s);
   GABUNG=R.saham.map(s=>gabungSaham(s.kode));
   $("info-data").textContent=`Harga penutupan ${R.tanggal_data} · diperbarui ${R.dibuat}`+(B?` · berita ${B.dibuat}`:"");
-  isiPengaturan(R.pengaturan);tampilPantau();route();
+  isiPengaturan(R.pengaturan);tampilPantau();pasangPantau();route();
 });
 function asingBeruntun(kode){
   if(!A)return BR?.metrik?.[kode]?.asing_beruntun??null;
@@ -493,8 +506,32 @@ function bukaSaham(k){location.hash="#saham/"+k}
 let PANTAU=bacaLokal("pantau-v1",["BBCA","BBRI","BMRI","TLKM","ASII"]);
 function tampilPantau(){
   $("jml-pantau").textContent=PANTAU.length;
-  $("pantau").innerHTML=PANTAU.filter(k=>PETA[k]).map(k=>{const s=G(k);return`<a href="#saham/${k}" data-k="${k}"><div><b>${k}</b><small>${s.nama!==k?esc(s.nama):"&nbsp;"}</small></div><div style="text-align:right"><b>${fmt(s.tutup)}</b><small class="${kelas(s.perubahan_pct)}">${pct(s.perubahan_pct)}</small></div></a>`}).join("")||'<div class="kosong">Belum ada saham.</div>';
+  $("pantau").innerHTML=PANTAU.filter(k=>PETA[k]).map(k=>{const s=G(k);return`<a href="#saham/${k}" data-k="${k}"><div><b>${k}</b><small>${s.nama!==k?esc(s.nama):"&nbsp;"}</small></div><div style="text-align:right"><b>${fmt(s.tutup)}</b><small class="${kelas(s.perubahan_pct)}">${pct(s.perubahan_pct)}</small></div><button class="hapus" data-hapus="${k}" title="Hapus ${k} dari daftar pantau" aria-label="Hapus ${k}">×</button></a>`}).join("")||'<div class="kosong">Belum ada saham.</div>';
 }
+function pasangPantau(){
+  $("daftar-kode").innerHTML=Object.keys(PETA).sort().map(k=>`<option value="${k}">${esc(G(k).nama||"")}</option>`).join("");
+  const pesan=t=>{const el=$("pesan-pantau");el.textContent=t;el.hidden=!t};
+  $("form-pantau").onsubmit=e=>{e.preventDefault();
+    const k=$("isi-pantau").value.trim().toUpperCase().replace(/\.JK$/,"");
+    if(!k)return;
+    if(!PETA[k])return pesan(`Kode ${k} tidak ada di daftar saham.`);
+    if(PANTAU.includes(k))return pesan(`${k} sudah ada di daftar pantau.`);
+    PANTAU=[...PANTAU,k];simpanLokal("pantau-v1",PANTAU);$("isi-pantau").value="";pesan("");tampilPantau()};
+  $("isi-pantau").oninput=()=>pesan("");
+  $("pantau").addEventListener("click",e=>{const b=e.target.closest("[data-hapus]");if(!b)return;e.preventDefault();e.stopPropagation();
+    const k=b.dataset.hapus;PANTAU=PANTAU.filter(x=>x!==k);simpanLokal("pantau-v1",PANTAU);tampilPantau();
+    if($("s-bintang"))$("s-bintang").textContent=PANTAU.includes(location.hash.split("/")[1])?"★":"☆"});
+}
+function jalankanJam(){
+  const f=new Intl.DateTimeFormat("id-ID",{timeZone:"Asia/Jakarta",weekday:"long",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+  const tik=()=>{const p=Object.fromEntries(f.formatToParts(new Date()).map(x=>[x.type,x.value]));
+    const hari=p.weekday,m=(+p.hour)*60+(+p.minute),jumat=hari==="Jumat",kerja=!["Sabtu","Minggu"].includes(hari);
+    const s1=m>=540&&m<(jumat?690:720), s2=m>=(jumat?840:810)&&m<950, pra=m>=525&&m<540;
+    const st=!kerja?"Bursa tutup (akhir pekan)":s1?"Sesi 1 berjalan":s2?"Sesi 2 berjalan":pra?"Pra-pembukaan":m>=950&&m<960?"Pra-penutupan":"Bursa tutup";
+    $("jam").innerHTML=`<b>${p.hour}.${p.minute}.${p.second} WIB</b><br>${hari}, ${p.day} ${p.month} ${p.year} · <span class="${s1||s2?"buka":""}">${st}</span>`};
+  tik();setInterval(tik,1000);
+}
+jalankanJam();
 function togglePantau(k){PANTAU=PANTAU.includes(k)?PANTAU.filter(x=>x!==k):[...PANTAU,k];simpanLokal("pantau-v1",PANTAU);tampilPantau();$("s-bintang").textContent=PANTAU.includes(k)?"★":"☆"}
 
 // ================= beranda =================
