@@ -24,15 +24,15 @@ DAFTAR = {
         ("^JKSE", "IHSG", "Indonesia"), ("^GSPC", "S&P 500", "Amerika Serikat"), ("^DJI", "Dow Jones 30", "Amerika Serikat"),
         ("^IXIC", "Nasdaq", "Amerika Serikat"), ("^HSI", "Hang Seng", "Hong Kong"), ("^N225", "Nikkei 225", "Jepang"),
         ("^KS11", "KOSPI", "Korea Selatan"), ("000001.SS", "Shanghai Composite", "Tiongkok"), ("^STI", "Straits Times", "Singapura"),
-        ("^KLSE", "FTSE Bursa Malaysia KLCI", "Malaysia"), ("^SET.BK", "SET", "Thailand"), ("^BSESN", "Sensex", "India"),
+        ("^KLSE", "FTSE Bursa Malaysia KLCI", "Malaysia"), ("^BSESN", "Sensex", "India"),
         ("^FTSE", "FTSE 100", "Inggris"), ("^FCHI", "CAC 40", "Prancis"), ("^GDAXI", "DAX", "Jerman"), ("^AXJO", "ASX 200", "Australia"),
     ],
     "komoditas": [
         ("BZ=F", "Minyak Brent", "USD/barel"), ("CL=F", "Minyak WTI", "USD/barel"), ("NG=F", "Gas alam", "USD/MMBtu"),
         ("MTF=F", "Batu bara Newcastle", "USD/ton"), ("GC=F", "Emas", "USD/troy ons"), ("SI=F", "Perak", "USD/troy ons"),
         ("HG=F", "Tembaga", "USD/pon"), ("ALI=F", "Aluminium", "USD/ton"), ("PL=F", "Platinum", "USD/troy ons"),
-        ("KPO=F", "Minyak sawit (CPO)", "MYR/ton"), ("ZS=F", "Kedelai", "sen USD/bushel"), ("KC=F", "Kopi", "sen USD/pon"),
-        ("CC=F", "Kakao", "USD/ton"), ("SB=F", "Gula", "sen USD/pon"), ("RS=F", "Kanola", "CAD/ton"),
+        ("ZS=F", "Kedelai", "sen USD/bushel"), ("KC=F", "Kopi", "sen USD/pon"),
+        ("CC=F", "Kakao", "USD/ton"), ("SB=F", "Gula", "sen USD/pon"), ("ZW=F", "Gandum", "sen USD/bushel"),
     ],
     "kurs": [
         ("IDR=X", "USD/IDR", "Rupiah per dolar AS"), ("EURIDR=X", "EUR/IDR", "Rupiah per euro"),
@@ -62,7 +62,8 @@ def main():
         except Exception:  # noqa: BLE001
             lama = {}
 
-    simbol = [s for g in DAFTAR.values() for s, _, _ in g]
+    TURUNAN = {"CNYIDR=X": "CNY=X", "SARIDR=X": "SAR=X"}  # dihitung dari USD/IDR dibagi USD/XXX
+    simbol = [s for g in DAFTAR.values() for s, _, _ in g] + list(TURUNAN.values())
     try:
         mentah = yf.download(simbol, period="1y", interval="1d", auto_adjust=False, group_by="ticker",
                              threads=True, progress=False)
@@ -76,6 +77,10 @@ def main():
         for s, nama, ket in daftar:
             try:
                 c = mentah[s]["Close"].dropna()
+                if len(c) < 2 and s in TURUNAN:
+                    usd = mentah["IDR=X"]["Close"].dropna()
+                    lain = mentah[TURUNAN[s]]["Close"].dropna()
+                    c = (usd / lain).dropna()
                 if len(c) < 2:
                     raise KeyError
             except Exception:  # noqa: BLE001
