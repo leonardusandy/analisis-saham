@@ -116,36 +116,39 @@ def urai_topbroker(html: str) -> list:
 # Jaringan
 # ---------------------------------------------------------------------------
 _SESI = None
+GAGAL_TERAKHIR = ""
 
 
 def sesi():
     global _SESI
     if _SESI is None:
-        try:
-            from curl_cffi import requests as creq  # meniru Chrome, lebih jarang diblokir
+        import requests
 
-            _SESI = creq.Session(impersonate="chrome")
-        except ImportError:
-            import requests
-
-            _SESI = requests.Session()
-            _SESI.headers["User-Agent"] = AGEN
+        _SESI = requests.Session()
+        _SESI.headers.update({
+            "User-Agent": AGEN,
+            "Accept": "text/html,*/*;q=0.8",
+            "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
+            "Referer": "https://www.indopremier.com/ipotnews/",
+            "X-Requested-With": "XMLHttpRequest",
+        })
     return _SESI
 
 
-def ambil(url: str, coba: int = 4) -> str | None:
+def ambil(url: str, coba: int = 3) -> str | None:
+    global GAGAL_TERAKHIR
     jeda = 0.5
-    for i in range(coba):
+    for _ in range(coba):
         try:
-            r = sesi().get(url, timeout=30)
+            r = sesi().get(url, timeout=(10, 20))
             if r.status_code == 200:
                 return r.text
-            # IPOT kadang memberi 404 palsu beberapa detik; ulangi
+            GAGAL_TERAKHIR = f"status {r.status_code}"  # IPOT kadang memberi 404 palsu sesaat; ulangi
         except Exception as e:  # noqa: BLE001
-            if i == coba - 1:
-                log("  ! gagal:", url[:90], e)
+            GAGAL_TERAKHIR = f"{type(e).__name__}: {str(e)[:120]}"
         time.sleep(jeda)
         jeda *= 2
+    log(f"  ! gagal mengambil ({GAGAL_TERAKHIR})")
     return None
 
 
@@ -189,22 +192,26 @@ def hari_bursa_terakhir(n: int) -> list[date]:
 def ambil_hari(tgl: date, kode_list: list[str], terbaru: bool) -> dict:
     s = tgl.strftime("%m/%d/%Y")
     data = {"tanggal": tgl.isoformat(), "dibuat": datetime.now(WIB).strftime("%Y-%m-%d %H:%M WIB"), "saham": {}}
-    ada_transaksi = False
+    ada_transaksi, berhasil, gagal = False, 0, 0
     for i, kode in enumerate(kode_list, 1):
         html = ambil(f"{IPOT_BROKER}?code={kode}&start={s}&end={s}&fd=all&board=all")
         if html is None:
+            gagal += 1
+            if berhasil == 0 and gagal >= 3:
+                raise ConnectionError(f"Situs Indo Premier tidak bisa diakses ({GAGAL_TERAKHIR}).")
             continue
+        berhasil += 1
         hasil = urai_broker(html)
         if hasil is None:
             continue
         if hasil["b"] or (hasil["tval"] or 0) > 0:
             ada_transaksi = True
             data["saham"][kode] = hasil
-        if i % 10 == 0:
+        if i % 5 == 0:
             log(f"  {tgl} {i}/{len(kode_list)} saham")
         time.sleep(0.4)
-        if i == 3 and not ada_transaksi:
-            break  # hari libur bursa: tiga saham teramai pun tanpa transaksi
+        if berhasil >= 3 and not ada_transaksi:
+            break  # hari libur bursa: tiga saham pun tanpa transaksi
     data["libur"] = not ada_transaksi
     if terbaru and ada_transaksi:
         html = ambil(IPOT_TOPBROKER)
@@ -298,6 +305,16 @@ def main():
     if "--uji" in sys.argv:
         uji()
         return
+    if "--cek" in sys.argv:
+        t = hari_bursa_terakhir(1)[0].strftime("%m/%d/%Y")
+        log(f"Menguji koneksi ke Indo Premier (BBCA, {t})…")
+        html = ambil(f"{IPOT_BROKER}?code=BBCA&start={t}&end={t}&fd=all&board=all")
+        if html is None:
+            log("GAGAL terhubung.")
+        else:
+            h = urai_broker(html)
+            log(f"BERHASIL: {len(h['b'])} pembeli, {len(h['s'])} penjual, nilai {h['tval']}, asing bersih {h['fnet']}")
+        return
     log("Mulai mengumpulkan data…")
     kode_list = daftar_saham()
     sudah = tanggal_tersedia()
@@ -308,9 +325,18 @@ def main():
     log(f"{len(kode_list)} saham, {len(hari)} hari akan diambil: {hari[0]} … {hari[-1]}")
     berkas = {}
     for tgl in hari:
-        d = ambil_hari(tgl, kode_list, terbaru=(tgl == hari[-1]))
+        try:
+            d = ambil_hari(tgl, kode_list, terbaru=(tgl == hari[-1]))
+        except ConnectionError as e:
+            log(f"BERHENTI: {e}")
+            t = tgl.strftime("%m/%d/%Y")
+            log("Uji di browser:", f"{IPOT_BROKER}?code=BBCA&start={t}&end={t}&fd=all&board=all")
+            break
         log(f"{tgl}: {'libur bursa' if d['libur'] else str(len(d['saham'])) + ' saham'}")
         berkas[f"docs/data/broker/hari/{tgl.isoformat()}.json"] = json.dumps(d, ensure_ascii=False, separators=(",", ":"))
+    if not berkas:
+        log("Tidak ada data yang bisa diunggah.")
+        return
     if "--tanpa-unggah" in sys.argv:
         out = FOLDER / "keluaran"
         out.mkdir(exist_ok=True)
