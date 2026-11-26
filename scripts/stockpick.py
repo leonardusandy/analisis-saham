@@ -207,8 +207,7 @@ def main():
     (k / "stockpick.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":"), default=str))
     print(f"Stockpick: uptrend {len(data['uptrend'])}, sideways {len(data['sideways'])}, keluar {len(keluar)}, "
           f"analisa {len(analisa)}, sektor better {len(lebih_baik)}, support kuat {sum(b['kuat'] for b in baris)}, "
-          f"murah {sum(b['murah'] for b in baris)}, ^^^ {sum(b['tingkat'] == 3 for b in baris)}; "
-          f"analisa: {[(a['kode'], a['entry'], a['r1'], a['cl']) for a in analisa]}")
+          f"murah {sum(b['murah'] for b in baris)}, ^^^ {sum(b['tingkat'] == 3 for b in baris)}")
 
 
 if __name__ == "__main__":

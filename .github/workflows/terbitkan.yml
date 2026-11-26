@@ -70,9 +70,15 @@ jobs:
           path: _site/data
           key: data-${{ github.run_id }}
 
+      # Data di cache tetap utuh; yang diterbitkan adalah salinan terenkripsi.
+      - name: Kunci data dengan sandi web
+        env:
+          SANDI_WEB: ${{ secrets.SANDI_WEB }}
+        run: python scripts/enkripsi.py _site _terbit
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: _terbit
 
       - id: deploy
         uses: actions/deploy-pages@v4
