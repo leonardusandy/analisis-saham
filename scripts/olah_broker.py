@@ -72,6 +72,10 @@ def main():
         return
 
     kode_list = sorted({k for t in tanggal for k in semua[t]["saham"]})
+    try:
+        lq45 = {x["kode"] for x in json.loads((AKAR / "ringkasan.json").read_text())["saham"]}
+    except Exception:  # noqa: BLE001
+        lq45 = set(kode_list)
     nama = nama_broker()
     for t in tanggal:
         for b in semua[t].get("pasar_broker") or []:
@@ -147,7 +151,7 @@ def main():
     if idx_tgl:
         harian = {}
         for t in idx_tgl:
-            harian[t] = {k: [v[0], v[1], v[2], v[4], v[5]] for k, v in semua[t]["idx"].items() if k in kode_list}
+            harian[t] = {k: [v[0], v[1], v[2], v[4], v[5]] for k, v in semua[t]["idx"].items() if k in lq45}
         t = idx_tgl[-1]
         baris = []
         for k, v in semua[t]["idx"].items():

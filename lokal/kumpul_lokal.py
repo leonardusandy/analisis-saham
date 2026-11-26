@@ -189,36 +189,58 @@ def hari_bursa_terakhir(n: int) -> list[date]:
     return sorted(hasil)
 
 
+IPOT_MATI = False  # setelah Indo Premier terbukti tidak bisa diakses, hari berikutnya tidak dicoba lagi
+
+
 def ambil_hari(tgl: date, kode_list: list[str], terbaru: bool) -> dict:
+    """Ambil satu hari bursa. Situs IDX dicoba lebih dulu (satu permintaan) karena sekaligus
+    memastikan apakah hari itu libur; Indo Premier (ringkasan broker) dicoba sesudahnya."""
+    global IPOT_MATI
     s = tgl.strftime("%m/%d/%Y")
     data = {"tanggal": tgl.isoformat(), "dibuat": datetime.now(WIB).strftime("%Y-%m-%d %H:%M WIB"), "saham": {}}
+
+    idx = ambil_idx(tgl)  # None = gagal; {} = tidak ada perdagangan (libur)
+    if idx == {}:
+        data["libur"] = True
+        return data
+    if idx:
+        data["idx"] = idx
+
     ada_transaksi, berhasil, gagal = False, 0, 0
-    for i, kode in enumerate(kode_list, 1):
-        html = ambil(f"{IPOT_BROKER}?code={kode}&start={s}&end={s}&fd=all&board=all")
-        if html is None:
-            gagal += 1
-            if berhasil == 0 and gagal >= 3:
-                raise ConnectionError(f"Situs Indo Premier tidak bisa diakses ({GAGAL_TERAKHIR}).")
-            continue
-        berhasil += 1
-        hasil = urai_broker(html)
-        if hasil is None:
-            continue
-        if hasil["b"] or (hasil["tval"] or 0) > 0:
-            ada_transaksi = True
-            data["saham"][kode] = hasil
-        if i % 5 == 0:
-            log(f"  {tgl} {i}/{len(kode_list)} saham")
-        time.sleep(0.4)
-        if berhasil >= 3 and not ada_transaksi:
-            break  # hari libur bursa: tiga saham pun tanpa transaksi
-    data["libur"] = not ada_transaksi
-    if terbaru and ada_transaksi:
-        html = ambil(IPOT_TOPBROKER)
-        if html:
-            data["pasar_broker"] = urai_topbroker(html)
-        data["idx"] = ambil_idx(tgl)
+    if not IPOT_MATI:
+        for i, kode in enumerate(kode_list, 1):
+            html = ambil(f"{IPOT_BROKER}?code={kode}&start={s}&end={s}&fd=all&board=all")
+            if html is None:
+                gagal += 1
+                if berhasil == 0 and gagal >= 3:
+                    IPOT_MATI = True
+                    log(f"  Indo Premier tidak bisa diakses ({GAGAL_TERAKHIR}); ringkasan broker dilewati.")
+                    break
+                continue
+            berhasil += 1
+            hasil = urai_broker(html)
+            if hasil is None:
+                continue
+            if hasil["b"] or (hasil["tval"] or 0) > 0:
+                ada_transaksi = True
+                data["saham"][kode] = hasil
+            if i % 5 == 0:
+                log(f"  {tgl} {i}/{len(kode_list)} saham")
+            time.sleep(0.4)
+            if berhasil >= 3 and not ada_transaksi and not idx:
+                break  # hari libur bursa: tiga saham pun tanpa transaksi
+        if terbaru and ada_transaksi:
+            html = ambil(IPOT_TOPBROKER)
+            if html:
+                data["pasar_broker"] = urai_topbroker(html)
+
+    if not idx and IPOT_MATI:
+        raise ConnectionError(f"Situs IDX dan Indo Premier sama-sama tidak bisa diakses ({GAGAL_TERAKHIR}).")
+    data["libur"] = not idx and not ada_transaksi
     return data
+
+
+_IDX_SESI = None
 
 
 def ambil_idx(tgl: date) -> dict | None:
@@ -227,9 +249,12 @@ def ambil_idx(tgl: date) -> dict | None:
         from curl_cffi import requests as creq
     except ImportError:
         return None
+    global _IDX_SESI
     try:
-        s = creq.Session(impersonate="chrome")
-        s.get("https://www.idx.co.id/id", timeout=30)
+        if _IDX_SESI is None:
+            _IDX_SESI = creq.Session(impersonate="chrome")
+            _IDX_SESI.get("https://www.idx.co.id/id", timeout=30)
+        s = _IDX_SESI
         r = s.get(IDX_RINGKASAN.format(tgl.strftime("%Y%m%d")), timeout=40,
                   headers={"Referer": "https://www.idx.co.id/id/data-pasar/ringkasan-perdagangan/ringkasan-saham/"})
         if r.status_code != 200:
@@ -242,8 +267,9 @@ def ambil_idx(tgl: date) -> dict | None:
                 float(d.get("Close") or 0), float(d.get("Previous") or 0),
                 float(d.get("Value") or 0), int(d.get("Frequency") or 0),
             ]
-        log(f"  Situs IDX: {len(hasil)} saham.")
-        return hasil or None
+        aktif = sum(1 for v in hasil.values() if v[4] > 0)
+        log(f"  {tgl} situs IDX: {aktif} saham diperdagangkan.")
+        return hasil if aktif else {}
     except Exception as e:  # noqa: BLE001
         log("  Situs IDX tidak bisa diakses:", e)
         return None
@@ -310,10 +336,13 @@ def main():
         log(f"Menguji koneksi ke Indo Premier (BBCA, {t})…")
         html = ambil(f"{IPOT_BROKER}?code=BBCA&start={t}&end={t}&fd=all&board=all")
         if html is None:
-            log("GAGAL terhubung.")
+            log("GAGAL terhubung ke Indo Premier.")
         else:
             h = urai_broker(html)
             log(f"BERHASIL: {len(h['b'])} pembeli, {len(h['s'])} penjual, nilai {h['tval']}, asing bersih {h['fnet']}")
+        log("Menguji koneksi ke situs IDX…")
+        hasil = ambil_idx(hari_bursa_terakhir(1)[0])
+        log("GAGAL terhubung ke IDX." if hasil is None else ("IDX: tidak ada perdagangan pada tanggal itu." if not hasil else "BERHASIL terhubung ke IDX."))
         return
     log("Mulai mengumpulkan data…")
     kode_list = daftar_saham()
