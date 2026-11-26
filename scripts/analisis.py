@@ -225,6 +225,22 @@ def _f(x, d=2):
     return round(x, d) if math.isfinite(x) else None
 
 
+def _ubah(df: pd.DataFrame, n: int):
+    if len(df) <= n:
+        return None
+    awal = df["Close"].iloc[-1 - n]
+    return _f((df["Close"].iloc[-1] / awal - 1) * 100) if awal else None
+
+
+def _ubah_ytd(df: pd.DataFrame):
+    tahun = df.index[-1].year
+    lalu = df[df.index.year < tahun]
+    if lalu.empty:
+        return None
+    awal = lalu["Close"].iloc[-1]
+    return _f((df["Close"].iloc[-1] / awal - 1) * 100) if awal else None
+
+
 def analisis_saham(kode: str, df: pd.DataFrame) -> tuple[dict, dict] | None:
     df = df.dropna(subset=["Open", "High", "Low", "Close"])
     df = df[df["Close"] > 0]
@@ -251,6 +267,8 @@ def analisis_saham(kode: str, df: pd.DataFrame) -> tuple[dict, dict] | None:
         "atr": _f(akhir["ATR"], 1),
         "sma20": _f(akhir["SMA20"], 0),
         "sma50": _f(akhir["SMA50"], 0),
+        "ubah_5h": _ubah(df, 5), "ubah_20h": _ubah(df, 20), "ubah_60h": _ubah(df, 60),
+        "ubah_1t": _ubah(df, 250), "ubah_ytd": _ubah_ytd(df),
         "skor": int(s_akhir["total"]),
         "likuid": bool(s_akhir["likuid"]),
         "alasan": alasan,

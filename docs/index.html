@@ -100,6 +100,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
   <div class="cari"><input id="cari" placeholder="Cari kode atau nama saham…" autocomplete="off"><div class="saran" id="saran"></div></div>
   <nav class="menu" id="menu">
     <a href="#beranda" data-h="beranda">Beranda</a>
+    <a href="#pasar" data-h="pasar">Pasar</a>
     <a href="#aliran" data-h="aliran">Aliran Dana</a>
     <a href="#bandar" data-h="bandar">Bandarmologi</a>
     <a href="#broker" data-h="broker">Pelacak Broker</a>
@@ -216,6 +217,17 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
       <div class="kisi2" style="margin-bottom:14px">
         <div class="kartu"><h3>Aktivitas broker seluruh pasar <span class="redup" id="pasar-broker-tgl"></span></h3><div class="gulir" style="max-height:480px"><table id="t-pasar-broker"></table></div></div>
         <div class="kartu"><h3>Pergerakan pemegang saham besar <span class="redup" id="milik-tgl"></span></h3><p class="redup" style="margin-top:0">Perubahan pemegang saham ≥ 1% (data KSEI bulanan) di saham yang dianalisis.</p><div class="gulir" style="max-height:440px"><table id="t-milik-ubah"></table></div></div>
+      </div>
+    </section>
+
+    <!-- PASAR: SEKTOR, INDEKS, KOMODITAS, KURS -->
+    <section class="halaman" id="h-pasar">
+      <div class="kartu">
+        <div class="tab" id="ps-tab" style="margin-top:0">
+          <button data-t="sektor" class="aktif">Sektor</button><button data-t="indeks">Indeks dunia</button><button data-t="komoditas">Komoditas</button><button data-t="kurs">Kurs</button>
+        </div>
+        <div class="baris" style="margin-bottom:10px"><span class="rentang" id="ps-periode"></span><span id="ps-info" class="redup"></span></div>
+        <div id="ps-isi"></div>
       </div>
     </section>
 
@@ -404,7 +416,9 @@ function tabelUrut(el,kolom,baris,status,klik){
 
 // ================= data =================
 let R=null,F={},A=null,B=null,BR=null,K=null,PETA={},GABUNG=[];
-Promise.allSettled([ambil("data/ringkasan.json"),ambil("data/fundamental.json"),ambil("data/asing.json"),ambil("data/berita.json"),ambil("data/broker/ringkasan.json"),ambil("data/kepemilikan.json")]).then(([r,f,a,b,br,k])=>{
+let GL=null;
+Promise.allSettled([ambil("data/ringkasan.json"),ambil("data/fundamental.json"),ambil("data/asing.json"),ambil("data/berita.json"),ambil("data/broker/ringkasan.json"),ambil("data/kepemilikan.json"),ambil("data/global.json")]).then(([r,f,a,b,br,k,gl])=>{
+  if(gl.status==="fulfilled")GL=gl.value;
   if(r.status!=="fulfilled"){$("info-data").textContent="Data belum tersedia. Jalankan alur kerja 'Analisis harian' di tab Actions GitHub.";return}
   R=r.value;if(f.status==="fulfilled")f.value.saham.forEach(s=>F[s.kode]=s);
   if(a.status==="fulfilled")A=a.value;if(b.status==="fulfilled")B=b.value;if(br.status==="fulfilled")BR=br.value;if(k.status==="fulfilled")K=k.value;
@@ -443,13 +457,13 @@ window.addEventListener("hashchange",route);
 const sudah={};
 function route(){
   if(!R)return;const h=(location.hash||"#beranda").slice(1);const [hal,arg]=h.split("/");
-  const nama=["beranda","saham","aliran","bandar","broker","penyaring","kandidat","bandingkan","berita","jurnal","panduan"].includes(hal)?hal:"beranda";
+  const nama=["beranda","saham","pasar","aliran","bandar","broker","penyaring","kandidat","bandingkan","berita","jurnal","panduan"].includes(hal)?hal:"beranda";
   document.querySelectorAll(".halaman").forEach(x=>x.classList.toggle("aktif",x.id==="h-"+nama));
   document.querySelectorAll("nav.menu a").forEach(x=>x.classList.toggle("aktif",x.dataset.h===nama));
   document.querySelectorAll(".pantau a").forEach(x=>x.classList.toggle("aktif",nama==="saham"&&x.dataset.k===arg));
   if(nama==="saham")tampilSaham((arg||"BBCA").toUpperCase());
   else if(nama==="broker"&&R){sudah.broker=1;tampilPelacak()}
-  else if(!sudah[nama]){sudah[nama]=1;({beranda:tampilBeranda,aliran:tampilAliran,bandar:tampilBandar,broker:tampilPelacak,penyaring:tampilPenyaring,kandidat:tampilKandidat,bandingkan:tampilBandingkan,berita:tampilBerita,jurnal:tampilJurnal}[nama]||(()=>{}))()}
+  else if(!sudah[nama]){sudah[nama]=1;({beranda:tampilBeranda,pasar:tampilPasar,aliran:tampilAliran,bandar:tampilBandar,broker:tampilPelacak,penyaring:tampilPenyaring,kandidat:tampilKandidat,bandingkan:tampilBandingkan,berita:tampilBerita,jurnal:tampilJurnal}[nama]||(()=>{}))()}
   window.scrollTo(0,0);
 }
 function bukaSaham(k){location.hash="#saham/"+k}
@@ -869,6 +883,62 @@ function tampilAliran(){
   }
 }
 
+
+
+// ================= Pasar: sektor, indeks, komoditas, kurs =================
+const PERIODE={perubahan_pct:"Hari ini",ubah_5h:"1 minggu",ubah_20h:"1 bulan",ubah_60h:"3 bulan",ubah_ytd:"Sejak awal tahun"};
+const PERIODE_G={ubah_pct:"Hari ini",ubah_5h:"1 minggu",ubah_20h:"1 bulan",ubah_60h:"3 bulan",ubah_ytd:"Sejak awal tahun"};
+let psTab="sektor",psPer="perubahan_pct",psSektor=null,psRamai=true,gGlobal=null;
+function tampilPasar(){
+  $("ps-tab").onclick=e=>{const b=e.target.closest("button");if(!b)return;psTab=b.dataset.t;document.querySelectorAll("#ps-tab button").forEach(x=>x.classList.toggle("aktif",x===b));isiPasar()};
+  isiPasar();
+}
+function chipPeriode(peta,aktif,ubah){$("ps-periode").innerHTML=Object.entries(peta).map(([k,n])=>`<button class="tombol kedua chip ${k===aktif?"aktif":""}" data-p="${k}">${n}</button>`).join("");$("ps-periode").onclick=e=>{const b=e.target.closest("button");if(b)ubah(b.dataset.p)}}
+function isiPasar(){
+  if(gGlobal){gGlobal.remove();gGlobal=null}
+  if(psTab==="sektor"){chipPeriode(PERIODE,psPer,p=>{psPer=p;isiPasar()});return isiSektor()}
+  const k=psTab==="indeks"?"ubah_pct":psPer in PERIODE_G?psPer:"ubah_pct";
+  chipPeriode(PERIODE_G,psPer==="perubahan_pct"?"ubah_pct":psPer,p=>{psPer=p;isiPasar()});
+  isiGlobal(psTab,psPer==="perubahan_pct"?"ubah_pct":psPer);
+}
+function batangPct(v,mx){const w=Math.min(100,Math.abs(v||0)/(mx||1)*100);return`<span style="display:inline-block;width:110px;text-align:${v>=0?"left":"right"}"><span style="display:inline-block;height:14px;border-radius:4px;width:${Math.max(3,w)}%;background:${v>=0?"var(--hijau)":"var(--merah)"}"></span></span>`}
+function isiSektor(){
+  const k=psPer,kel={};
+  GABUNG.forEach(s=>{const sek=s.sektor&&s.sektor!=="–"?s.sektor:"Lainnya";(kel[sek]??=[]).push(s)});
+  const daftar=Object.entries(kel).map(([n,a])=>{const ada=a.filter(s=>s[k]!=null&&(s.kap||s.kapitalisasi));const bobot=ada.reduce((t,s)=>t+(s.kap||s.kapitalisasi),0);
+    return{n,jml:a.length,naik:a.filter(s=>s[k]>0).length,turun:a.filter(s=>s[k]<0).length,v:bobot?ada.reduce((t,s)=>t+s[k]*(s.kap||s.kapitalisasi),0)/bobot:null,kap:bobot}}).sort((a,b)=>(b.v??-1e9)-(a.v??-1e9));
+  const mx=Math.max(...daftar.map(d=>Math.abs(d.v||0)));
+  $("ps-info").textContent=`Rata-rata perubahan berbobot kapitalisasi · ${GABUNG.length} saham dianalisis`;
+  $("ps-isi").innerHTML=`<table><thead><tr><th>Sektor</th><th>Saham</th><th>Naik / turun</th><th>Kapitalisasi</th><th style="text-align:center">Perubahan</th><th></th></tr></thead><tbody>${
+    daftar.map(d=>`<tr class="klik" data-s="${esc(d.n)}" style="${psSektor===d.n?"background:var(--latar-aksen)":""}"><td><b>${esc(d.n)}</b></td><td>${d.jml}</td><td><span class="naik">${d.naik}</span> / <span class="turun">${d.turun}</span></td><td>Rp${rp(d.kap)}</td><td>${batangPct(d.v,mx)}</td><td class="${kelas(d.v)}" style="font-weight:700">${pct(d.v)} ${psSektor===d.n?"▾":"›"}</td></tr>${psSektor===d.n?`<tr><td colspan="6" style="padding:0 0 10px;white-space:normal"><div id="ps-saham"></div></td></tr>`:""}`).join("")}</tbody></table>
+   <p class="redup">Sektor menurut data Yahoo Finance. Klik sektor untuk melihat sahamnya, diurutkan dari kinerja terbaik pada periode yang dipilih.</p>`;
+  $("ps-isi").querySelector("tbody").onclick=e=>{const tr=e.target.closest("tr[data-s]");if(!tr)return;psSektor=psSektor===tr.dataset.s?null:tr.dataset.s;isiSektor()};
+  if(psSektor&&$("ps-saham")){
+    const anggota=(kel[psSektor]||[]).filter(s=>!psRamai||s.likuid).map(s=>({...s,v:s[k]}));
+    $("ps-saham").innerHTML=`<div class="baris" style="margin:6px 0"><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="ps-ramai" ${psRamai?"checked":""}> hanya saham ramai (≥ Rp1 M/hari)</label></div><table id="ps-tabel"></table>`;
+    $("ps-ramai").onchange=e=>{psRamai=e.target.checked;isiSektor()};
+    tabelUrut($("ps-tabel"),[["kode","Saham",(v,s)=>`<b>${v}</b> <span class="redup">${esc((s.nama||"").slice(0,26))}</span>`],["lapis","Lapis",(v,s)=>`${v||"–"}${s.grup?" · "+esc(s.grup):""}`],["tutup","Harga",v=>fmt(v)],["v",PERIODE[k],v=>`<b class="${kelas(v)}">${pct(v)}</b>`],["perubahan_pct","Hari ini",v=>`<span class="${kelas(v)}">${pct(v)}</span>`],["rasio_vol","Vol ×",v=>fmt(v,1)],["asing5","Asing 5h",v=>v==null?"–":`<span class="${kelas(v)}">${rp(v)}</span>`],["skor","Skor"]],anggota,{k:"v",turun:true});
+  }
+}
+function garisMini(r,w=160,h=40){const c=r.map(x=>x.c).filter(v=>v!=null);if(c.length<2)return"";const mn=Math.min(...c),mx=Math.max(...c),sk=mx-mn||1;
+  const pts=c.map((v,i)=>`${(i/(c.length-1)*w).toFixed(1)},${(h-(v-mn)/sk*h).toFixed(1)}`).join(" ");const nk=c.at(-1)>=c[0];
+  return`<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block"><polyline points="${pts}" fill="none" stroke="${nk?"var(--hijau)":"var(--merah)"}" stroke-width="1.6"/></svg>`}
+let glPilih=null;
+function isiGlobal(grup,k){
+  if(!GL){$("ps-isi").innerHTML='<div class="kosong">Data global belum tersedia. Diperbarui setiap 2 jam.</div>';$("ps-info").textContent="";return}
+  const d=GL.data[grup]||[];$("ps-info").textContent=`Sumber: Yahoo Finance (bisa tertunda) · diperbarui ${GL.dibuat}`;
+  const dig=x=>Math.abs(x.akhir)<10?4:Math.abs(x.akhir)<1000?2:0;
+  $("ps-isi").innerHTML=`<div id="gl-grafik"></div><div class="kisi" style="grid-template-columns:repeat(auto-fill,minmax(230px,1fr))">${d.map(x=>`<div class="kartu klik" data-s="${esc(x.simbol)}" style="padding:12px;cursor:pointer;${glPilih===x.simbol?"border-color:var(--aksen)":""}">
+    <div style="display:flex;justify-content:space-between"><b>${esc(x.nama)}</b><span class="redup" style="font-size:11px">${x.tanggal.slice(5)}</span></div><div class="redup" style="font-size:12px">${esc(x.ket)}</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:6px"><div><div style="font-size:20px;font-weight:700">${fmt(x.akhir,dig(x))}</div><div class="${kelas(x[k])}" style="font-weight:600">${pct(x[k])} <span class="redup" style="font-weight:400">${PERIODE_G[k].toLowerCase()}</span></div></div>${garisMini(x.riwayat.slice(-66))}</div>
+    <div class="redup" style="font-size:11px;margin-top:4px">1M ${pct(x.ubah_20h)} · 3M ${pct(x.ubah_60h)} · YTD ${pct(x.ubah_ytd)}</div></div>`).join("")}</div>
+    ${grup==="komoditas"?'<p class="redup">Nikel dan timah (harga LME) tidak tersedia gratis di Yahoo Finance. Batu bara dan CPO memakai kontrak berjangka yang tersedia; bila datanya tidak muncul, simbolnya sedang tidak tersedia.</p>':""}`;
+  $("ps-isi").querySelector(".kisi").onclick=e=>{const c=e.target.closest("[data-s]");if(!c)return;glPilih=glPilih===c.dataset.s?null:c.dataset.s;isiGlobal(grup,k)};
+  if(glPilih&&d.find(x=>x.simbol===glPilih)){const x=d.find(z=>z.simbol===glPilih);
+    $("gl-grafik").innerHTML=`<div class="kartu" style="margin-bottom:12px"><h3>${esc(x.nama)} <span class="redup">${esc(x.ket)} · 6 bulan</span></h3><div class="grafik-sedang" id="gl-g"></div></div>`;
+    gGlobal=LightweightCharts.createChart($("gl-g"),opsiGrafik());const nk=x.riwayat.at(-1).c>=x.riwayat[0].c;
+    gGlobal.addAreaSeries({lineColor:nk?warna("--hijau"):warna("--merah"),topColor:nk?"rgba(0,168,107,.2)":"rgba(229,72,77,.2)",bottomColor:"rgba(0,0,0,0)",lineWidth:2,priceLineVisible:false}).setData(x.riwayat.filter(r=>r.c!=null).map(r=>({time:r.t,value:r.c})));gGlobal.timeScale().fitContent();}
+}
 
 // ================= Bandarmologi =================
 let bdTab="analisis",bdCari="",bdPreset="Semua",bdArah="beli",SARING_BD={likuid:"1"};
