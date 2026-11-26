@@ -41,6 +41,10 @@ def main():
         jalan("fundamental")
     if mode == "harian" or not ada("stockpick.json"):
         jalan("stockpick")
+    if mode == "harian" or not ada("model.json"):
+        jalan("model")
+    if mode == "harian" or not ada("prediksi.json"):
+        jalan("prediksi")
     if mode == "harian" or not ada("kepemilikan.json"):
         jalan("kepemilikan")
     if mode in ("harian", "berita") or not ada("global.json"):

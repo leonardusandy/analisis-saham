@@ -56,6 +56,8 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Bangun data (${{ env.MODE }})
+        env:
+          SANDI_WEB: ${{ secrets.SANDI_WEB || secrets.LEONARDUSANDY }}
         run: python scripts/bangun.py "$MODE"
 
       - name: Siapkan halaman

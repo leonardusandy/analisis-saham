@@ -34,6 +34,12 @@ def bungkus(aes: AESGCM, isi: bytes) -> bytes:
     return iv + aes.encrypt(iv, gzip.compress(isi, mtime=0), None)
 
 
+def buka(data: bytes, sandi: str):
+    """Kebalikan bungkus(): dipakai untuk memulihkan riwayat dari situs."""
+    kunci = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=GARAM, iterations=ITERASI).derive(sandi.encode())
+    return json.loads(gzip.decompress(AESGCM(kunci).decrypt(data[:12], data[12:], None)))
+
+
 def main(asal: str, tujuan: str) -> None:
     asal_p, tujuan_p = Path(asal), Path(tujuan)
     if tujuan_p.exists():
