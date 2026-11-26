@@ -49,6 +49,22 @@ def sinyal(df, ihsg_naik):
         "D. Pantul support (aturan Pilihan Harian)": (tren_naik | datar) & (l <= sup * 1.02) & (c > o),
         "E. Tren naik kuat ^^^ + volume": tren_naik & (c >= 0.97 * h.rolling(20).max()) & (ma20 > ma20.shift(5) * 1.01) & (rv >= 1.2) & (c > o),
     }
+    # --- aturan dari materi Stock School & Hengky Adinata ---
+    v20 = v.rolling(20).mean().shift(1)
+    lonjak = (v >= 3 * v20) & (c > c.shift(1))
+    s["F. HA: lonjakan volume lalu volume mengering saat koreksi"] = (
+        (lonjak.shift(1).rolling(10).max() > 0) & (v < 0.6 * v20) & (c <= c.shift(1)) & (c > ma20))
+    e12, e26 = c.ewm(span=12, adjust=False).mean(), c.ewm(span=26, adjust=False).mean()
+    macd = e12 - e26; sig = macd.ewm(span=9, adjust=False).mean()
+    s["G. SS: MACD potong ke atas, di atas 0, harga > MA20"] = (macd > sig) & (macd.shift(1) <= sig.shift(1)) & (macd > 0) & (c > ma20)
+    tk = (h.rolling(9).max() + l.rolling(9).min()) / 2
+    kj = (h.rolling(26).max() + l.rolling(26).min()) / 2
+    awan = pd.concat([((tk + kj) / 2).shift(26), ((h.rolling(52).max() + l.rolling(52).min()) / 2).shift(26)], axis=1).max(axis=1)
+    s["H. SS: Ichimoku di atas awan + tenkan potong kijun"] = (c > awan) & (tk > kj) & (tk.shift(1) <= kj.shift(1))
+    bawah20, atas20 = l.rolling(20).min(), h.rolling(20).max()
+    s["I. SS: sideways, beli di dasar rentang"] = (rentang < 0.12) & (c <= bawah20 + 0.25 * (atas20 - bawah20)) & (c > o)
+    s["J. E + HA: tren kuat ^^^ tanpa candle merah bervolume besar 5 hari"] = s["E. Tren naik kuat ^^^ + volume"] & ~(
+        ((c < o) & (v >= 2.5 * v20)).rolling(5).max() > 0)
     s = {k: (x & ramai).fillna(False) for k, x in s.items()}
     return s, atr, ma5
 
