@@ -1,0 +1,27 @@
+name: Uji kapitalisasi (sementara)
+on: workflow_dispatch
+jobs:
+  kap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install yfinance
+      - run: |
+          python - <<'PY'
+          import json, glob, time, yfinance as yf
+          h = json.load(open(sorted(glob.glob('docs/data/broker/hari/*.json'))[-1]))
+          kode = sorted(h['idx'])
+          out = {}
+          for i, k in enumerate(kode):
+              try:
+                  fi = yf.Ticker(k + '.JK').fast_info
+                  out[k] = round(fi.get('marketCap') or fi.get('market_cap') or 0)
+              except Exception as e:
+                  out[k] = None
+              if i % 100 == 0: print('kemajuan', i, flush=True)
+              time.sleep(0.15)
+          print('KAP_JSON=' + json.dumps(out))
+          PY
