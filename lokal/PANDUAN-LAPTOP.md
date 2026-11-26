@@ -36,6 +36,19 @@ Setelah itu laptop mengambil data otomatis setiap hari pukul 17.45 dan mencoba l
 setiap jam sampai 22.45 jika laptop baru dinyalakan. Jika laptop mati beberapa hari, data
 yang terlewat (hingga 20 hari bursa) diambil sekaligus saat skrip berjalan berikutnya.
 
+## Tentang jendela Chrome yang muncul sendiri
+
+Situs IDX memasang verifikasi "Anda manusia" (Cloudflare). Program membuka jendela Chrome
+khusus (terpisah dari Chrome biasa Anda, profilnya di folder `.analisis-saham-chrome`) lalu
+mengambil data dari dalam halaman IDX.
+
+- Jika di jendela itu muncul **kotak verifikasi**, klik kotaknya. Program menunggu sampai 4 menit.
+- Setelah lolos sekali, biasanya verifikasi tidak diminta lagi selama beberapa waktu.
+- Saat jadwal otomatis berjalan dan Anda tidak di depan laptop, verifikasi yang tidak diklik
+  membuat data IDX hari itu terlewat; program mencoba lagi tiap jam sampai 22.45, dan
+  hari yang terlewat diambil pada percobaan berikutnya yang berhasil.
+- Jangan menutup jendela Chrome itu saat program berjalan; ia tertutup sendiri setelah selesai.
+
 ## Memeriksa apakah berjalan
 
 - Catatan kegiatan ada di `log.txt` di folder yang sama.

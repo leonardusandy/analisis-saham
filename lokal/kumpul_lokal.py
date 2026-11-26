@@ -243,8 +243,28 @@ def ambil_hari(tgl: date, kode_list: list[str], terbaru: bool) -> dict:
 _IDX_SESI = None
 
 
+IDX_HALAMAN = "https://www.idx.co.id/id/data-pasar/ringkasan-perdagangan/ringkasan-saham/"
+IDX_CACHE: dict[str, dict | None] = {}  # tanggal -> data (diisi lewat browser)
+IDX_LEWAT_BROWSER = False
+PROFIL_CHROME = Path.home() / ".analisis-saham-chrome"
+
+
+def ubah_idx(js: dict) -> dict:
+    hasil = {}
+    for d in js.get("data") or []:
+        hasil[d["StockCode"]] = [
+            float(d.get("ForeignBuy") or 0), float(d.get("ForeignSell") or 0),
+            float(d.get("Close") or 0), float(d.get("Previous") or 0),
+            float(d.get("Value") or 0), int(d.get("Frequency") or 0),
+        ]
+    aktif = sum(1 for v in hasil.values() if v[4] > 0)
+    return hasil if aktif else {}
+
+
 def ambil_idx(tgl: date) -> dict | None:
-    """Ringkasan Saham IDX (seluruh saham). Sering diblokir; tidak wajib."""
+    """Ringkasan Saham IDX (seluruh saham). None = gagal, {} = tidak ada perdagangan."""
+    if IDX_LEWAT_BROWSER:
+        return IDX_CACHE.get(tgl.isoformat())
     try:
         from curl_cffi import requests as creq
     except ImportError:
@@ -254,25 +274,82 @@ def ambil_idx(tgl: date) -> dict | None:
         if _IDX_SESI is None:
             _IDX_SESI = creq.Session(impersonate="chrome")
             _IDX_SESI.get("https://www.idx.co.id/id", timeout=30)
-        s = _IDX_SESI
-        r = s.get(IDX_RINGKASAN.format(tgl.strftime("%Y%m%d")), timeout=40,
-                  headers={"Referer": "https://www.idx.co.id/id/data-pasar/ringkasan-perdagangan/ringkasan-saham/"})
+        r = _IDX_SESI.get(IDX_RINGKASAN.format(tgl.strftime("%Y%m%d")), timeout=40, headers={"Referer": IDX_HALAMAN})
         if r.status_code != 200:
-            log(f"  Situs IDX menolak ({r.status_code}); dilewati.")
+            log(f"  Situs IDX menolak program biasa ({r.status_code}).")
             return None
-        hasil = {}
-        for d in r.json().get("data") or []:
-            hasil[d["StockCode"]] = [
-                float(d.get("ForeignBuy") or 0), float(d.get("ForeignSell") or 0),
-                float(d.get("Close") or 0), float(d.get("Previous") or 0),
-                float(d.get("Value") or 0), int(d.get("Frequency") or 0),
-            ]
-        aktif = sum(1 for v in hasil.values() if v[4] > 0)
-        log(f"  {tgl} situs IDX: {aktif} saham diperdagangkan.")
-        return hasil if aktif else {}
+        hasil = ubah_idx(r.json())
+        log(f"  {tgl} situs IDX: {len(hasil)} saham.")
+        return hasil
     except Exception as e:  # noqa: BLE001
         log("  Situs IDX tidak bisa diakses:", e)
         return None
+
+
+def idx_lewat_browser(daftar: list[date], tunggu_detik: int = 240) -> None:
+    """Buka Chrome Anda (profil khusus), lewati verifikasi Cloudflare, lalu ambil data
+    Ringkasan Saham untuk setiap tanggal dari dalam halaman IDX itu sendiri."""
+    global IDX_LEWAT_BROWSER
+    try:
+        from patchright.sync_api import sync_playwright
+    except ImportError:
+        log("  Pustaka 'patchright' belum terpasang; jalankan pasang_windows.bat lagi.")
+        return
+    IDX_LEWAT_BROWSER = True
+    js_ambil = """async (u) => {
+        try { const r = await fetch(u, {credentials: 'include', headers: {'Accept': 'application/json'}});
+              if (!r.ok) return {status: r.status};
+              return {status: 200, data: await r.json()}; }
+        catch (e) { return {status: 0, galat: String(e)}; } }"""
+    log("Membuka Chrome untuk situs IDX…")
+    with sync_playwright() as p:
+        try:
+            ctx = p.chromium.launch_persistent_context(
+                str(PROFIL_CHROME), channel="chrome", headless=False, no_viewport=True,
+                args=["--window-size=1000,750"])
+        except Exception as e:  # noqa: BLE001
+            log("  Chrome tidak bisa dibuka:", e)
+            return
+        try:
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
+            page.goto(IDX_HALAMAN, wait_until="domcontentloaded", timeout=90000)
+            uji = IDX_RINGKASAN.format(daftar[-1].strftime("%Y%m%d"))
+            batas, diberi_tahu = time.time() + tunggu_detik, False
+            lolos = False
+            while time.time() < batas:
+                try:
+                    h = page.evaluate(js_ambil, uji)
+                except Exception:  # noqa: BLE001
+                    h = {"status": 0}  # halaman sedang berpindah (verifikasi selesai)
+                if h.get("status") == 200:
+                    lolos = True
+                    break
+                if not diberi_tahu:
+                    log(">>> Jika di jendela Chrome muncul kotak verifikasi IDX, klik kotaknya. Menunggu…")
+                    diberi_tahu = True
+                time.sleep(4)
+            if not lolos:
+                log("  Verifikasi IDX tidak terlewati dalam waktu tunggu; data IDX dilewati.")
+                return
+            log("  Verifikasi IDX lolos.")
+            for tgl in daftar:
+                h = page.evaluate(js_ambil, IDX_RINGKASAN.format(tgl.strftime("%Y%m%d")))
+                if h.get("status") == 200:
+                    IDX_CACHE[tgl.isoformat()] = ubah_idx(h["data"])
+                    log(f"  {tgl} situs IDX: {len(IDX_CACHE[tgl.isoformat()])} saham.")
+                else:
+                    log(f"  {tgl} situs IDX gagal (status {h.get('status')}).")
+                time.sleep(1.0)
+        finally:
+            ctx.close()
+
+
+def siapkan_idx(daftar: list[date]) -> None:
+    """Coba cara biasa dulu; bila ditolak Cloudflare, pakai jendela Chrome."""
+    if not daftar:
+        return
+    if ambil_idx(daftar[-1]) is None:
+        idx_lewat_browser(daftar)
 
 
 # ---------------------------------------------------------------------------
@@ -341,6 +418,7 @@ def main():
             h = urai_broker(html)
             log(f"BERHASIL: {len(h['b'])} pembeli, {len(h['s'])} penjual, nilai {h['tval']}, asing bersih {h['fnet']}")
         log("Menguji koneksi ke situs IDX…")
+        siapkan_idx(hari_bursa_terakhir(1))
         hasil = ambil_idx(hari_bursa_terakhir(1)[0])
         log("GAGAL terhubung ke IDX." if hasil is None else ("IDX: tidak ada perdagangan pada tanggal itu." if not hasil else "BERHASIL terhubung ke IDX."))
         return
@@ -352,6 +430,7 @@ def main():
         log("Semua hari bursa terakhir sudah ada. Selesai.")
         return
     log(f"{len(kode_list)} saham, {len(hari)} hari akan diambil: {hari[0]} … {hari[-1]}")
+    siapkan_idx(hari)
     berkas = {}
     for tgl in hari:
         try:
