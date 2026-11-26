@@ -16,13 +16,19 @@ ATURAN (juga ditampilkan di web):
   * kuat    : harga terendah menyentuh area support (±1%) minimal 3 kali terpisah (berjarak
               >= 3 hari) pada 60 sampai 5 hari terakhir.
   Murah     : PER positif < 80% median PER sektornya, atau PBV < 1 dengan ROE > 8%.
-  Warna     : Baru masuk (status berlangsung <= 2 hari), Sinyal beli (memantul di support
-              atau menembus resistance dengan volume >= 1,5x), Naik/turun pangkat (tingkat
-              berubah dari kemarin).
-  Analisa   : saham uptrend/sideways bersinyal beli & ramai. Entry = support s.d. harga
-              penutupan; R1 = resistance terdekat; R2 = resistance berikutnya;
-              CL (batas rugi) = support - 0,3 ATR, minimal 1 ATR di bawah harga. Hanya ditampilkan bila jarak R1 minimal
-              1,2x jarak CL dan CL tidak lebih dari 7% di bawah harga.
+  Warna     : Baru masuk (status berlangsung <= 2 hari), Sinyal beli (aturan J terpenuhi),
+              Naik/turun pangkat (tingkat berubah dari kemarin).
+  Aturan J  : harga > MA50, MA20 > MA50, MA50 naik dibanding 10 hari lalu, harga >= 97% harga
+              tertinggi 20 hari, MA20 naik >= 1% dalam 5 hari, volume >= 1,2x rata-rata 20 hari,
+              candle hijau, dan tidak ada candle merah bervolume >= 2,5x dalam 5 hari (jejak
+              distribusi). Uji 3 tahun (456 saham, pegang 3 hari, batas rugi -5%, saat IHSG di atas
+              MA20): rata-rata +0,39% per transaksi, menang 37%, untung total/rugi total 1,16.
+  Analisa   : saham ramai dengan sinyal aturan J, tanpa tanda bahaya fundamental (rugi bersih
+              atau arus kas operasi negatif). Urutan: MACD baru potong ke atas, sektor menguat,
+              lolos saringan kualitas, lapis. Entry = harga penutupan s.d. 0,5 ATR di bawahnya;
+              CL = 5% di bawah harga beli; jual paling lambat penutupan hari ke-3 setelah beli;
+              R1/R2 = resistance terdekat sebagai acuan ambil untung lebih awal.
+  Pasar     : beli hanya saat IHSG di atas MA20. Jika tidak, analisa ditampilkan sebagai "ditunda".
 """
 from __future__ import annotations
 
@@ -130,9 +136,7 @@ def main():
             (f.get("per") and f["per"] > 0 and sektor in median_per and f["per"] < 0.8 * median_per[sektor])
             or (f.get("pbv") and f["pbv"] < 1 and (f.get("roe") or 0) > 8))
         rv = s.get("rasio_vol") or 0
-        o = float(df["o"].iloc[-1])
-        tinggi20_lalu = df["h"].iloc[-21:-1].max()
-        sinyal = bool((df["l"].iloc[-1] <= support * 1.02 and c > o) or (c > tinggi20_lalu and rv >= 1.5))
+        sinyal = bool(s.get("sinyal_j"))  # aturan J (hasil uji 3 tahun terbaik untuk pegang 1-3 hari)
         lama = tanggal_mulai(hs["st"])
         warna = ("baru" if lama <= 2 else "beli" if sinyal else "naik" if tk > tk_k and st == st_k
                  else "turun" if tk < tk_k and st == st_k else None)
@@ -142,7 +146,8 @@ def main():
             "support": bulatkan(support, "bawah"), "resistance": bulatkan(r1, "atas"), "r2": bulatkan(r2, "atas"),
             "kuat": sentuh >= 3, "murah": murah, "sejak": df.index[-lama], "hari": lama,
             "warna": warna, "sinyal": sinyal, "tutup": c, "ubah": s.get("perubahan_pct"), "atr": round(float(atr), 1),
-            "skor": s.get("skor"), "rasio_vol": rv,
+            "skor": s.get("skor"), "rasio_vol": rv, "macd": bool(s.get("sinyal_macd")),
+            "bahaya": f.get("bahaya") or [], "kualitas": bool(f.get("lolos_kualitas")),
         })
 
     # ----- tren sektor: indeks berbobot kapitalisasi dari harga anggota -----
@@ -168,8 +173,9 @@ def main():
     lebih_baik = {x["nama"] for x in sektor_hasil if x["arah"] == "better"}
 
     # ----- analisa harian -----
-    kand = [b for b in baris if b["sinyal"]]
-    kand.sort(key=lambda b: (-b["tingkat"], b["sektor"] not in lebih_baik, b["lapis"] or 9, -(b["skor"] or 0), -(b["rasio_vol"] or 0)))
+    kand = [b for b in baris if b["sinyal"] and not b["bahaya"]]
+    kand.sort(key=lambda b: (not b["macd"], b["sektor"] not in lebih_baik, not b["kualitas"], b["lapis"] or 9,
+                             -(b["skor"] or 0), -(b["rasio_vol"] or 0)))
     analisa = []
     for b in kand:
         if len(analisa) >= 6:
@@ -178,19 +184,17 @@ def main():
         hi = bulatkan(b["tutup"], "bawah")
         r1 = b["resistance"] if b["resistance"] > hi * 1.01 else bulatkan(hi + b["atr"], "atas")
         r2 = b["r2"] if b["r2"] > r1 * 1.01 else bulatkan(r1 + b["atr"], "atas")
-        cl = bulatkan(b["support"] - 0.3 * b["atr"], "bawah")
-        if cl >= lo:
-            cl = bulatkan(lo - 0.5 * b["atr"], "bawah")
-        cl = min(cl, bulatkan(hi - b["atr"], "bawah"))  # minimal 1 ATR di bawah harga agar tidak kena gerak harian biasa
+        cl = bulatkan(hi * (1 - cfg.STOP_PERSEN), "atas")  # batas rugi 5% dari harga beli, sesuai uji
         untung, rugi = r1 / hi - 1, 1 - cl / hi
-        if rugi <= 0 or rugi > 0.07 or untung / rugi < 1.2:
-            continue  # rasio untung:rugi kurang menarik atau batas rugi terlalu jauh
         analisa.append({
             "kode": b["kode"], "sk": b["sk"], "status": b["status"], "tingkat": b["tingkat"],
             "entry": [lo, hi], "r1": r1, "r2": r2, "cl": cl,
             "untung_r1_pct": round(untung * 100, 1), "rugi_cl_pct": round(-rugi * 100, 1), "rasio": round(untung / rugi, 2),
-            "alasan": ("memantul di support" if b["tutup"] <= b["support"] * 1.05 else "menembus resistance dengan volume besar")
-                      + (", sektor sedang menguat" if b["sektor"] in lebih_baik else ""),
+            "macd": b["macd"], "kualitas": b["kualitas"],
+            "alasan": "tren naik kuat + volume, tanpa jejak distribusi"
+                      + (", MACD baru potong ke atas" if b["macd"] else "")
+                      + (", sektor sedang menguat" if b["sektor"] in lebih_baik else "")
+                      + (", lolos saringan kualitas" if b["kualitas"] else ""),
         })
 
     urut = lambda b: (-b["tingkat"], b["sejak"])  # noqa: E731
@@ -202,6 +206,7 @@ def main():
         "keluar": keluar,
         "sektor": sektor_hasil,
         "analisa": analisa,
+        "pasar_mendukung": bool(rk.get("pasar_mendukung", True)),
         "aturan": __doc__.split("ATURAN (juga ditampilkan di web):")[1].strip(),
     }
     (k / "stockpick.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":"), default=str))

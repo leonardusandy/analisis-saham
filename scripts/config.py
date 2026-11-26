@@ -58,3 +58,7 @@ def semesta() -> list[dict]:
 
 def kode_semesta() -> list[str]:
     return [s["kode"] for s in semesta()]
+
+# Strategi utama (aturan J, hasil uji 3 tahun): pegang maksimal 3 hari, batas rugi -5% dari harga beli.
+STOP_PERSEN = 0.05
+KALI_ATR_TARGET_ACUAN = 2.0  # target acuan saja; aturan keluar utama = jual penutupan hari ke-3

@@ -115,6 +115,37 @@ def kali(lap: dict, k: float, kecuali=("Laba per saham",)) -> dict:
     return lap
 
 
+# Saringan kualitas gaya Yahoo Screener (materi Stock School) dan pengaman dasar.
+SYARAT_KUALITAS = [
+    ("ROE > 10%", "roe", lambda v: v > 10),
+    ("ROA > 5%", "roa", lambda v: v > 5),
+    ("Margin laba > 5%", "margin_laba", lambda v: v > 5),
+    ("Rasio lancar > 1", "rasio_lancar", lambda v: v > 1),
+    ("Rasio cepat > 1", "rasio_cepat", lambda v: v > 1),
+    ("Arus kas operasi positif", "arus_kas_operasi", lambda v: v > 0),
+    ("PEG < 1", "peg", lambda v: 0 < v < 1),
+]
+
+
+def periksa(d: dict) -> dict:
+    hasil = []
+    for nama, k, uji in SYARAT_KUALITAS:
+        v = d.get(k)
+        hasil.append(None if v is None else bool(uji(v)))
+    terdata = [x for x in hasil if x is not None]
+    bahaya = []
+    if (d.get("eps") is not None and d["eps"] < 0) or (d.get("margin_laba") is not None and d["margin_laba"] < 0):
+        bahaya.append("rugi bersih")
+    if d.get("arus_kas_operasi") is not None and d["arus_kas_operasi"] < 0:
+        bahaya.append("arus kas operasi negatif")
+    return {
+        "kualitas": sum(terdata),            # jumlah syarat terpenuhi
+        "kualitas_terdata": len(terdata),    # jumlah syarat yang datanya ada (bank tak punya rasio lancar/cepat)
+        "lolos_kualitas": all(x is not False for x in hasil) and len(terdata) >= 5,
+        "bahaya": bahaya,
+    }
+
+
 def ambil_satu(kode: str) -> dict:
     import yfinance as yf
 
@@ -153,6 +184,11 @@ def ambil_satu(kode: str) -> dict:
         "tertinggi_52m": angka(info.get("fiftyTwoWeekHigh"), 0),
         "terendah_52m": angka(info.get("fiftyTwoWeekLow"), 0),
         "jumlah_saham": angka(info.get("sharesOutstanding"), 0),
+        "rasio_lancar": angka(info.get("currentRatio"), 2),
+        "rasio_cepat": angka(info.get("quickRatio"), 2),
+        "arus_kas_operasi": (round(info["operatingCashflow"] * k) if info.get("operatingCashflow") is not None
+                             and math.isfinite(k) else None),
+        "peg": angka(info.get("trailingPegRatio") or info.get("pegRatio"), 2),
         "situs": info.get("website"),
     }
     detail = dict(ringkas)
@@ -205,8 +241,14 @@ def main():
             return 10_000
 
     umur_map = {k: umur(k) for k in kode_list}
+    # berkas lama belum punya rasio baru (lancar, cepat, arus kas, PEG): anggap kedaluwarsa
+    for k in kode_list:
+        f = FOLDER / "fundamental" / f"{k}.json"
+        if umur_map[k] < 10_000 and f.exists() and "rasio_cepat" not in f.read_text():
+            umur_map[k] = 9_000
     kosong = sum(1 for v in umur_map.values() if v >= 10_000)
-    batas = len(kode_list) if kosong > len(kode_list) // 2 else MAKS_PER_JALAN
+    lama_format = sum(1 for v in umur_map.values() if v == 9_000)
+    batas = len(kode_list) if (kosong + lama_format) > len(kode_list) // 2 else MAKS_PER_JALAN
     perlu = sorted([k for k in kode_list if umur_map[k] >= UMUR_MAKS_HARI], key=lambda k: -umur_map[k])[:batas]
     print(f"Fundamental: {len(perlu)} dari {len(kode_list)} saham diperbarui hari ini.")
 
@@ -227,13 +269,15 @@ def main():
 
     kunci = ["kode", "nama", "sektor", "industri", "kapitalisasi", "per", "per_maju", "pbv", "roe", "roa", "der",
              "margin_laba", "tumbuh_pendapatan", "tumbuh_laba", "imbal_dividen", "eps", "nilai_buku", "mata_uang_laporan",
-             "beta", "tertinggi_52m", "terendah_52m", "jumlah_saham", "situs", "diperbarui"]
+             "beta", "tertinggi_52m", "terendah_52m", "jumlah_saham", "situs", "diperbarui",
+             "rasio_lancar", "rasio_cepat", "arus_kas_operasi", "peg"]
     semua = []
     for kode in kode_list:
         f = FOLDER / "fundamental" / f"{kode}.json"
         if f.exists():
-            d = json.loads(f.read_text())
-            semua.append({k: d.get(k) for k in kunci})
+            d = {k: json.loads(f.read_text()).get(k) for k in kunci}
+            d.update(periksa(d))
+            semua.append(d)
     (FOLDER / "fundamental.json").write_text(json.dumps(
         {"dibuat": datetime.now(WIB).strftime("%Y-%m-%d %H:%M WIB"), "saham": semua},
         ensure_ascii=False, separators=(",", ":")))

@@ -314,11 +314,11 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
       <div class="kartu" style="margin-bottom:14px">
         <h3>Kalkulator ukuran posisi</h3>
         <div class="baris">
-          <label>Modal (Rp)<input id="modal" type="number" value="10000000" min="0" step="100000"></label>
-          <label>Risiko lapis 1 (%)<input id="risiko" type="number" value="1" min="0.1" max="5" step="0.1"></label>
-          <label>Risiko lapis 2–3 (%)<input id="risiko2" type="number" value="0.5" min="0.1" max="5" step="0.1"></label>
+          <label>Modal (Rp)<input id="modal" type="number" min="0" step="100000"></label>
+          <label>Risiko per transaksi (% modal)<input id="risiko" type="number" min="0.1" max="5" step="0.1"></label>
+          <label>Maks per emiten (% modal)<input id="maks-emiten" type="number" min="5" max="100" step="5"></label>
         </div>
-        <p class="redup">Jumlah lot dihitung agar kerugian bila kena batas rugi tidak melebihi risiko yang Anda pilih. Saham lapis 2–3 bergerak lebih liar, jadi risikonya dibuat lebih kecil.</p>
+        <p class="redup">Jumlah lot dihitung agar kerugian bila kena batas rugi (−5%) tidak melebihi risiko yang Anda pilih (anjuran 2%), dan nilai satu saham tidak melebihi batas per emiten (anjuran 40%). Dengan batas rugi 5%, risiko 2% berarti posisi sekitar 40% modal. Pengaturan ini juga dipakai di Pilihan Harian.</p>
         <div class="baris" id="kandidat-saring" style="margin-top:8px"></div>
       </div>
       <div class="kisi" id="kisi-kandidat"></div>
@@ -417,8 +417,9 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
         <h3>Aturan yang disarankan</h3>
         <ul>
           <li>Selalu pasang batas rugi dan jangan menurunkannya setelah masuk.</li>
-          <li>Risiko per transaksi maksimal 1% dari modal.</li>
-          <li>Saat IHSG di bawah MA20, kurangi jumlah dan ukuran transaksi.</li>
+          <li>Risiko per transaksi maksimal 2% dari modal; satu saham maksimal 40% modal.</li>
+          <li>Batas rugi −5% dari harga beli; jual paling lambat penutupan hari ke-3.</li>
+          <li>Saat IHSG di bawah MA20, tunda pembelian baru.</li>
           <li>Nilai strategi dari jurnal minimal 30 transaksi.</li>
         </ul>
         <p class="redup">Halaman ini alat bantu analisis, bukan nasihat investasi. Keputusan dan risiko transaksi sepenuhnya milik Anda.</p>
@@ -748,14 +749,22 @@ function gambarGrafik(){
   aturRentang();
 }
 function panelKunci(){
-  const f=DETAIL.f;if(!f){$("p-kunci").innerHTML='<div class="kosong">Data fundamental belum tersedia.</div>';return}
+  if(!DETAIL.f){$("p-kunci").innerHTML='<div class="kosong">Data fundamental belum tersedia.</div>';return}
+  const f={...(F[DETAIL.kode]||{}),...DETAIL.f};
   const p=v=>v==null?"–":fmt(v,2)+"%",s=G(DETAIL.kode);
   const grup=[["Valuasi",[["Kapitalisasi","Rp"+rp(f.kapitalisasi)],["PER",fmt(f.per,2)],["PER perkiraan",fmt(f.per_maju,2)],["PBV",fmt(f.pbv,2)],["Laba per saham",fmt(f.eps,2)],["Nilai buku per saham",fmt(f.nilai_buku,2)]]],
     ["Profitabilitas",[["ROE",p(f.roe)],["ROA",p(f.roa)],["Margin laba bersih",p(f.margin_laba)]]],
     ["Pertumbuhan (tahunan, kuartal terakhir)",[["Pendapatan",p(f.tumbuh_pendapatan)],["Laba",p(f.tumbuh_laba)]]],
-    ["Kesehatan & dividen",[["DER",fmt(f.der,2)+"×"],["Imbal dividen",p(f.imbal_dividen)],["Beta",fmt(f.beta,2)]]],
+    ["Kesehatan & dividen",[["DER",fmt(f.der,2)+"×"],["Rasio lancar",fmt(f.rasio_lancar,2)],["Rasio cepat",fmt(f.rasio_cepat,2)],["Arus kas operasi",f.arus_kas_operasi==null?"–":"Rp"+rp(f.arus_kas_operasi)],["PEG",fmt(f.peg,2)],["Imbal dividen",p(f.imbal_dividen)],["Beta",fmt(f.beta,2)]]],
     ["Harga",[["Tertinggi 52 minggu",fmt(f.tertinggi_52m)],["Terendah 52 minggu",fmt(f.terendah_52m)],["Jarak dari tertinggi",pct(s.jarak52)],["Jumlah saham",rp(f.jumlah_saham)+" lembar"]]]];
-  $("p-kunci").innerHTML=grup.map(([j,a])=>`<h3 style="margin-top:14px">${j}</h3><div class="statistik">${a.map(([x,y])=>`<div><span class="label">${x}</span><b>${y}</b></div>`).join("")}</div>`).join("")+
+  const sy=[["ROE > 10%",f.roe,v=>v>10],["ROA > 5%",f.roa,v=>v>5],["Margin laba > 5%",f.margin_laba,v=>v>5],["Rasio lancar > 1",f.rasio_lancar,v=>v>1],
+    ["Rasio cepat > 1",f.rasio_cepat,v=>v>1],["Arus kas operasi positif",f.arus_kas_operasi,v=>v>0],["PEG < 1",f.peg,v=>v>0&&v<1]];
+  const cek=`<h3 style="margin-top:14px">Saringan kualitas (gaya Yahoo Screener)</h3>
+    <div class="statistik">${sy.map(([n,v,u])=>`<div><span class="label">${n}</span><b class="${v==null?"redup":u(v)?"naik":"turun"}">${v==null?"– tidak ada data":u(v)?"✓ lolos":"✗ tidak"}</b></div>`).join("")}</div>
+    <p style="margin:8px 0">${f.lolos_kualitas?'<span class="naik"><b>Lolos saringan kualitas.</b></span>':`Memenuhi ${f.kualitas??0} dari ${f.kualitas_terdata??0} syarat yang datanya ada.`}
+    ${(f.bahaya||[]).length?` <span class="turun"><b>Tanda bahaya:</b> ${esc(f.bahaya.join(", "))} — dibuang dari kandidat dan analisa harian.</span>`:""}</p>
+    <p class="redup" style="font-size:12px">Bank dan perusahaan keuangan biasanya tidak memiliki rasio lancar/cepat, jadi syarat itu dilewati.</p>`;
+  $("p-kunci").innerHTML=grup.map(([j,a])=>`<h3 style="margin-top:14px">${j}</h3><div class="statistik">${a.map(([x,y])=>`<div><span class="label">${x}</span><b>${y}</b></div>`).join("")}</div>`).join("")+cek+
     (f.profil?`<h3 style="margin-top:16px">Profil perusahaan</h3><p class="redup" style="font-size:13px">${esc(f.profil)}</p><p class="redup">Profil dari Yahoo Finance, dalam bahasa Inggris.${f.situs?` Situs: <a href="${esc(f.situs)}" target="_blank" rel="noopener">${esc(f.situs)}</a>`:""}</p>`:"")+
     `<p class="redup">Sumber: Yahoo Finance. Periksa ulang dengan laporan keuangan resmi di situs IDX sebelum mengambil keputusan.</p>`;
 }
@@ -802,7 +811,7 @@ function panelSinyal(){
   $("p-sinyal").innerHTML=`<div class="kisi2"><div>
     <div style="display:flex;gap:10px;align-items:center"><span class="lencana">skor ${s.skor}</span>${R.kandidat.includes(s.kode)?'<span class="lencana">kandidat besok</span>':`<span class="redup">bukan kandidat (perlu skor ≥ ${R.pengaturan.skor_minimal}${s.likuid?"":" dan likuid"})</span>`}</div>
     <ul class="alasan">${s.alasan.map(a=>`<li class="${a.startsWith("Peringatan")?"peringatan":""}">${a}</li>`).join("")||"<li>Tidak ada sinyal teknikal hari ini.</li>"}</ul>
-    ${l&&l.masuk?`<div class="level"><div><span class="label">Masuk</span><b>${fmt(l.masuk)}</b></div><div><span class="label">Target</span><b class="naik">${fmt(l.target)}</b><span class="redup">${pct(l.untung_bersih_pct)}</span></div><div><span class="label">Batas rugi</span><b class="turun">${fmt(l.stop)}</b><span class="redup">${pct(l.rugi_bersih_pct)}</span></div></div>`:""}
+    ${l&&l.masuk?`<div class="level"><div><span class="label">Masuk</span><b>${fmt(l.masuk)}</b></div><div><span class="label">Target acuan</span><b class="naik">${fmt(l.target)}</b><span class="redup">${pct(l.untung_bersih_pct)}</span></div><div><span class="label">Batas rugi (−5%)</span><b class="turun">${fmt(l.stop)}</b><span class="redup">${pct(l.rugi_bersih_pct)}</span></div></div>`:""}
     <div class="statistik">${[["MA20",fmt(s.sma20)],["MA50",fmt(s.sma50)],["RSI",fmt(s.rsi,1)],["ATR",fmt(s.atr,0)],["Volume vs rata-rata",fmt(s.rasio_vol,2)+"×"],["Nilai/hari (20h)","Rp"+fmt(s.nilai_rata20_miliar,1)+" M"]].map(([a,b])=>`<div><span class="label">${a}</span><b>${b}</b></div>`).join("")}</div>
   </div><div>
     <h3>Uji balik saham ini (2 tahun)</h3>
@@ -1001,19 +1010,21 @@ async function tampilPilihan(){
   el.innerHTML=`
    <div class="kartu" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="margin:0">Pilihan saham harian · ${tglPendek(SP.tanggal)} ${SP.tanggal.slice(0,4)}</h3><span class="redup">dibuat ${SP.dibuat} · hanya saham ramai (≥ Rp1 M/hari)</span></div>
      <p class="redup" style="margin:6px 0 0">Disusun otomatis dari aturan teknikal di bawah. Ini informasi, bukan perintah beli atau jual; risiko dan keputusan transaksi ada pada Anda.</p></div>
-   <div class="kartu" style="margin-bottom:14px"><h3>Analisa harian</h3>
+   ${SP.pasar_mendukung===false?'<div class="pita waspada"><b>Pasar tidak mendukung:</b> IHSG di bawah MA20. Menurut aturan, pembelian baru <b>ditunda</b>; analisa di bawah hanya untuk dipantau.</div>':""}
+   <div class="kartu" style="margin-bottom:14px"><h3>Analisa harian${SP.pasar_mendukung===false?' <span class="turun" style="font-size:13px">(ditunda)</span>':""}</h3>
      <div class="kisi" style="grid-template-columns:repeat(auto-fill,minmax(250px,1fr))">${SP.analisa.map(a=>`<div class="kartu klik" data-k="${a.kode}" style="padding:12px;text-align:center;cursor:pointer">
        <div style="font-weight:800;font-size:16px">${a.kode}${"^".repeat(a.tingkat)} <span class="redup" style="font-size:12px">${a.sk?"("+a.sk+")":""} · ${NS[a.status]}</span></div>
        <div style="margin-top:6px">Entry <b>${fmt(a.entry[0])}${a.entry[1]!==a.entry[0]?" – "+fmt(a.entry[1]):""}</b></div>
        <div>R1: <b class="naik">${fmt(a.r1)}</b> <span class="redup">(${pct(a.untung_r1_pct)})</span> · R2: <b class="naik">${fmt(a.r2)}</b></div>
        <div>CL: <b class="turun">${fmt(a.cl)}</b> <span class="redup">(${pct(a.rugi_cl_pct)})</span></div>
-       <div class="redup" style="font-size:12px;margin-top:4px">untung:rugi ${fmt(a.rasio,2)} · ${esc(a.alasan)}</div></div>`).join("")||'<div class="redup">Tidak ada saham yang memenuhi syarat hari ini.</div>'}</div></div>
+       <div style="font-size:13px;margin-top:4px">${(()=>{const u=hitungLot(a.entry[1],a.cl);return`≈ <b>${fmt(u.lot)} lot</b> <span class="redup">(Rp${fmt(u.nilai)}, rugi maks Rp${fmt(u.rugi)})</span>`})()}</div>
+       <div class="redup" style="font-size:12px;margin-top:4px">${a.macd?'<span class="lencana">MACD</span> ':""}${a.kualitas?'<span class="lencana">Kualitas ✓</span> ':""}${esc(a.alasan)} · jual paling lambat penutupan hari ke-3</div></div>`).join("")||'<div class="redup">Tidak ada saham yang memenuhi syarat hari ini.</div>'}</div></div>
    <div class="kisi2" style="margin-bottom:14px">${tabel("Saham uptrend",SP.uptrend)}${tabel("Saham sideways",SP.sideways)}</div>
    <div class="kisi" style="margin-bottom:14px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))">
      <div class="kartu" style="padding:12px"><h3 style="margin:0 0 6px">Keluar tabel hari ini</h3>${SP.keluar.map(x=>`<span class="kode-kecil klik" data-k="${x.kode}" style="cursor:pointer;margin-bottom:4px">${x.kode}${x.sektor?" ("+x.sektor+")":""} <span class="redup">${NS[x.dari]} → ${NS[x.ke]}</span></span>`).join(" ")||'<div class="redup">Tidak ada.</div>'}</div>
      ${kartuSek("Sektor menguat",warna("--hijau"),sek("better"))}${kartuSek("Sektor melemah",warna("--merah"),sek("worst"))}
      <div class="kartu legenda" style="padding:12px"><h3 style="margin:0 0 6px">Keterangan</h3>
-       <div><span class="kotak pk-baru"></span>Baru masuk (≤ 2 hari)</div><div><span class="kotak pk-beli"></span>Sinyal beli</div><div><span class="kotak pk-naik"></span>Naik pangkat</div><div><span class="kotak pk-turun"></span>Turun pangkat</div>
+       <div><span class="kotak pk-baru"></span>Baru masuk (≤ 2 hari)</div><div><span class="kotak pk-beli"></span>Sinyal beli (aturan J)</div><div><span class="kotak pk-naik"></span>Naik pangkat</div><div><span class="kotak pk-turun"></span>Turun pangkat</div>
        <div style="margin-top:6px"><b>*</b> support kuat · <b>^</b> kekuatan tren (1–3) · <b>◌</b> murah</div>
        <div class="redup" style="font-size:12px;margin-top:4px">Huruf sektor: C konsumen primer, CC konsumen nonprimer, F keuangan, E energi, B bahan baku, IN perindustrian, I infrastruktur/telekomunikasi/utilitas, H kesehatan, P properti, T teknologi.</div></div>
    </div>
@@ -1173,9 +1184,11 @@ function pasangSaringLapis(el,st,ulang){el.innerHTML=htmlSaringLapis(el.id,st);e
 const lencanaLapis=s=>`<span class="redup">L${s.lapis||"–"}${s.grup?" · "+esc(s.grup):""}</span>`;
 
 // ================= penyaring =================
-const FILTER=[["per","PER"],["pbv","PBV"],["roe","ROE %"],["imbal_dividen","Imbal dividen %"],["der","DER"],["rsi","RSI"],["perubahan_pct","Ubah hari ini %"],["rasio_vol","Volume ×"],["skor","Skor sinyal"],["jarak52","Jarak dari tertinggi 52m %"],["asing5","Asing bersih 5h (Rp M)"],["akum_b","Akumulasi beruntun (hari)"]];
+const FILTER=[["per","PER"],["pbv","PBV"],["roe","ROE %"],["imbal_dividen","Imbal dividen %"],["der","DER"],["rsi","RSI"],["perubahan_pct","Ubah hari ini %"],["rasio_vol","Volume ×"],["skor","Skor sinyal"],["jarak52","Jarak dari tertinggi 52m %"],["asing5","Asing bersih 5h (Rp M)"],["roa","ROA %"],["margin_laba","Margin laba %"],["rasio_lancar","Rasio lancar"],["rasio_cepat","Rasio cepat"],["peg","PEG"],["arus_kas_operasi","Arus kas operasi (Rp M)"],["akum_b","Akumulasi beruntun (hari)"]];
 const PRESET={
   "Semua":{},
+  "Sinyal aturan J hari ini":{sinyal_j:[1,null]},
+  "Kualitas (Yahoo Screener)":{roe:[10.0001,null],roa:[5.0001,null],margin_laba:[5.0001,null],rasio_lancar:[1.0001,null],rasio_cepat:[1.0001,null],arus_kas_operasi:[0.0001,null],peg:[0.0001,0.9999]},
   "Murah (PER<10, PBV<1,5)":{per:[0.01,10],pbv:[0,1.5]},
   "Dividen tinggi (>5%)":{imbal_dividen:[5,null]},
   "Profitabel (ROE>15%)":{roe:[15,null],der:[null,1.5]},
@@ -1199,7 +1212,7 @@ function isiFilter(){
   pasangSaringLapis($("saring-lapis"),SARING_L,jalankanSaring);
 }
 function jalankanSaring(){
-  const hasil=GABUNG.filter(s=>lolosLapis(s,SARING_L)).filter(s=>Object.entries(SARING).every(([k,[a,b]])=>{let v=s[k];if(k==="asing5"&&v!=null)v=v/1e9;if(a==null&&b==null)return true;if(v==null)return false;return(a==null||v>=a)&&(b==null||v<=b)}));
+  const hasil=GABUNG.filter(s=>lolosLapis(s,SARING_L)).filter(s=>Object.entries(SARING).every(([k,[a,b]])=>{let v=s[k];if((k==="asing5"||k==="arus_kas_operasi")&&v!=null)v=v/1e9;if(a==null&&b==null)return true;if(v==null)return false;return(a==null||v>=a)&&(b==null||v<=b)}));
   $("info-saring").textContent=`${hasil.length} dari ${GABUNG.length} saham cocok.`;
   tabelUrut($("t-saring"),[["kode","Kode",(v,s)=>`<b>${v}</b> <span class="redup">${esc((s.nama||"").slice(0,22))}</span>`],["lapis","Lapis",(v,s)=>`${v||"–"}${s.likuid?"":' <span class="redup">sepi</span>'}`],["grup","Grup",v=>v?esc(v):"–"],["sektor","Sektor"],["tutup","Harga",v=>fmt(v)],["perubahan_pct","Ubah",v=>`<span class="${kelas(v)}">${pct(v)}</span>`],
     ["kap","Kapitalisasi",v=>rp(v)],["per","PER",v=>fmt(v,1)],["pbv","PBV",v=>fmt(v,2)],["roe","ROE",v=>v==null?"–":fmt(v,1)+"%"],["imbal_dividen","Div.",v=>v==null?"–":fmt(v,1)+"%"],
@@ -1207,23 +1220,35 @@ function jalankanSaring(){
 }
 
 // ================= kandidat =================
-["modal","risiko","risiko2"].forEach(id=>$(id).addEventListener("input",tampilKandidat));
+let ATUR_LOT=bacaLokal("atur-lot-v1",{modal:10000000,risiko:2,maks:40});
+[["modal","modal"],["risiko","risiko"],["maks-emiten","maks"]].forEach(([id,k])=>{$(id).value=ATUR_LOT[k];
+  $(id).addEventListener("input",()=>{ATUR_LOT={...ATUR_LOT,[k]:+$(id).value};simpanLokal("atur-lot-v1",ATUR_LOT);tampilKandidat()})});
+function hitungLot(masuk,stop){
+  const m=+ATUR_LOT.modal||0,r=(+ATUR_LOT.risiko||0)/100,x=(+ATUR_LOT.maks||0)/100;
+  if(!(masuk>stop)||!m)return{lot:0,nilai:0,rugi:0};
+  const lot=Math.max(0,Math.floor(Math.min(m*r/(masuk-stop),m*x/(masuk*1.0015))/100));
+  return{lot,nilai:lot*100*masuk,rugi:lot*100*(masuk-stop)};
+}
 let SARING_K={};
 function tampilKandidat(){
   const u=R.uji_balik_gabungan;
-  if(u.jumlah&&u.rata_hasil_pct<=0)$("pita-uji").innerHTML=`<div class="pita waspada"><b>Perhatian:</b> pada uji balik 2 tahun, sinyal ini rata-rata <b>${pct(u.rata_hasil_pct)}</b> per transaksi (menang ${fmt(u.persen_menang,0)}%). Jangan dipakai dengan uang sungguhan sebelum aturannya diperbaiki.</div>`;
+  const tunda=R.kandidat_tunda||[],saring=R.kandidat_tersaring||[];
+  $("pita-uji").innerHTML=`<div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Aturan yang dipakai: aturan J</h3>
+    <p style="margin:4px 0">Tren naik kuat (harga dekat tertinggi 20 hari, MA20 naik tajam, volume ≥ 1,2× rata-rata, candle hijau) <b>tanpa</b> candle merah bervolume besar dalam 5 hari. Beli di pembukaan besok, <b>batas rugi −5%</b>, jual paling lambat <b>penutupan hari ke-3</b>. Hanya saat IHSG di atas MA20. Saham dengan rugi bersih atau arus kas operasi negatif dibuang.</p>
+    <p class="redup" style="margin:4px 0">Uji 3 tahun pada 456 saham: rata-rata +0,39% per transaksi, menang 37%, rata-rata menang +7,8% vs kalah −4,0%. Keuntungannya tipis: disiplin batas rugi dan ukuran posisi adalah kuncinya.${u.jumlah?` Uji per saham di data harian: ${u.jumlah} transaksi, rata-rata <span class="${kelas(u.rata_hasil_pct)}">${pct(u.rata_hasil_pct)}</span>, menang ${fmt(u.persen_menang,0)}%.`:""}</p></div>`
+    +(R.pasar_mendukung===false?`<div class="pita waspada"><b>Pasar tidak mendukung:</b> IHSG di bawah MA20, jadi menurut aturan pembelian <b>ditunda</b>. ${tunda.length?`Sinyal yang muncul hari ini (hanya untuk dipantau): ${tunda.map(k=>`<a href="#saham/${k}">${k}</a>`).join(", ")}.`:""}</div>`:"")
+    +(saring.length?`<div class="redup" style="margin:0 0 10px">Dibuang oleh saringan pengaman: ${saring.map(x=>`<a href="#saham/${x.kode}">${x.kode}</a> (${esc(x.alasan.join(", "))})`).join(", ")}.</div>`:"");
   const el=$("kisi-kandidat");
   if(!$("kandidat-saring").innerHTML)pasangSaringLapis($("kandidat-saring"),SARING_K,tampilKandidat);
   const daftarK=R.kandidat.filter(k=>lolosLapis(G(k),SARING_K));
   if(!daftarK.length){el.innerHTML='<div class="kartu">Tidak ada kandidat yang memenuhi syarat hari ini.</div>';return}
-  const modal=+$("modal").value||0;
-  el.innerHTML=daftarK.map(k=>{const s=G(k),l=s.level,u=s.uji_balik,risiko=(+(s.lapis===1?$("risiko").value:$("risiko2").value)||0)/100;
-    let lot=l.masuk>l.stop?Math.floor(modal*risiko/(l.masuk-l.stop)/100):0;lot=Math.max(0,Math.min(lot,Math.floor(modal/(l.masuk*100*1.0015))));
-    return`<div class="kartu"><div style="display:flex;justify-content:space-between;align-items:center"><span><a href="#saham/${k}" style="font-size:18px;font-weight:800;color:var(--teks)">${k}</a>${s.sektor&&s.sektor!=="–"?` <span class="redup" style="font-size:12px;margin-left:4px">${esc(s.sektor)}</span>`:""}</span><span><span class="lencana" style="background:var(--hover);color:var(--teks)">Lapis ${s.lapis||"–"}</span> <span class="lencana">skor ${s.skor}</span></span></div>
+  el.innerHTML=daftarK.map(k=>{const s=G(k),l=s.level,u=s.uji_balik,uk=hitungLot(l.masuk,l.stop),f=F[k]||{};
+    return`<div class="kartu"><div style="display:flex;justify-content:space-between;align-items:center"><span><a href="#saham/${k}" style="font-size:18px;font-weight:800;color:var(--teks)">${k}</a>${s.sektor&&s.sektor!=="–"?` <span class="redup" style="font-size:12px;margin-left:4px">${esc(s.sektor)}</span>`:""}</span><span><span class="lencana" style="background:var(--hover);color:var(--teks)">Lapis ${s.lapis||"–"}</span> ${s.sinyal_macd?'<span class="lencana" title="MACD baru memotong ke atas di atas 0">MACD</span> ':""}${f.lolos_kualitas?'<span class="lencana" title="Lolos saringan kualitas gaya Yahoo Screener">Kualitas ✓</span>':""}</span></div>
       <div class="redup">${esc(s.nama)}${s.grup?" · Grup "+esc(s.grup):""}</div>
       <div>${fmt(s.tutup)} <span class="${kelas(s.perubahan_pct)}">${pct(s.perubahan_pct)}</span> <span class="redup">· vol ${fmt(s.rasio_vol,1)}× · RSI ${fmt(s.rsi,0)}${s.asing5!=null?` · asing 5h <span class="${kelas(s.asing5)}">${rp(s.asing5)}</span>`:""}</span></div>
-      <div class="level"><div><span class="label">Masuk</span><b>${fmt(l.masuk)}</b></div><div><span class="label">Target</span><b class="naik">${fmt(l.target)}</b><span class="redup">${pct(l.untung_bersih_pct)}</span></div><div><span class="label">Batas rugi</span><b class="turun">${fmt(l.stop)}</b><span class="redup">${pct(l.rugi_bersih_pct)}</span></div></div>
-      <div class="redup">Ukuran disarankan <b style="color:var(--teks)">${fmt(lot)} lot</b> (≈Rp${fmt(lot*100*l.masuk)}, risiko ${fmt(risiko*100,1)}%)</div>
+      <div class="level"><div><span class="label">Masuk</span><b>${fmt(l.masuk)}</b></div><div><span class="label">Target acuan</span><b class="naik">${fmt(l.target)}</b><span class="redup">${pct(l.untung_bersih_pct)}</span></div><div><span class="label">Batas rugi (−5%)</span><b class="turun">${fmt(l.stop)}</b><span class="redup">${pct(l.rugi_bersih_pct)}</span></div></div>
+      <div class="redup">Jual paling lambat penutupan hari ke-3 setelah beli.</div>
+      <div class="redup">Ukuran disarankan <b style="color:var(--teks)">${fmt(uk.lot)} lot</b> (≈Rp${fmt(uk.nilai)}; rugi maks ≈Rp${fmt(uk.rugi)})</div>
       <ul class="alasan">${s.alasan.map(a=>`<li class="${a.startsWith("Peringatan")?"peringatan":""}">${a}</li>`).join("")}</ul>
       <div class="redup">Uji balik saham ini: ${u.jumlah?`${u.jumlah} sinyal, menang ${fmt(u.persen_menang,0)}%, rata-rata <span class="${kelas(u.rata_hasil_pct)}">${pct(u.rata_hasil_pct)}</span>`:"belum ada sinyal"}</div></div>`}).join("");
 }

@@ -162,11 +162,24 @@ def main() -> None:
         gabungan["habis_waktu"] = sum(u["habis_waktu"] for _, u in bobot)
 
     tanggal_data = max(s["tanggal"] for s in semua)
+    # saringan pengaman fundamental (dari data fundamental terakhir, jika ada)
+    bahaya = {}
+    p_fund = FOLDER_DATA / "fundamental.json"
+    if p_fund.exists():
+        for f in json.loads(p_fund.read_text()).get("saham", []):
+            if f.get("bahaya"):
+                bahaya[f["kode"]] = f["bahaya"]
     kandidat = sorted(
-        [s for s in semua if s["skor"] >= cfg.SKOR_MINIMAL and s["likuid"] and s["tanggal"] == tanggal_data],
-        key=lambda s: (s["skor"], s["rasio_vol"] or 0),
+        [s for s in semua if s.get("sinyal_j") and s["likuid"] and s["tanggal"] == tanggal_data
+         and s["kode"] not in bahaya],
+        key=lambda s: (s["sinyal_macd"], s["skor"], s["rasio_vol"] or 0),
         reverse=True,
     )
+    pasar_mendukung = bool(ihsg and ihsg["di_atas_ma20"])
+    kandidat_tunda = [] if pasar_mendukung else kandidat
+    if not pasar_mendukung:
+        kandidat = []
+    tersaring = [s["kode"] for s in semua if s.get("sinyal_j") and s["likuid"] and s["kode"] in bahaya]
     terkini = [s for s in semua if s["tanggal"] == tanggal_data and s["perubahan_pct"] is not None]
     naik = sorted(terkini, key=lambda s: s["perubahan_pct"], reverse=True)[:5]
     turun = sorted(terkini, key=lambda s: s["perubahan_pct"])[:5]
@@ -178,14 +191,17 @@ def main() -> None:
         "pengaturan": {
             "biaya_beli": cfg.BIAYA_BELI,
             "biaya_jual": cfg.BIAYA_JUAL,
-            "kali_atr_stop": cfg.KALI_ATR_STOP,
-            "kali_atr_target": cfg.KALI_ATR_TARGET,
+            "stop_persen": cfg.STOP_PERSEN,
+            "kali_atr_target": cfg.KALI_ATR_TARGET_ACUAN,
             "skor_minimal": cfg.SKOR_MINIMAL,
             "hari_pegang_maks": cfg.HARI_PEGANG_MAKS,
             "nilai_transaksi_minimal_miliar": cfg.NILAI_TRANSAKSI_MINIMAL / 1e9,
         },
         "ihsg": ihsg,
         "kandidat": [s["kode"] for s in kandidat],
+        "kandidat_tunda": [s["kode"] for s in kandidat_tunda],
+        "kandidat_tersaring": [{"kode": k, "alasan": bahaya[k]} for k in tersaring],
+        "pasar_mendukung": pasar_mendukung,
         "naik_terbesar": [s["kode"] for s in naik],
         "turun_terbesar": [s["kode"] for s in turun],
         "uji_balik_gabungan": gabungan,
