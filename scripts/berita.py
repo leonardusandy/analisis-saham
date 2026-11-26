@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import calendar
 import json
+import os
 import re
 import sys
 import time
@@ -18,6 +19,7 @@ import feedparser
 
 sys.path.insert(0, str(Path(__file__).parent))
 import config as cfg  # noqa: E402
+import sentimen as snt  # noqa: E402
 
 BERKAS = cfg.KELUAR / "berita.json"
 WIB = timezone(timedelta(hours=7))
@@ -56,6 +58,24 @@ ALIAS = {
     "AKRA": ["AKR Corporindo"], "ESSA": ["ESSA Industries"], "WIFI": ["Solusi Sinergi Digital"],
 }
 SEMESTA = cfg.kode_semesta()
+
+
+def _nama_pendek(nama: str) -> str | None:
+    """'PT Bank Central Asia Tbk' -> 'Bank Central Asia'. Hanya nama >= 2 kata agar tidak salah cocok."""
+    n = re.sub(r"\(.*?\)|\bPT\b|\bTbk\.?|\bPersero\b|,", " ", nama or "", flags=re.I)
+    n = re.sub(r"\s+", " ", n).strip()
+    return n if len(n.split()) >= 2 and len(n) >= 8 else None
+
+
+try:
+    for _s in json.loads((cfg.KELUAR / "fundamental.json").read_text())["saham"]:
+        _n = _nama_pendek(_s.get("nama"))
+        if _n and _s["kode"] in SEMESTA:
+            ALIAS.setdefault(_s["kode"], [])
+            if _n not in ALIAS[_s["kode"]]:
+                ALIAS[_s["kode"]].append(_n)
+except Exception:  # noqa: BLE001
+    pass
 # Kode saham dicocokkan persis huruf besar (mis. "BBCA"); nama lain hanya untuk emiten yang dikenal
 POLA = {
     k: re.compile(r"\b(" + "|".join(re.escape(x) for x in [k] + ALIAS.get(k, [])) + r")\b")
@@ -114,16 +134,34 @@ def baca_rss(sumber: str, url: str) -> list[dict]:
     return hasil
 
 
+def kunci_judul(b: dict) -> str:
+    return re.sub(r"\W+", "", b["judul"].lower())[:80]
+
+
 def gabung(baru: list[dict], lama: list[dict], batas: int) -> list[dict]:
     batas_waktu = (datetime.now(WIB) - timedelta(days=UMUR_MAKS_HARI)).strftime("%Y-%m-%dT%H:%M:%S")
+    analisis_lama = {kunci_judul(b): b for b in lama if "analisis" in b}
     terlihat, hasil = set(), []
     for b in sorted(baru + lama, key=lambda x: x["waktu"], reverse=True):
-        kunci = re.sub(r"\W+", "", b["judul"].lower())[:80]
+        kunci = kunci_judul(b)
         if kunci in terlihat or b["waktu"] < batas_waktu:
             continue
         terlihat.add(kunci)
+        if "analisis" not in b and kunci in analisis_lama:
+            b["analisis"] = analisis_lama[kunci]["analisis"]
+            b["oleh"] = analisis_lama[kunci].get("oleh")
         hasil.append(b)
     return hasil[:batas]
+
+
+def lengkapi(b: dict) -> dict:
+    """Saham terkait lewat tema dan sentimen kata kunci untuk satu berita."""
+    b["kode"] = sorted(set(b.get("kode", [])) | set(tandai(b["judul"])))
+    b["sentimen"] = snt.sentimen_aturan(b["judul"])
+    # saham terkait tema hanya bila beritanya bersentimen jelas, agar berita umum tidak penuh label
+    b["terkait"] = (snt.tema_terkait(b["judul"], set(SEMESTA), b["kode"])
+                    if b["sentimen"]["label"] in ("positif", "negatif") else [])
+    return b
 
 
 def main():
@@ -156,13 +194,33 @@ def main():
         for k in b["kode"]:
             per_saham.setdefault(k, []).append(b)
 
+    # Lengkapi saham terkait & sentimen; analisis AI bila kunci tersedia (hanya judul baru)
+    pasar_akhir = gabung(pasar, lama.get("pasar", []), 120)
+    per_saham_akhir = {
+        k: v for k in sorted(set(per_saham) | set(lama.get("per_saham", {})))
+        if (v := gabung(per_saham.get(k, []), lama.get("per_saham", {}).get(k, []), 25))
+    }
+    semua = {kunci_judul(b): b for b in pasar_akhir}
+    for v in per_saham_akhir.values():
+        for b in v:
+            semua.setdefault(kunci_judul(b), b)
+    for b in semua.values():
+        lengkapi(b)
+    n_ai = snt.analisis_ai(list(semua.values()), snt.semua_kode_bei())
+    if n_ai:
+        print(f"Analisis AI: {n_ai} judul baru.")
+    # salin hasil AI ke salinan judul yang sama di daftar lain
+    for daftar in [pasar_akhir, *per_saham_akhir.values()]:
+        for b in daftar:
+            s = semua.get(kunci_judul(b))
+            if s is not b and s and "analisis" in s:
+                b["analisis"], b["oleh"] = s["analisis"], s.get("oleh")
+
     data = {
         "dibuat": datetime.now(WIB).strftime("%Y-%m-%d %H:%M WIB"),
-        "pasar": gabung(pasar, lama.get("pasar", []), 120),
-        "per_saham": {
-            k: v for k in sorted(set(per_saham) | set(lama.get("per_saham", {})))
-            if (v := gabung(per_saham.get(k, []), lama.get("per_saham", {}).get(k, []), 25))
-        },
+        "ai": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "pasar": pasar_akhir,
+        "per_saham": per_saham_akhir,
     }
     BERKAS.parent.mkdir(parents=True, exist_ok=True)
     BERKAS.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")))

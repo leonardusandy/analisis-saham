@@ -77,6 +77,9 @@ button.chip.aktif{background:var(--latar-aksen);color:var(--aksen);border-color:
 .daftar-berita a:hover{text-decoration:none;color:var(--biru)}
 .daftar-berita .meta{color:var(--redup);font-size:12px;margin-top:2px}
 .kode-kecil{display:inline-block;font-size:11px;font-weight:700;padding:0 6px;border-radius:4px;background:var(--hover);color:var(--teks);margin-right:4px}
+.sn-positif{background:#e6f6ef;color:#00804f}.sn-negatif{background:#fdecec;color:#c62828}.sn-netral,.sn-campuran{background:var(--hover);color:var(--redup)}
+@media (prefers-color-scheme:dark){.sn-positif{background:#12291f;color:#2fc98a}.sn-negatif{background:#3a1717;color:#f2676b}}
+.dampak{font-size:12px;color:var(--redup);margin-top:2px}.dampak b{font-weight:600}
 .saham-kepala{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
 .bintang{cursor:pointer;font-size:22px;background:none;border:1px solid var(--garis);border-radius:8px;padding:2px 10px;color:var(--kuning)}
 .level{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0;text-align:center}
@@ -292,6 +295,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
         <div class="baris" style="margin-bottom:8px">
           <button class="tombol kedua chip aktif" data-b="semua">Semua</button>
           <button class="tombol kedua chip" data-b="pantau">Daftar pantau saya</button>
+          <label>Sentimen<select id="berita-sn"><option value="">Semua</option><option value="positif">▲ Positif</option><option value="negatif">▼ Negatif</option><option value="netral">■ Netral</option></select></label>
           <label>Kode saham<input id="berita-kode" placeholder="mis. BBCA" size="8"></label>
         </div>
         <div class="redup" id="berita-info"></div>
@@ -551,14 +555,28 @@ function gambarPeta(){
 window.addEventListener("resize",()=>{if(sudah.beranda&&$("h-beranda").classList.contains("aktif"))gambarPeta()});
 
 // ================= berita =================
-function daftarBerita(arr){
+const IKON_SN={positif:"▲",negatif:"▼",netral:"■",campuran:"◆"};
+function analisisBerita(b){
+  // utamakan analisis AI; jika tidak ada, pakai sentimen kata kunci untuk saham yang disebut/terkait
+  if(b.analisis)return b.analisis.map(a=>({...a,ai:true}));
+  const lab=b.sentimen?.label||"netral";
+  return[...(b.kode||[]).map(k=>({kode:k,sentimen:lab})),...(b.terkait||[]).map(k=>({kode:k,sentimen:lab,tema:true}))];
+}
+function sentimenUntuk(b,kode){const a=analisisBerita(b);const x=a.find(z=>z.kode===kode);return x?x.sentimen:(b.sentimen?.label||"netral")}
+function daftarBerita(arr,fokus){
   if(!arr.length)return'<div class="kosong">Belum ada berita. Berita diperbarui setiap 2 jam.</div>';
-  return arr.map(b=>`<a href="${esc(b.tautan)}" target="_blank" rel="noopener"><div>${b.kode.filter(k=>PETA[k]).map(k=>`<span class="kode-kecil">${k}</span>`).join("")}${esc(b.judul)}</div><div class="meta">${esc(b.sumber)} · ${waktuLalu(b.waktu)}</div></a>`).join("");
+  return arr.map(b=>{
+    const an=analisisBerita(b),lab=b.sentimen?.label;
+    const chip=an.map(a=>`<span class="kode-kecil sn-${a.sentimen}" title="${a.sentimen}${a.tema?" (terkait tema)":""}">${IKON_SN[a.sentimen]||""} ${a.kode}${a.tema?"*":""}</span>`).join("");
+    const dampak=an.filter(a=>a.dampak&&(!fokus||a.kode===fokus)).map(a=>`<div class="dampak"><b>${a.kode}:</b> ${esc(a.dampak)}</div>`).join("");
+    const umum=!an.length&&lab&&lab!=="netral"?`<span class="kode-kecil sn-${lab}" title="sentimen umum">${IKON_SN[lab]} pasar</span>`:"";
+    const kata=!b.analisis&&b.sentimen?.kata?.length?`<div class="dampak">Kata kunci: ${b.sentimen.kata.map(esc).join(", ")}</div>`:"";
+    return`<a href="${esc(b.tautan)}" target="_blank" rel="noopener"><div>${chip}${umum}${chip||umum?" ":""}${esc(b.judul)}</div>${dampak||kata}<div class="meta">${esc(b.sumber)} · ${waktuLalu(b.waktu)}${b.analisis?" · dianalisis AI":""}</div></a>`}).join("");
 }
 let modeBerita="semua";
 function tampilBerita(){
   document.querySelectorAll("#h-berita [data-b]").forEach(b=>b.onclick=()=>{modeBerita=b.dataset.b;document.querySelectorAll("#h-berita [data-b]").forEach(x=>x.classList.toggle("aktif",x===b));$("berita-kode").value="";saringBerita()});
-  $("berita-kode").oninput=saringBerita;saringBerita();
+  $("berita-kode").oninput=saringBerita;$("berita-sn").onchange=saringBerita;saringBerita();
 }
 function saringBerita(){
   if(!B){$("berita-semua").innerHTML='<div class="kosong">Berita belum tersedia.</div>';return}
@@ -566,8 +584,11 @@ function saringBerita(){
   if(q)arr=B.per_saham[q]||[];
   else if(modeBerita==="pantau"){const m=new Map();PANTAU.forEach(k=>(B.per_saham[k]||[]).forEach(b=>m.set(b.judul,b)));arr=[...m.values()].sort((a,b)=>b.waktu.localeCompare(a.waktu))}
   else arr=B.pasar;
-  $("berita-info").textContent=`${arr.length} berita · diperbarui ${B.dibuat}`;
-  $("berita-semua").innerHTML=daftarBerita(arr.slice(0,100));
+  const sn=$("berita-sn").value;
+  if(sn)arr=arr.filter(b=>q?sentimenUntuk(b,q)===sn:analisisBerita(b).some(x=>x.sentimen===sn)||(!analisisBerita(b).length&&(b.sentimen?.label||"netral")===sn));
+  const hitung=l=>arr.filter(b=>(q?sentimenUntuk(b,q):(b.sentimen?.label||"netral"))===l).length;
+  $("berita-info").innerHTML=`${arr.length} berita · diperbarui ${B.dibuat}${B.ai?" · analisis AI aktif":" · sentimen dari kata kunci"}${q?` · untuk ${esc(q)}: <span class="naik">▲ ${hitung("positif")}</span> <span class="turun">▼ ${hitung("negatif")}</span>`:""}`;
+  $("berita-semua").innerHTML=daftarBerita(arr.slice(0,100),q||null);
 }
 
 // ================= halaman saham =================
@@ -584,7 +605,8 @@ async function tampilSaham(kode){
   $("s-bintang").textContent=PANTAU.includes(kode)?"★":"☆";$("s-bintang").onclick=()=>togglePantau(kode);
   $("s-statcepat").innerHTML=[["Kapitalisasi","Rp"+rp(s.kapitalisasi)],["PER",fmt(s.per,1)],["PBV",fmt(s.pbv,2)],["ROE",s.roe==null?"–":fmt(s.roe,1)+"%"],["Imbal dividen",s.imbal_dividen==null?"–":fmt(s.imbal_dividen,2)+"%"],["RSI",fmt(s.rsi,0)],["Skor sinyal",s.skor],["Asing 5 hari",s.asing5==null?"–":`<span class="${kelas(s.asing5)}">Rp${rp(s.asing5)}</span>`]].map(([a,b])=>`<div><span class="label">${a}</span><b>${b}</b></div>`).join("");
   ["p-kunci","p-keuangan","p-dividen","p-asing","p-sinyal"].forEach(id=>$(id).innerHTML='<div class="kosong">Memuat…</div>');
-  $("s-berita").innerHTML=daftarBerita(B?.per_saham[kode]||[]);
+  {const bs=B?.per_saham[kode]||[];const n=l=>bs.filter(b=>sentimenUntuk(b,kode)===l).length;
+   $("s-berita").innerHTML=(bs.length?`<div class="statistik" style="margin-bottom:8px"><div><span class="label">Berita 14 hari</span><b>${bs.length}</b></div><div><span class="label">Positif</span><b class="naik">▲ ${n("positif")}</b></div><div><span class="label">Negatif</span><b class="turun">▼ ${n("negatif")}</b></div><div><span class="label">Netral/campuran</span><b>${n("netral")+n("campuran")}</b></div></div>`:"")+daftarBerita(bs,kode);}
   const [h,f]=await Promise.allSettled([ambil(`data/saham/${kode}.json`),ambil(`data/fundamental/${kode}.json`)]);
   DETAIL={h:h.value,f:f.status==="fulfilled"?f.value:null,kode};
   gambarGrafik();panelKunci();panelKeuangan("tahunan");panelDividen();panelAsing(kode);panelSinyal();panelMilik(kode);panelBrokerSaham(kode);
