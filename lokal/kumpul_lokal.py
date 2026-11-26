@@ -10,7 +10,7 @@ Hasilnya diunggah ke repositori GitHub Anda sebagai satu commit:
 GitHub kemudian mengolahnya otomatis menjadi data untuk web.
 
 Pemakaian:
-  python kumpul_lokal.py            # ambil hari bursa yang belum ada (maks 20 hari ke belakang)
+  python kumpul_lokal.py            # ambil hari bursa yang belum ada (data IDX maks 60 hari, broker maks 20 hari ke belakang)
   python kumpul_lokal.py --uji      # uji pengurai memakai contoh HTML, tanpa internet/unggah
   python kumpul_lokal.py --tanpa-unggah   # ambil data, simpan di folder 'keluaran' saja
 """
@@ -32,7 +32,8 @@ CABANG = "main"
 WIB = timezone(timedelta(hours=7))
 FOLDER = Path(__file__).resolve().parent
 BERKAS_TOKEN = Path.home() / ".analisis-saham-token.txt"
-HARI_MUNDUR = 20
+HARI_MUNDUR = 60          # data IDX (transaksi asing) diambil sampai 60 hari bursa ke belakang
+HARI_BROKER_MUNDUR = 20   # ringkasan broker cukup 20 hari ke belakang (lebih lambat diambil)
 AGEN = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
 
 IPOT_BROKER = "https://www.indopremier.com/module/saham/include/data-brokersummary.php"
@@ -457,7 +458,8 @@ def main():
         ada_broker = set(ind.get("tanggal", []))
     semua_hari = [d for d in hari_bursa_terakhir(HARI_MUNDUR) if d.isoformat() not in libur]
     perlu_idx = [d for d in semua_hari if d.isoformat() not in ada_idx]
-    perlu_broker = [d for d in semua_hari if d.isoformat() not in ada_broker]
+    batas_broker = set(hari_bursa_terakhir(HARI_BROKER_MUNDUR))
+    perlu_broker = [d for d in semua_hari if d.isoformat() not in ada_broker and d in batas_broker]
 
     global IPOT_MATI
     if perlu_broker:

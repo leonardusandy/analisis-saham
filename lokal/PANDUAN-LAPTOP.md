@@ -30,11 +30,11 @@ Jangan bagikan token ini ke siapa pun.
 2. **Windows**: klik dua kali `pasang_windows.bat`.
    **Mac**: buka Terminal, ketik `bash ` lalu seret berkas `pasang_mac.sh` ke Terminal, tekan Enter.
 3. Tempel token saat diminta (Windows: klik kanan untuk menempel), tekan Enter.
-4. Pemasang langsung mengambil 20 hari bursa terakhir (10–15 menit). Biarkan sampai selesai.
+4. Pemasang langsung mengambil data hingga 60 hari bursa terakhir (beberapa menit). Biarkan sampai selesai.
 
 Setelah itu laptop mengambil data otomatis setiap hari pukul 17.45 dan mencoba lagi
 setiap jam sampai 22.45 jika laptop baru dinyalakan. Jika laptop mati beberapa hari, data
-yang terlewat (hingga 20 hari bursa) diambil sekaligus saat skrip berjalan berikutnya.
+yang terlewat (hingga 60 hari bursa untuk data IDX, 20 hari untuk broker) diambil sekaligus saat skrip berjalan berikutnya.
 
 ## Tentang jendela Chrome yang muncul sendiri
 

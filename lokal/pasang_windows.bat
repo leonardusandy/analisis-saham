@@ -73,7 +73,7 @@ if errorlevel 1 (
 
 echo.
 echo ==========================================================
-echo  Sekarang mengambil data pertama kali (20 hari bursa terakhir).
+echo  Sekarang mengambil data pertama kali (hingga 60 hari bursa terakhir).
 echo  Ini bisa makan waktu 10-15 menit. Jangan tutup jendela ini.
 echo ==========================================================
 %PY% kumpul_lokal.py
