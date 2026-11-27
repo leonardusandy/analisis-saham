@@ -80,6 +80,98 @@ ARUS_KAS = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Piotroski F-Score (0-9) dan Beneish M-Score, dari laporan keuangan tahunan (2 tahun terakhir)
+# ---------------------------------------------------------------------------
+def _ambil(df, nama: list[str], kol):
+    if df is None or getattr(df, "empty", True) or kol >= len(df.columns):
+        return None
+    for n in nama:
+        if n in df.index:
+            v = angka(df.iloc[:, kol].get(n) if hasattr(df.iloc[:, kol], "get") else df.loc[n].iloc[kol])
+            if v is not None:
+                return v
+    return None
+
+
+def hitung_skor(inc, bs, cf, keuangan: bool = False) -> dict:
+    """Mengembalikan piotroski (jumlah syarat lolos), piotroski_terdata (jumlah syarat yang bisa dihitung),
+    dan beneish (M-Score 8 variabel; tidak dihitung untuk sektor keuangan)."""
+    def v(df, nama, t):
+        return _ambil(df, nama, t)
+    NI = ["Net Income Common Stockholders", "Net Income"]
+    TA = ["Total Assets"]
+    CFO = ["Operating Cash Flow", "Cash Flow From Continuing Operating Activities"]
+    LTD = ["Long Term Debt", "Long Term Debt And Capital Lease Obligation"]
+    CA, CL = ["Current Assets"], ["Current Liabilities"]
+    SH = ["Ordinary Shares Number", "Share Issued"]
+    REV = ["Total Revenue", "Operating Revenue"]
+    GP = ["Gross Profit"]
+    COGS = ["Cost Of Revenue", "Reconciled Cost Of Revenue"]
+    AR = ["Accounts Receivable", "Receivables", "Gross Accounts Receivable"]
+    PPE = ["Net PPE"]
+    SEC = ["Available For Sale Securities", "Investmentin Financial Assets", "Other Short Term Investments"]
+    DEP = ["Reconciled Depreciation", "Depreciation And Amortization", "Depreciation Amortization Depletion"]
+    SGA = ["Selling General And Administration"]
+
+    def bagi(a, b):
+        return a / b if a is not None and b not in (None, 0) else None
+
+    syarat = []
+    ni0, ni1 = v(inc, NI, 0), v(inc, NI, 1)
+    ta0, ta1, ta2 = v(bs, TA, 0), v(bs, TA, 1), v(bs, TA, 2)
+    cfo0 = v(cf, CFO, 0)
+    roa0, roa1 = bagi(ni0, ta1 or ta0), bagi(ni1, ta2 or ta1)
+    syarat.append(None if roa0 is None else roa0 > 0)                                  # 1 ROA positif
+    syarat.append(None if cfo0 is None else cfo0 > 0)                                  # 2 arus kas operasi positif
+    syarat.append(None if roa0 is None or roa1 is None else roa0 > roa1)               # 3 ROA naik
+    syarat.append(None if cfo0 is None or ni0 is None else cfo0 > ni0)                 # 4 kualitas laba
+    lev0, lev1 = bagi(v(bs, LTD, 0) or 0.0, ta0), bagi(v(bs, LTD, 1) or 0.0, ta1)
+    syarat.append(None if lev0 is None or lev1 is None else lev0 <= lev1)              # 5 utang jangka panjang turun
+    cr0, cr1 = bagi(v(bs, CA, 0), v(bs, CL, 0)), bagi(v(bs, CA, 1), v(bs, CL, 1))
+    syarat.append(None if cr0 is None or cr1 is None else cr0 > cr1)                   # 6 likuiditas membaik
+    sh0, sh1 = v(bs, SH, 0), v(bs, SH, 1)
+    syarat.append(None if sh0 is None or sh1 is None else sh0 <= sh1 * 1.001)          # 7 tidak menerbitkan saham baru
+    rev0, rev1 = v(inc, REV, 0), v(inc, REV, 1)
+    gm0, gm1 = bagi(v(inc, GP, 0), rev0), bagi(v(inc, GP, 1), rev1)
+    syarat.append(None if gm0 is None or gm1 is None else gm0 > gm1)                   # 8 margin kotor naik
+    at0, at1 = bagi(rev0, ta1 or ta0), bagi(rev1, ta2 or ta1)
+    syarat.append(None if at0 is None or at1 is None else at0 > at1)                   # 9 perputaran aset naik
+    ada = [x for x in syarat if x is not None]
+    hasil = {"piotroski": sum(ada) if ada else None, "piotroski_terdata": len(ada),
+             "piotroski_rinci": [None if x is None else bool(x) for x in syarat], "beneish": None}
+
+    if not keuangan:
+        try:
+            ar0, ar1 = v(bs, AR, 0), v(bs, AR, 1)
+            cogs0, cogs1 = v(inc, COGS, 0), v(inc, COGS, 1)
+            if gm0 is None and cogs0 is not None and rev0:
+                gm0 = (rev0 - cogs0) / rev0
+            if gm1 is None and cogs1 is not None and rev1:
+                gm1 = (rev1 - cogs1) / rev1
+            ca0, ca1 = v(bs, CA, 0), v(bs, CA, 1)
+            ppe0, ppe1 = v(bs, PPE, 0), v(bs, PPE, 1)
+            sec0, sec1 = v(bs, SEC, 0) or 0.0, v(bs, SEC, 1) or 0.0
+            dep0, dep1 = v(cf, DEP, 0) or v(inc, DEP, 0), v(cf, DEP, 1) or v(inc, DEP, 1)
+            sga0, sga1 = v(inc, SGA, 0), v(inc, SGA, 1)
+            cl0, cl1 = v(bs, CL, 0), v(bs, CL, 1)
+            ltd0, ltd1 = v(bs, LTD, 0) or 0.0, v(bs, LTD, 1) or 0.0
+            dsri = (ar0 / rev0) / (ar1 / rev1)
+            gmi = gm1 / gm0
+            aqi = (1 - (ca0 + ppe0 + sec0) / ta0) / (1 - (ca1 + ppe1 + sec1) / ta1)
+            sgi = rev0 / rev1
+            depi = (dep1 / (dep1 + ppe1)) / (dep0 / (dep0 + ppe0))
+            sgai = (sga0 / rev0) / (sga1 / rev1) if sga0 and sga1 else 1.0
+            tata = (ni0 - cfo0) / ta0
+            lvgi = ((cl0 + ltd0) / ta0) / ((cl1 + ltd1) / ta1)
+            m = (-4.84 + 0.92 * dsri + 0.528 * gmi + 0.404 * aqi + 0.892 * sgi + 0.115 * depi
+                 - 0.172 * sgai + 4.679 * tata - 0.327 * lvgi)
+            hasil["beneish"] = round(m, 2) if math.isfinite(m) else None
+        except (TypeError, ZeroDivisionError):
+            hasil["beneish"] = None
+    return hasil
+
+
 def persen(x):
     """yfinance kadang memberi 0,028 dan kadang 2,8 untuk 2,8%."""
     x = angka(x)
@@ -138,11 +230,17 @@ def periksa(d: dict) -> dict:
         bahaya.append("rugi bersih")
     if d.get("arus_kas_operasi") is not None and d["arus_kas_operasi"] < 0:
         bahaya.append("arus kas operasi negatif")
+    if d.get("piotroski") is not None and (d.get("piotroski_terdata") or 0) >= 7 and d["piotroski"] <= 2:
+        bahaya.append(f"Piotroski F-Score rendah ({d['piotroski']}/{d['piotroski_terdata']})")
+    peringatan = []
+    if d.get("beneish") is not None and d["beneish"] > -1.78:
+        peringatan.append(f"Beneish M-Score {d['beneish']:.2f}".replace('.', ',') + " (> -1,78: pola laporan keuangan perlu dicermati)")
     return {
         "kualitas": sum(terdata),            # jumlah syarat terpenuhi
         "kualitas_terdata": len(terdata),    # jumlah syarat yang datanya ada (bank tak punya rasio lancar/cepat)
         "lolos_kualitas": all(x is not False for x in hasil) and len(terdata) >= 5,
         "bahaya": bahaya,
+        "peringatan": peringatan,
     }
 
 
@@ -195,6 +293,12 @@ def ambil_satu(kode: str) -> dict:
     detail["profil"] = info.get("longBusinessSummary")
     detail["diperbarui"] = datetime.now(WIB).strftime("%Y-%m-%d")
     detail["kurs_konversi"] = None if k == 1.0 else round(k, 2)
+    try:  # skor Piotroski & Beneish (rasio, jadi tidak perlu konversi kurs)
+        sk = hitung_skor(t.income_stmt, t.balance_sheet, t.cashflow, keuangan=ringkas.get("sektor") == "Keuangan")
+        ringkas.update(sk)
+        detail.update(sk)
+    except Exception as e:  # noqa: BLE001
+        print(f"  ! {kode} skor Piotroski/Beneish: {e}")
     for nama, fungsi, n in [
         ("laba_rugi_tahunan", lambda: t.income_stmt, 4),
         ("laba_rugi_kuartal", lambda: t.quarterly_income_stmt, 6),
@@ -244,7 +348,7 @@ def main():
     # berkas lama belum punya rasio baru (lancar, cepat, arus kas, PEG): anggap kedaluwarsa
     for k in kode_list:
         f = FOLDER / "fundamental" / f"{k}.json"
-        if umur_map[k] < 10_000 and f.exists() and "rasio_cepat" not in f.read_text():
+        if umur_map[k] < 10_000 and f.exists() and '"piotroski"' not in f.read_text():
             umur_map[k] = 9_000
     kosong = sum(1 for v in umur_map.values() if v >= 10_000)
     lama_format = sum(1 for v in umur_map.values() if v == 9_000)
@@ -270,7 +374,8 @@ def main():
     kunci = ["kode", "nama", "sektor", "industri", "kapitalisasi", "per", "per_maju", "pbv", "roe", "roa", "der",
              "margin_laba", "tumbuh_pendapatan", "tumbuh_laba", "imbal_dividen", "eps", "nilai_buku", "mata_uang_laporan",
              "beta", "tertinggi_52m", "terendah_52m", "jumlah_saham", "situs", "diperbarui",
-             "rasio_lancar", "rasio_cepat", "arus_kas_operasi", "peg"]
+             "rasio_lancar", "rasio_cepat", "arus_kas_operasi", "peg",
+             "piotroski", "piotroski_terdata", "piotroski_rinci", "beneish"]
     semua = []
     for kode in kode_list:
         f = FOLDER / "fundamental" / f"{kode}.json"

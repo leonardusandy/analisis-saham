@@ -16,18 +16,14 @@ ATURAN (juga ditampilkan di web):
   * kuat    : harga terendah menyentuh area support (±1%) minimal 3 kali terpisah (berjarak
               >= 3 hari) pada 60 sampai 5 hari terakhir.
   Murah     : PER positif < 80% median PER sektornya, atau PBV < 1 dengan ROE > 8%.
-  Warna     : Baru masuk (status berlangsung <= 2 hari), Sinyal beli (aturan J terpenuhi),
+  Warna     : Baru masuk (status berlangsung <= 2 hari), Sinyal beli (pilihan utama strategi B),
               Naik/turun pangkat (tingkat berubah dari kemarin).
-  Aturan J  : harga > MA50, MA20 > MA50, MA50 naik dibanding 10 hari lalu, harga >= 97% harga
-              tertinggi 20 hari, MA20 naik >= 1% dalam 5 hari, volume >= 1,2x rata-rata 20 hari,
-              candle hijau, dan tidak ada candle merah bervolume >= 2,5x dalam 5 hari (jejak
-              distribusi). Uji 3 tahun (456 saham, pegang 3 hari, batas rugi -5%, saat IHSG di atas
-              MA20): rata-rata +0,39% per transaksi, menang 37%, untung total/rugi total 1,16.
-  Analisa   : saham ramai dengan sinyal aturan J, tanpa tanda bahaya fundamental (rugi bersih
-              atau arus kas operasi negatif). Urutan: MACD baru potong ke atas, sektor menguat,
-              lolos saringan kualitas, lapis. Entry = harga penutupan s.d. 0,5 ATR di bawahnya;
-              CL = 5% di bawah harga beli; jual paling lambat penutupan hari ke-3 setelah beli;
-              R1/R2 = resistance terdekat sebagai acuan ambil untung lebih awal.
+  Strategi B: pilihan utama web (scripts/strategi.py). Saham layak dengan kenaikan 20 hari <= 100%,
+              diurutkan dengan peringkat kenaikan 20 hari + peringkat model antarsaham. Uji Jan 2024 -
+              Nov 2026 (semesta bebas bias): rata-rata +0,60% per transaksi, menang 49%, untung/rugi 1,41.
+  Analisa   : 3 pilihan utama + 2 cadangan strategi B, tanpa tanda bahaya fundamental. Entry = harga
+              penutupan s.d. 0,5 ATR di bawahnya; CL = 5% di bawah harga beli; jual paling lambat penutupan
+              hari ke-3 setelah beli; R1/R2 = resistance terdekat sebagai acuan.
   Pasar     : beli hanya saat IHSG di atas MA20. Jika tidak, analisa ditampilkan sebagai "ditunda".
 """
 from __future__ import annotations
@@ -82,6 +78,12 @@ def tanggal_mulai(st: pd.Series) -> int:
 
 
 def main():
+    STR = {}
+    p_str = cfg.KELUAR / "strategi.json"
+    if p_str.exists():
+        STR = json.loads(p_str.read_text())
+    pilihan = {x["kode"]: x for x in STR.get("B", [])}
+    pilihan_utama = {x["kode"] for x in STR.get("B", []) if x.get("utama")}
     k = cfg.KELUAR
     rk = json.loads((k / "ringkasan.json").read_text())
     saham = {s["kode"]: s for s in rk["saham"]}
@@ -114,7 +116,7 @@ def main():
         st_k, tk_k = hs["st"].iloc[-2], int(hs["tingkat"].iloc[-2])
         if st_k in ("up", "side") and st not in ("up", "side") and s.get("likuid"):
             keluar.append({"kode": kode, "dari": st_k, "ke": st, "sektor": KODE_SEKTOR.get(sektor, "")})
-        if st not in ("up", "side") or not s.get("likuid"):
+        if (st not in ("up", "side") and kode not in pilihan) or not s.get("likuid"):
             continue
 
         c = float(df["c"].iloc[-1])
@@ -136,7 +138,7 @@ def main():
             (f.get("per") and f["per"] > 0 and sektor in median_per and f["per"] < 0.8 * median_per[sektor])
             or (f.get("pbv") and f["pbv"] < 1 and (f.get("roe") or 0) > 8))
         rv = s.get("rasio_vol") or 0
-        sinyal = bool(s.get("sinyal_j"))  # aturan J (hasil uji 3 tahun terbaik untuk pegang 1-3 hari)
+        sinyal = kode in pilihan_utama  # pilihan utama strategi B (lihat scripts/strategi.py)
         lama = tanggal_mulai(hs["st"])
         warna = ("baru" if lama <= 2 else "beli" if sinyal else "naik" if tk > tk_k and st == st_k
                  else "turun" if tk < tk_k and st == st_k else None)
@@ -172,14 +174,12 @@ def main():
     sektor_hasil.sort(key=lambda x: -x["ubah20"])
     lebih_baik = {x["nama"] for x in sektor_hasil if x["arah"] == "better"}
 
-    # ----- analisa harian -----
-    kand = [b for b in baris if b["sinyal"] and not b["bahaya"]]
-    kand.sort(key=lambda b: (not b["macd"], b["sektor"] not in lebih_baik, not b["kualitas"], b["lapis"] or 9,
-                             -(b["skor"] or 0), -(b["rasio_vol"] or 0)))
+    # ----- analisa harian: pilihan strategi B (utama + cadangan), urutan sesuai skor -----
+    per_kode = {b["kode"]: b for b in baris}
+    kand = [per_kode[x["kode"]] for x in STR.get("B", []) if x["kode"] in per_kode and not per_kode[x["kode"]]["bahaya"]]
     analisa = []
     for b in kand:
-        if len(analisa) >= 6:
-            break
+        sx = pilihan[b["kode"]]
         lo = bulatkan(max(b["support"], b["tutup"] - 0.5 * b["atr"]), "bawah")
         hi = bulatkan(b["tutup"], "bawah")
         r1 = b["resistance"] if b["resistance"] > hi * 1.01 else bulatkan(hi + b["atr"], "atas")
@@ -190,9 +190,9 @@ def main():
             "kode": b["kode"], "sk": b["sk"], "status": b["status"], "tingkat": b["tingkat"],
             "entry": [lo, hi], "r1": r1, "r2": r2, "cl": cl,
             "untung_r1_pct": round(untung * 100, 1), "rugi_cl_pct": round(-rugi * 100, 1), "rasio": round(untung / rugi, 2),
-            "macd": b["macd"], "kualitas": b["kualitas"],
-            "alasan": "tren naik kuat + volume, tanpa jejak distribusi"
-                      + (", MACD baru potong ke atas" if b["macd"] else "")
+            "macd": b["macd"], "kualitas": b["kualitas"], "utama": sx["utama"], "urutan": sx["urutan"],
+            "alasan": f"naik {sx['r20']:+.0f}% dalam 20 hari (peringkat {sx['pk_r20']:.0f}), model peringkat {sx['pk_model']:.0f}"
+                      + (", tanpa jejak distribusi" if not sx["distribusi"] else ", ada jejak distribusi")
                       + (", sektor sedang menguat" if b["sektor"] in lebih_baik else "")
                       + (", lolos saringan kualitas" if b["kualitas"] else ""),
         })
@@ -206,7 +206,7 @@ def main():
         "keluar": keluar,
         "sektor": sektor_hasil,
         "analisa": analisa,
-        "pasar_mendukung": bool(rk.get("pasar_mendukung", True)),
+        "pasar_mendukung": bool(STR.get("pasar_mendukung", rk.get("pasar_mendukung", True))),
         "aturan": __doc__.split("ATURAN (juga ditampilkan di web):")[1].strip(),
     }
     (k / "stockpick.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":"), default=str))

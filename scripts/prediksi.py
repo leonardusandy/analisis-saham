@@ -255,16 +255,22 @@ def catat_model(md: dict) -> list[dict]:
              "p": x["p"], "keyakinan": x["keyakinan"], "p_rel": x.get("p_rel")} for x in md["prediksi"]]
 
 
-def catat_hari_ini(rk: dict, sp: dict, fund: dict) -> list[dict]:
+def catat_hari_ini(rk: dict, sp: dict, fund: dict, st: dict | None = None) -> list[dict]:
     t = rk["tanggal_data"]
     ihsg_naik = bool(rk.get("pasar_mendukung"))
+    st = st or {}
+    tag_strategi = {}
+    if st.get("tanggal") == t:
+        for nama in ("B", "A"):
+            for x in st.get(nama, []):
+                tag_strategi.setdefault(x["kode"], []).append(nama if x.get("utama", True) else nama + "-cadangan")
     pilih_analisa = {a["kode"]: a for a in (sp or {}).get("analisa", [])}
     kandidat = set(rk.get("kandidat", [])) | set(rk.get("kandidat_tunda", []))
     baris_sp = {b["kode"]: b for b in (sp or {}).get("uptrend", []) + (sp or {}).get("sideways", [])}
     arah_sektor = {x["nama"]: x["arah"] for x in (sp or {}).get("sektor", [])}
     baru = []
     for s in rk["saham"]:
-        if s.get("tanggal") != t or not s.get("likuid") or not s.get("sinyal_j"):
+        if s.get("tanggal") != t or not s.get("likuid") or not (s.get("sinyal_j") or s["kode"] in tag_strategi):
             continue
         k = s["kode"]
         f, b = fund.get(k, {}), baris_sp.get(k, {})
@@ -275,7 +281,8 @@ def catat_hari_ini(rk: dict, sp: dict, fund: dict) -> list[dict]:
         sektor = f.get("sektor") or "Lainnya"
         baru.append({
             "id": f"{t}|{k}|beli", "jenis": "beli", "tanggal": t, "kode": k, "status": "menunggu",
-            "dipilih": [x for x, ya in (("analisa", k in pilih_analisa), ("kandidat", k in kandidat)) if ya],
+            "dipilih": [x for x, ya in (("analisa", k in pilih_analisa), ("kandidat", k in kandidat)) if ya]
+                       + tag_strategi.get(k, []) + (["J"] if s.get("sinyal_j") else []),
             "rencana": rencana, "tutup": s.get("tutup"),
             "fitur": {
                 "ihsg_naik": ihsg_naik, "macd": bool(s.get("sinyal_macd")), "kualitas": bool(f.get("lolos_kualitas")),
@@ -379,6 +386,13 @@ def statistik(cat: list[dict]) -> dict:
     }
     return {
         "beli_semua": ringkas(beli), "beli_dipilih": ringkas(pilih),
+        # uji kertas per strategi (catatan lama tanpa label strategi dianggap aturan J)
+        "per_strategi": {
+            "B": ringkas([c for c in beli if "B" in c.get("dipilih", [])]),
+            "B_saat_pasar_naik": ringkas([c for c in beli if "B" in c.get("dipilih", []) and c["fitur"].get("ihsg_naik")]),
+            "A": ringkas([c for c in beli if "A" in c.get("dipilih", [])]),
+            "J": ringkas([c for c in beli if "J" in c.get("dipilih", []) or not any(x in c.get("dipilih", []) for x in ("A", "B", "A-cadangan", "B-cadangan"))]),
+        },
         "beli_analisa": ringkas([c for c in beli if "analisa" in c.get("dipilih", [])]),
         "kena": {"r1": round(sum(c["hasil"]["kena_r1"] for c in r1) / len(r1) * 100, 1) if r1 else None,
                  "r2": round(sum(c["hasil"]["kena_r2"] for c in r1) / len(r1) * 100, 1) if r1 else None,
@@ -417,7 +431,7 @@ def main():
 
     # 2) tambah catatan hari ini (id unik: data tanggal yang sama tidak terhitung dua kali)
     n_baru = 0
-    for c in catat_hari_ini(rk, sp, fund) + catat_model(baca(k / "model.json")):
+    for c in catat_hari_ini(rk, sp, fund, baca(k / "strategi.json", {})) + catat_model(baca(k / "model.json")):
         if c["id"] not in cat:
             cat[c["id"]] = c
             n_baru += 1

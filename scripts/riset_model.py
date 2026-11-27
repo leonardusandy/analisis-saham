@@ -147,7 +147,7 @@ def ciri_saham(df: pd.DataFrame) -> pd.DataFrame:
     return f
 
 
-def bangun_data():
+def bangun_data(pakai_global: bool = True):
     t0 = time.time()
     kode = cfg.kode_semesta()
     data = jalankan.ambil_yahoo(kode)
@@ -184,6 +184,8 @@ def bangun_data():
     d = d.merge(pasar, left_on="t", right_index=True, how="left")
     # global & makro (jurnal Binus): kurs, minyak, emas, batu bara, S&P 500 — nilai hari SEBELUMNYA
     try:
+        if not pakai_global:
+            raise RuntimeError("dilewati (tidak dipakai strategi harian)")
         import yfinance as yf
         gl = yf.download(["IDR=X", "BZ=F", "GC=F", "MTF=F", "^GSPC"], period="5y", interval="1d",
                          auto_adjust=True, progress=False)["Close"]
