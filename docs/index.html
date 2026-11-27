@@ -2457,7 +2457,7 @@ async function tampilAnalisa(kode){
   const putusC=bB&&pasar&&!negTp.length?["beli","Layak beli",`Termasuk ${bB.utama?"pilihan #"+bB.urutan:"cadangan"} strategi B hari ini.`]
     :(per&&per[0]<=8&&!gagalC.length)?["beli","Layak beli","Masuk 8 besar skor strategi B dan semua syarat terpenuhi."]
     :(per&&per[0]<=20&&c>=x.ma20&&!(F0.bahaya||[]).length)?["pantau","Pantau",`Peringkat #${per[0]}: cukup kuat, tetapi belum termasuk yang terbaik${gagalC.length?"; yang belum terpenuhi: "+gagalC.map(z=>z.teks.split(" (")[0].split(":")[0]).join(", "):""}.`]
-    :["hindari","Belum layak",gagalC.map(z=>z.teks.split(" (")[0]).join("; ")+"."];
+    :["hindari","Belum layak","Belum terpenuhi: "+gagalC.map(z=>z.teks.split(" (")[0].replace(/^Tidak ada /,"ada ").replace(/^Peringkat skor strategi B ≤ 20.*/,"peringkat skor B ≤ 20")).join("; ")+"."];
   // ---- swing
   const syaratS=[
     ok(c>x.ma50,"Harga di atas MA50",fmt(x.ma50)),ok(x.ma20>x.ma50,"MA20 di atas MA50",`${fmt(x.ma20)} vs ${fmt(x.ma50)}`),
@@ -2471,7 +2471,7 @@ async function tampilAnalisa(kode){
     ok(pasar,"Pasar mendukung: IHSG di atas MA20",pasar?"ya":"tidak")];
   const gagalS=syaratS.filter(z=>!z.b),swPil=SW?.pilihan?.find(z=>z.kode===kode);
   const putusS=!gagalS.length?["beli","Layak swing",swPil?`Termasuk ${swPil.utama?"pilihan swing #"+swPil.urutan:"cadangan swing"} hari ini.`:"Semua syarat terpenuhi."]
-    :gagalS.length<=2&&c>x.ma50?["pantau","Pantau",`Kurang: ${gagalS.map(z=>z.teks).join("; ")}.`]:["hindari","Belum layak",gagalS.map(z=>z.teks).join("; ")+"."];
+    :gagalS.length<=2&&c>x.ma50?["pantau","Pantau",`Belum terpenuhi: ${gagalS.map(z=>z.teks).join("; ")}.`]:["hindari","Belum layak","Belum terpenuhi: "+gagalS.map(z=>z.teks.replace(/^Tidak ada /,"ada ")).join("; ")+"."];
   const W={beli:"var(--hijau)",pantau:"var(--kuning)",hindari:"var(--merah)"};
   const daftarSyarat=a=>`<table class="pk-tabel" style="font-size:13px"><tbody>${a.map(z=>`<tr><td style="width:22px">${z.b?'<span class="naik">✓</span>':'<span class="turun">✗</span>'}</td><td style="text-align:left">${z.teks}</td><td style="text-align:right" class="redup">${esc(String(z.nilai))}</td></tr>`).join("")}</tbody></table>`;
   const hi=bulatHarga(c,"bawah"),lo=bulatHarga(Math.max(lv.S1.v,c-0.5*atr),"bawah"),cl5=bulatHarga(hi*0.95,"atas"),cl8=bulatHarga(hi*0.92,"atas"),uk=hitungLot(hi,cl5);
