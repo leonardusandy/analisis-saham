@@ -298,6 +298,7 @@ def siapkan(cetak_pola=True):
     from sklearn.ensemble import HistGradientBoostingRegressor
     ciri = [c for c in CIRI if not c.startswith(("ihsg_", "luas_", "g_")) and c != "hari"]
     ciri_pola = ciri + [k for k, _ in nama_pola]
+    d.attrs["ciri"] = list(ciri)
     lat = d[d["layak"] & d["hasil"].notna()].copy()
     lat["pk_hasil"] = lat.groupby("t")["hasil"].rank(pct=True)
     u = d[d["layak"] & d["hasil"].notna() & (d["t"] >= rm.MULAI_UJI) & d["di_semesta"]].copy()
