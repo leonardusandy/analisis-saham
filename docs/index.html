@@ -1026,12 +1026,16 @@ function aksiSaham(k,hari=14){const batas=Date.now()-hari*864e5,lihat=new Set();
     .filter(b=>{if(lihat.has(b.judul))return false;lihat.add(b.judul);return(!b.waktu||new Date(b.waktu)>=batas)&&jenisAksi(b.judul).length})
     .sort((a,b)=>(b.waktu||"").localeCompare(a.waktu||""))}
 function lencanaAksi(k){const j=[...new Set(aksiSaham(k).flatMap(b=>jenisAksi(b.judul)))];return j.map(x=>`<span class="lencana" title="Berita 14 hari terakhir" style="background:var(--hover);color:var(--teks)">📢 ${x}</span>`).join(" ")}
-const TAUTAN_IDX=k=>[["Profil & pengumuman emiten",`https://www.idx.co.id/id/perusahaan-tercatat/profil-perusahaan-tercatat/detail-profile-perusahaan?kodeEmiten=${k}`],
-  ["Laporan keuangan & tahunan","https://www.idx.co.id/id/perusahaan-tercatat/laporan-keuangan-dan-tahunan/"],
-  ["Keterbukaan informasi","https://www.idx.co.id/id/perusahaan-tercatat/keterbukaan-informasi/"]];
+// periode laporan terbaru yang biasanya sudah terbit (batas lapor: Q1 akhir April, Q2 akhir Juli/Agustus, Q3 akhir Oktober)
+function periodeLapkeuTerbaru(){const d=new Date(),y=d.getFullYear(),m=d.getMonth()+1;
+  return m<=4?{th:y-1,tw:"TW3",ro:"III",teks:`Triwulan III ${y-1}`}:m<=7?{th:y,tw:"TW1",ro:"I",teks:`Triwulan I ${y}`}:m<=10?{th:y,tw:"TW2",ro:"II",teks:`Triwulan II ${y}`}:{th:y,tw:"TW3",ro:"III",teks:`Triwulan III ${y}`}}
+function tautanXlsx(k,p=periodeLapkeuTerbaru()){return`https://www.idx.co.id/Portals/0/StaticData/ListedCompanies/Corporate_Actions/New_Info_JSX/Jenis_Informasi/01_Laporan_Keuangan/02_Soft_Copy_Laporan_Keuangan//Laporan%20Keuangan%20Tahun%20${p.th}/${p.tw}/${k}/FinancialStatement-${p.th}-${p.ro}-${k}.xlsx`}
+const TAUTAN_IDX=k=>[["Profil, dividen, pengumuman & kalender",`https://www.idx.co.id/id/perusahaan-tercatat/profil-perusahaan-tercatat/${k}`],
+  [`Unduh Excel laporan ${periodeLapkeuTerbaru().teks}`,tautanXlsx(k)],
+  ["Keterbukaan informasi (semua emiten)","https://www.idx.co.id/id/perusahaan-tercatat/keterbukaan-informasi/"]];
 function kotakIDX(k){return`<div class="kartu" style="padding:10px 12px;margin-bottom:10px"><b>Dokumen resmi ${k} di IDX</b>
   <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0">${TAUTAN_IDX(k).map(([n,u])=>`<a class="tombol kedua chip" href="${u}" target="_blank" rel="noopener">${n} ↗</a>`).join("")}</div>
-  <div class="redup" style="font-size:12px">Di halaman laporan keuangan, isi kode <b>${k}</b>, pilih tahun dan periode, lalu unduh file <b>Excel (.xlsx)</b>. Unggah file itu di menu <a href="#lapkeu">Laporan Keuangan Saya</a>.</div></div>`}
+  <div class="redup" style="font-size:12px">Tombol unduh mengambil file <b>Excel (.xlsx)</b> laporan terbaru langsung dari IDX; unggah file itu di menu <a href="#lapkeu">Laporan Keuangan Saya</a>. Bila belum terbit atau gagal, buka profil emiten → tab <b>Laporan Keuangan</b>. Pengumuman resmi (RUPS, dividen, aksi korporasi) ada di tab <b>Pengumuman</b> dan <b>Kalender</b> di profil emiten.</div></div>`}
 function saringBerita(){
   if(!B){$("berita-semua").innerHTML='<div class="kosong">Berita belum tersedia.</div>';return}
   const q=$("berita-kode").value.trim().toUpperCase();let arr;
@@ -1551,7 +1555,7 @@ function kartuSwing(sebut,dipegang){
         <div><span class="label">Jumlah</span><b>${fmt(uk.lot)} lot</b><span class="redup">Rp${fmt(uk.nilai)}</span></div></div>
       <ul class="ml-alasan"><li>ROE ${fmt(b.roe,1)}% · Piotroski ${b.piotroski}/${b.piotroski_terdata||9}${b.per?` · PER ${fmt(b.per,1)}`:""}${b.pbv?` · PBV ${fmt(b.pbv,2)}`:""}</li>
         <li>Naik ${pct(b.r60)} dalam 60 hari, ${pct(b.r20)} dalam 20 hari.</li>
-        ${lk?`<li>Laporan unggahan Anda ${esc(lk.periode)}: <b>${lk.putusan}</b>${lk.rasio?.laba_tumbuh!=null?`, laba ${pct(lk.rasio.laba_tumbuh)} vs tahun lalu`:""}.</li>`:`<li class="redup">Cek laporan terbaru: <a href="${TAUTAN_IDX(b.kode)[1][1]}" target="_blank" rel="noopener">unduh di IDX ↗</a>, lalu unggah di <a href="#lapkeu">Laporan Keuangan Saya</a>.</li>`}
+        ${lk?`<li>Laporan unggahan Anda ${esc(lk.periode)}: <b>${lk.putusan}</b>${lk.rasio?.laba_tumbuh!=null?`, laba ${pct(lk.rasio.laba_tumbuh)} vs tahun lalu`:""}.</li>`:`<li class="redup">Cek laporan terbaru: <a href="${tautanXlsx(b.kode)}" target="_blank" rel="noopener">unduh Excel ${periodeLapkeuTerbaru().teks} dari IDX ↗</a>, lalu unggah di <a href="#lapkeu">Laporan Keuangan Saya</a>.</li>`}
         ${(b.peringatan||[]).map(w=>`<li style="color:var(--kuning)">⚠ ${esc(w)}</li>`).join("")}</ul>
       <div class="ml-aksi"><button class="tombol chip" data-beli="${b.kode}" data-harga="${b.entry[1]}" data-lot="${uk.lot||1}" data-cl="${b.cl}" data-jenis="swing">Saya beli ini (swing)</button></div>
     </div>`}).join("")||'<div class="kosong">Hari ini tidak ada saham yang lolos tren + fundamental kuat.</div>'}</div>
@@ -2075,7 +2079,7 @@ const LK_POLA={
   aset_lancar:[/^total current assets$/,/^jumlah aset lancar$/],
   liab_lancar:[/^total current liabilities$/,/^jumlah liabilitas jangka pendek$/],
   total_liab:[/^total liabilities$/,/^jumlah liabilitas$/],
-  ekuitas_induk:[/^total equity attributable to (equity )?owners of (the )?parent( entity)?$/,/^jumlah ekuitas yang dapat diatribusikan kepada pemilik entitas induk$/],
+  ekuitas_induk:[/^total equity attributable to (equity )?owners of (the )?parent( entity)?$/,/^jumlah ekuitas yang (dapat )?diatribusikan kepada pemilik entitas induk$/],
   total_ekuitas:[/^total equity$/,/^jumlah ekuitas$/],
   pendapatan:[/^(total )?(sales and revenues?|revenues?|net revenues?|net sales|sales)$/,/^(jumlah )?(penjualan dan pendapatan usaha|pendapatan( usaha)?|penjualan( bersih)?|pendapatan bersih)$/,/^(total )?interest income$/,/^(jumlah )?pendapatan bunga$/],
   laba_kotor:[/^(total )?gross profit( \(loss\))?$/,/^(jumlah )?laba( \(rugi\))? bruto$/],
@@ -2157,16 +2161,21 @@ async function tampilLapkeu(){
   $("lk-isi").innerHTML=`
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin:0">Laporan Keuangan Saya</h3>
      <p class="redup" style="margin:6px 0 10px">Untuk saham yang Anda anggap potensial: unduh laporan keuangan terbaru dari IDX, lalu unggah di sini. Web membaca file Excel di perangkat Anda, menghitung rasio dan skor sehat, lalu menyimpannya (terenkripsi) agar terlihat di semua perangkat dan dipakai di Rencana swing.</p>
-     <ol style="margin:0 0 10px 18px;padding:0;font-size:14px"><li>Buka <a href="https://www.idx.co.id/id/perusahaan-tercatat/laporan-keuangan-dan-tahunan/" target="_blank" rel="noopener"><b>Laporan Keuangan dan Tahunan di IDX ↗</b></a>.</li>
-       <li>Pilih <b>Saham</b>, isi kode emiten, pilih tahun dan periode terbaru (misalnya Triwulan III), lalu klik Cari.</li>
-       <li>Unduh file berakhiran <b>.xlsx</b> (biasanya bernama <i>FinancialStatement-…-KODE.xlsx</i>), bukan PDF.</li>
+     <div class="baris" style="margin-bottom:10px;align-items:flex-end"><label>Kode saham<input id="lk-kode-unduh" maxlength="4" size="6" placeholder="mis. ASGR" style="text-transform:uppercase" list="daftar-kode"></label>
+       <a class="tombol" id="lk-unduh" href="#" target="_blank" rel="noopener" style="pointer-events:none;opacity:.5">Unduh Excel ${periodeLapkeuTerbaru().teks} dari IDX ↗</a>
+       <a class="tombol kedua" id="lk-profil" href="#" target="_blank" rel="noopener" style="pointer-events:none;opacity:.5">Profil emiten di IDX ↗</a></div>
+     <ol style="margin:0 0 10px 18px;padding:0;font-size:14px"><li>Isi kode saham, lalu klik <b>Unduh Excel</b>. File laporan terbaru (<i>FinancialStatement-…-KODE.xlsx</i>) terunduh langsung dari IDX.</li>
+       <li>Bila laporan periode itu belum terbit, buka <b>Profil emiten</b> → tab <b>Laporan Keuangan</b>, lalu unduh file <b>.xlsx</b> (bukan PDF) periode terbaru.</li>
        <li>Pilih file itu di bawah ini. Boleh beberapa file sekaligus.</li></ol>
-     <label class="tombol" style="display:inline-block;cursor:pointer">Pilih file Excel IDX<input type="file" id="lk-file" accept=".xlsx,.xls" multiple hidden></label>
+     <button class="tombol" id="lk-pilih" type="button">Pilih file Excel IDX</button><input type="file" id="lk-file" accept=".xlsx,.xls" multiple hidden>
      <span class="redup" id="lk-status" style="margin-left:8px"></span>
      <div id="lk-pratinjau" style="margin-top:12px"></div></div>
    <div class="kartu"><h3 style="margin-top:0">Tersimpan (${daftar.length} saham)</h3>
      <div class="ml-posisi">${daftar.map(([k,v])=>kartuLK(v[0])+(v.length>1?`<div class="redup" style="font-size:12px;margin:-4px 0 8px 6px">Periode lain: ${v.slice(1).map(y=>`${esc(y.periode)} (${y.putusan})`).join(", ")}</div>`:"")).join("")||'<div class="kosong">Belum ada laporan yang diunggah.</div>'}</div>
      <p class="redup" style="font-size:12px;margin:10px 0 0">Penilaian: <b>kuat</b> = laba positif dan tumbuh, ROE ≥ 10%, arus kas operasi tidak negatif, utang/ekuitas ≤ 2 (kecuali bank). <b>Lemah</b> = rugi. <b>Waspada</b> = laba positif tetapi arus kas operasi negatif. Laba kuartalan dibandingkan dengan periode yang sama tahun lalu; ROE disetahunkan.</p></div>`;
+  $("lk-pilih").onclick=()=>$("lk-file").click();
+  $("lk-kode-unduh").oninput=e=>{const k=e.target.value.trim().toUpperCase(),ok=/^[A-Z]{4}$/.test(k);
+    [["lk-unduh",ok?tautanXlsx(k):"#"],["lk-profil",ok?`https://www.idx.co.id/id/perusahaan-tercatat/profil-perusahaan-tercatat/${k}`:"#"]].forEach(([id,u])=>{const a=$(id);a.href=u;a.style.pointerEvents=ok?"":"none";a.style.opacity=ok?"":".5"})};
   $("lk-file").onchange=async e=>{
     const files=[...e.target.files];if(!files.length)return;$("lk-status").textContent="Membaca file…";LK_BARU=[];
     for(const f of files){try{LK_BARU.push(await lkBaca(f))}catch(err){LK_BARU.push({gagal:f.name+": "+err.message})}}
