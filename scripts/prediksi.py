@@ -239,7 +239,7 @@ def nilai_model(c: dict, L: list) -> None:
     if not ke:
         return
     ubah = (ke[-1]["c"] / L[i]["c"] - 1) * 100
-    c["hasil"] = {"pct": round(ubah, 2), "hari": len(ke)}
+    c["hasil"] = {"pct": round(ubah, 2), "hari": len(ke), "sampai": ke[-1]["t"]}
     if len(ke) >= HARI_BELI:
         c["status"] = "selesai"
         c["benar"] = (c["p"] >= 50) == (ubah > 0)
@@ -417,6 +417,19 @@ def main():
     sp = baca(k / "stockpick.json", {})
     fund = {f["kode"]: f for f in (baca(k / "fundamental.json", {}) or {}).get("saham", [])}
 
+    t_data = rk["tanggal_data"]
+    # 0a) penilaian yang memakai harga SETELAH tanggal data terakhir (mis. candle belum final) dibatalkan
+    for c in cat.values():
+        h1 = c.get("h1")
+        hs = c.get("hasil") or {}
+        if (h1 and h1.get("t", "") > t_data) or (hs.get("sampai", "") > t_data):
+            for x in ("h1", "hasil", "benar", "benar_rel"):
+                c.pop(x, None)
+            c["status"] = "menunggu"
+    # 0b) proses ulang untuk tanggal data yang sama: catatan yang belum dinilai diganti yang terbaru
+    for cid in [cid for cid, c in cat.items()
+                if c["tanggal"] == t_data and c["jenis"] in ("beli", "tren", "model") and "h1" not in c]:
+        del cat[cid]
     # 1) nilai catatan yang belum selesai
     simpan = {}
     for c in cat.values():

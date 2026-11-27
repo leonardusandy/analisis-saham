@@ -33,11 +33,21 @@ def ambil_yahoo(kode_list: list[str]) -> dict[str, pd.DataFrame]:
     simbol = [f"{k}.JK" for k in kode_list] + [cfg.KODE_IHSG]
     hasil = {}
 
+    # Saat bursa belum tutup, Yahoo memberi candle hari ini yang belum final: buang.
+    from datetime import datetime, timedelta, timezone
+    kini = datetime.now(timezone(timedelta(hours=7)))
+    belum_tutup = kini.weekday() < 5 and (kini.hour * 60 + kini.minute) < 16 * 60 + 15
+    hari_ini = pd.Timestamp(kini.date())
+
     def simpan(s, df):
         df = df[["Open", "High", "Low", "Close", "Volume"]].dropna(how="all")
         if df.empty:
             return False
         df.index = pd.to_datetime(df.index).tz_localize(None)
+        if belum_tutup:
+            df = df[df.index.normalize() < hari_ini]
+            if df.empty:
+                return False
         kode = "IHSG" if s == cfg.KODE_IHSG else s.replace(".JK", "")
         hasil[kode] = df
         return True
