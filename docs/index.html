@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Analisis Saham Harian</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2313294B'/><path d='M6 22l7-7 5 4 8-9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<title>Leading Signals · Rencana Trading Harian</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%2313294B'/><g fill='none' stroke-linecap='square'><path d='M17 12V50H35' stroke='%23C9932E' stroke-width='8'/><path d='M44 15H33Q27 15 27 21V25Q27 31 33 31H40Q46 31 46 37V44Q46 50 40 50H25' stroke='%2313294B' stroke-width='12'/><path d='M44 15H33Q27 15 27 21V25Q27 31 33 31H40Q46 31 46 37V44Q46 50 40 50H25' stroke='%23F3E6C8' stroke-width='8'/></g><path d='M42 8H54V20M44 18L54 8' fill='none' stroke='%23C9932E' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#13294B">
@@ -37,8 +37,8 @@ main{grid-area:utama;min-width:0;padding:16px 20px 40px}
 
 .logo{font-weight:800;font-size:16px;color:#fff;display:flex;align-items:center;gap:10px;white-space:nowrap;padding:18px 18px 14px;letter-spacing:-.01em}
 .logo:hover{text-decoration:none}
-.logo i{width:26px;height:26px;border-radius:7px;background:var(--emas);display:inline-grid;place-items:center}
-.logo i::after{content:"";width:12px;height:8px;border:2.5px solid var(--tinta);border-top:0;border-right:0;transform:rotate(-45deg) translate(1px,-2px)}
+.logo .tanda{width:30px;height:30px;flex:none;border-radius:8px;box-shadow:0 0 0 1px rgba(201,147,46,.45)}
+.logo .nama{display:flex;flex-direction:column;line-height:1.1}.logo .nama small{font-weight:500;font-size:11px;color:rgba(255,255,255,.55);letter-spacing:.02em}
 
 /* jam bursa: satu-satunya unsur menonjol */
 .papan{margin:4px 12px 14px;padding:12px 14px;border-radius:10px;background:var(--tinta-2);border:1px solid rgba(201,147,46,.35)}
@@ -106,9 +106,27 @@ nav.menu.utama svg,nav.bawah svg{width:18px;height:18px;flex:none;stroke:current
 /* masuk */
 body.terkunci{overflow:hidden}
 .layar-masuk[hidden],.keluar[hidden]{display:none}
+.ringkas-beranda{display:flex;flex-wrap:wrap;gap:18px;justify-content:space-between;align-items:center;background:var(--tinta);color:#fff;border-radius:16px;padding:22px 24px;margin-bottom:14px}
+.ringkas-beranda h2{margin:2px 0 10px;font-size:24px;letter-spacing:-.02em}
+.ringkas-sapa{color:var(--emas);font-size:13px;font-weight:600}
+.ringkas-status{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.08)}
+.ringkas-status span{width:9px;height:9px;border-radius:50%;background:#3ccf91}.ringkas-status.tunda span{background:#f0b429}
+.ringkas-kecil{margin-top:8px;font-size:13px;color:rgba(255,255,255,.65)}.ringkas-kecil .naik{color:#5fe0a8}.ringkas-kecil .turun{color:#ff8a8d}
+.ringkas-kanan{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
+.ringkas-angka{display:flex;flex-direction:column;justify-content:center;min-width:104px;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.06);color:#fff;text-decoration:none}
+.ringkas-angka:hover{background:rgba(255,255,255,.11);text-decoration:none}.ringkas-angka b{font-size:26px;line-height:1.1}.ringkas-angka b[style*="inherit"]{color:#fff!important}
+.ringkas-angka span{font-size:12px;color:rgba(255,255,255,.65)}
+.ringkas-buka{align-self:center;background:var(--emas)!important;color:var(--tinta)!important;font-weight:700}
+@media (max-width:700px){.ringkas-beranda{padding:18px}.ringkas-angka{min-width:calc(50% - 5px)}.ringkas-buka{width:100%;text-align:center}}
 .layar-masuk{position:fixed;inset:0;z-index:1000;background:var(--tinta);display:flex;align-items:center;justify-content:center;padding:20px}
 .layar-masuk form{width:100%;max-width:360px;background:var(--kartu);border-radius:14px;padding:28px}
-.layar-masuk h2{margin:0 0 4px;font-size:20px;display:flex;align-items:center;gap:10px}.layar-masuk h2 i{width:26px;height:26px;border-radius:7px;background:var(--emas);display:inline-block}
+.layar-masuk{flex-direction:column;gap:22px}
+.masuk-merek{display:flex;flex-direction:column;align-items:center;text-align:center;color:#fff}
+.masuk-merek .tanda{width:72px;height:72px;border-radius:18px;box-shadow:0 0 0 1px rgba(201,147,46,.5)}
+.masuk-merek h1{margin:14px 0 2px;font-size:28px;font-weight:800;letter-spacing:-.02em}
+.masuk-merek p{margin:0;color:rgba(255,255,255,.62);font-size:14px}
+.masuk-merek .moto{margin-top:6px;color:var(--emas);font-size:12px;font-weight:600;letter-spacing:.04em}
+.layar-masuk h2{margin:0 0 4px;font-size:17px}
 .layar-masuk input[type=password]{width:100%;padding:11px 12px;margin:16px 0 10px;border:1px solid var(--garis);border-radius:9px;font:inherit;background:var(--bg);color:var(--teks)}
 .layar-masuk button{width:100%;padding:11px;border:0;border-radius:9px;background:var(--aksen);color:#fff;font:inherit;font-weight:700;font-size:15px;cursor:pointer;margin-top:14px}
 .layar-masuk button:disabled{opacity:.6}
@@ -259,8 +277,10 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
 </style>
 </head>
 <body>
-<div class="layar-masuk" id="layar-masuk" hidden><form id="form-masuk">
-  <h2><i></i>Analisis Saham</h2><div class="redup" style="font-size:13px">Masukkan sandi untuk membuka web.</div>
+<div class="layar-masuk" id="layar-masuk" hidden>
+<div class="masuk-merek"><svg class="tanda" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#13294B"/><g fill="none" stroke-linecap="square"><path d="M17 12V50H35" stroke="#C9932E" stroke-width="8"/><path d="M44 15H33Q27 15 27 21V25Q27 31 33 31H40Q46 31 46 37V44Q46 50 40 50H25" stroke="#13294B" stroke-width="12"/><path d="M44 15H33Q27 15 27 21V25Q27 31 33 31H40Q46 31 46 37V44Q46 50 40 50H25" stroke="#F3E6C8" stroke-width="8"/><path d="M17 12V50H35" stroke="#13294B" stroke-width="2.2"/><path d="M44 15H33Q27 15 27 21V25Q27 31 33 31H40Q46 31 46 37V44Q46 50 40 50H25" stroke="#13294B" stroke-width="2.2"/></g><path d="M42 8H54V20M44 18L54 8" fill="none" stroke="#C9932E" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg><h1>Leading Signals</h1><p>Rencana trading Anda, siap sebelum bursa buka.</p><div class="moto">Trade the trend, not the noise</div></div>
+<form id="form-masuk">
+  <h2>Masuk</h2><div class="redup" style="font-size:13px">Masukkan sandi untuk membuka data Anda.</div>
   <input type="password" id="sandi" placeholder="Sandi" autocomplete="current-password" aria-label="Sandi" required>
   <label style="font-size:13px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="ingat" checked> Ingat di perangkat ini</label>
   <div id="salah-masuk" class="turun" style="font-size:13px;margin-top:8px" hidden>Sandi salah. Coba lagi.</div>
@@ -268,7 +288,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
 </form></div>
 <div class="aplikasi">
 <nav class="sisi menu utama" id="menu" aria-label="Menu utama">
-  <a class="logo" href="#malam"><i></i>Analisis Saham</a>
+  <a class="logo" href="#beranda"><svg class="tanda" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#13294B"/><g fill="none" stroke-linecap="square"><path d="M17 12V50H35" stroke="#C9932E" stroke-width="8"/><path d="M44 15H33Q27 15 27 21V25Q27 31 33 31H40Q46 31 46 37V44Q46 50 40 50H25" stroke="#13294B" stroke-width="12"/><path d="M44 15H33Q27 15 27 21V25Q27 31 33 31H40Q46 31 46 37V44Q46 50 40 50H25" stroke="#F3E6C8" stroke-width="8"/><path d="M17 12V50H35" stroke="#13294B" stroke-width="2.2"/><path d="M44 15H33Q27 15 27 21V25Q27 31 33 31H40Q46 31 46 37V44Q46 50 40 50H25" stroke="#13294B" stroke-width="2.2"/></g><path d="M42 8H54V20M44 18L54 8" fill="none" stroke="#C9932E" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="nama">Leading Signals<small>Rencana trading harian</small></span></a>
   <div class="papan"><div id="jam" title="Waktu Jakarta (WIB)"></div><button class="keluar" id="tombol-keluar" hidden title="Kunci web di perangkat ini">Keluar</button></div>
     <div class="grup">Hari ini</div>
     <a href="#malam" data-h="malam"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>Rencana</a>
@@ -320,6 +340,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
 
     <!-- BERANDA -->
     <section class="halaman" id="h-beranda">
+      <div id="beranda-ringkas"></div>
       <div id="pita-pasar"></div>
       <div class="kisi2" style="margin-bottom:14px">
         <div class="kartu">
@@ -330,8 +351,8 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
         <div class="kartu">
           <h3>Statistik pasar <span class="redup" id="tgl-pasar"></span></h3>
           <div class="statistik" id="stat-pasar"></div>
-          <h3 style="margin-top:14px">Uji balik sinyal kandidat (2 tahun)</h3>
-          <div id="uji-gabungan" class="redup"></div>
+          <h3 style="margin-top:14px">Kinerja strategi</h3>
+          <div id="uji-gabungan"></div>
         </div>
       </div>
       <div class="kartu" style="margin-bottom:14px">
@@ -913,14 +934,38 @@ jalankanJam();
 function togglePantau(k){PANTAU=PANTAU.includes(k)?PANTAU.filter(x=>x!==k):[...PANTAU,k];simpanLokal("pantau-v1",PANTAU);tampilPantau();$("s-bintang").textContent=PANTAU.includes(k)?"★":"☆"}
 
 // ================= beranda =================
+async function ringkasBeranda(){
+  await Promise.all([muatStrategi(),muatSwing(),muatPrediksi(),muatLK(),muatPsi()]);
+  if(!SP){try{SP=await ambil("data/stockpick.json")}catch(e){SP={uptrend:[],sideways:[],analisa:[],sektor:[]}}}
+  const i=R.ihsg||{},jam=+new Date().toLocaleString("en-US",{timeZone:"Asia/Jakarta",hour:"numeric",hour12:false});
+  const sapa=jam<11?"Selamat pagi":jam<15?"Selamat siang":jam<18?"Selamat sore":"Selamat malam";
+  const tglTindak=tambahHariBursa(R.tanggal_data,1),lbl=labelTindak(tglTindak),hari=namaHari(tglTindak);
+  const nilai=POSISI.map(p=>nilaiPosisi(p)),jual=nilai.filter(x=>x.keputusan==="jual").length,tahan=nilai.filter(x=>x.keputusan!=="jual"&&x.keputusan!=="data").length;
+  const dipegang=new Set(POSISI.map(p=>p.kode)),cepat=rekomendasiBeli().filter(b=>!dipegang.has(b.kode)&&!b.tunda&&(b.ib?.utama??true)).length;
+  const swing=(SW?.tanggal===R.tanggal_data?SW.pilihan:[]).filter(b=>b.utama&&!dipegang.has(b.kode)).length,boleh=!!R.pasar_mendukung;
+  const angka=(n,l,w,href)=>`<a class="ringkas-angka" href="${href}"><b style="color:${w}">${n}</b><span>${l}</span></a>`;
+  $("beranda-ringkas").innerHTML=`<div class="ringkas-beranda">
+    <div class="ringkas-kiri"><div class="ringkas-sapa">${sapa}</div>
+      <h2>Rencana ${lbl==="hari ini"||lbl==="besok"?lbl+", ":""}${hari.panjang}</h2>
+      <div class="ringkas-status ${boleh?"boleh":"tunda"}"><span></span>${boleh?"Pasar mendukung pembelian: IHSG di atas MA20":"Pembelian baru ditunda: IHSG di bawah MA20"}</div>
+      <div class="ringkas-kecil">IHSG ${fmt(i.tutup,2)} <span class="${kelas(i.perubahan_pct)}">${pct(i.perubahan_pct)}</span>${i.di_atas_ma50===false?" · masih di bawah MA50 (tren menengah lemah)":""} · data ${tglPendek(R.tanggal_data)}</div></div>
+    <div class="ringkas-kanan">${angka(jual,"posisi perlu dijual",jual?"var(--merah)":"inherit","#malam")}${angka(tahan,"posisi ditahan","inherit","#malam")}${angka(boleh?cepat:0,"antre beli trading cepat","var(--emas)","#malam")}${angka(boleh?swing:0,"antre beli swing","var(--emas)","#malam")}
+      <a class="tombol ringkas-buka" href="#malam">Buka rencana lengkap</a></div></div>`;
+  const u=STR?.uji?.B,us=SW?.uji,ps=PRD?.statistik?.per_strategi||{};
+  $("uji-gabungan").innerHTML=`<div class="statistik">
+    <div><span class="label">Trading cepat (uji 2024–2026)</span><b class="naik">${u?pct(u.rata):"–"}</b><span class="redup" style="font-size:12px;display:block">per transaksi, menang ${u?.menang??"–"}%</span></div>
+    <div><span class="label">Swing fundamental (uji)</span><b class="${kelas(us?.porto)}">${us?pct(us.porto):"–"}</b><span class="redup" style="font-size:12px;display:block">IHSG ${us?pct(us.ihsg):"–"} pada periode sama</span></div>
+    <div><span class="label">Uji kertas trading cepat</span><b class="${kelas(ps.B?.rata)}">${ps.B?pct(ps.B.rata):"menunggu"}</b><span class="redup" style="font-size:12px;display:block">${ps.B?ps.B.n+" transaksi selesai":"sejak 27 Nov 2026"}</span></div>
+    <div><span class="label">Uji kertas swing</span><b class="${kelas(ps.S?.rata)}">${ps.S?pct(ps.S.rata):"menunggu"}</b><span class="redup" style="font-size:12px;display:block">${ps.S?ps.S.n+" transaksi selesai":"sejak 27 Nov 2026"}</span></div></div>
+    <a href="#evaluasi" class="redup" style="font-size:13px">Lihat evaluasi lengkap →</a>`;
+}
 function tampilBeranda(){
+  ringkasBeranda();
   const i=R.ihsg;
   if(R.data_contoh)$("pita-pasar").innerHTML='<div class="pita bahaya">DATA CONTOH (acak), bukan harga sebenarnya.</div>';
   if(i){
     $("ihsg-tutup").textContent=fmt(i.tutup,2);$("ihsg-ubah").innerHTML=`<span class="${kelas(i.perubahan_pct)}">${pct(i.perubahan_pct)}</span> <span class="redup">RSI ${fmt(i.rsi,0)}</span>`;
-    const sehat=i.di_atas_ma20&&i.di_atas_ma50;
-    $("pita-pasar").innerHTML+=sehat?`<div class="pita"><b>Kondisi pasar: mendukung.</b> IHSG di atas MA20 dan MA50.</div>`
-      :`<div class="pita waspada"><b>Kondisi pasar: waspada.</b> IHSG ${[i.di_atas_ma20?"":"di bawah MA20",i.di_atas_ma50?"":"di bawah MA50"].filter(Boolean).join(" dan ")}. Sinyal beli lebih sering gagal; kurangi jumlah dan ukuran transaksi.</div>`;
+
     const ch=LightweightCharts.createChart($("grafik-ihsg"),opsiGrafik());
     const naik=i.riwayat.at(-1).c>=i.riwayat[0].c;
     ch.addAreaSeries({lineColor:naik?warna("--hijau"):warna("--merah"),topColor:naik?"rgba(0,168,107,.25)":"rgba(229,72,77,.25)",bottomColor:"rgba(0,0,0,0)",lineWidth:2,priceLineVisible:false}).setData(i.riwayat.map(x=>({time:x.t,value:x.c})));
@@ -934,8 +979,6 @@ function tampilBeranda(){
     <div><span class="label">Nilai transaksi</span><b>Rp${rp(p.nilai_total)}</b></div>
     <div><span class="label">Asing bersih</span><b class="${kelas(p.asing_bersih_total)}">Rp${rp(p.asing_bersih_total)}</b></div>`;}
   $("stat-pasar").innerHTML=st;
-  const u=R.uji_balik_gabungan;
-  $("uji-gabungan").innerHTML=u.jumlah?`<span class="besar ${kelas(u.rata_hasil_pct)}">${pct(u.rata_hasil_pct)}</span> rata-rata per transaksi setelah biaya · ${fmt(u.jumlah)} transaksi · menang ${fmt(u.persen_menang,1)}%`+(u.rata_hasil_pct<=0?`<div style="margin-top:6px">Rata-rata masih rugi: jangan ikuti sinyal kandidat apa adanya.</div>`:""):"Belum ada sinyal.";
   gambarPeta();
   const kecil=(id,arr,f)=>{$(id).innerHTML=arr.map(s=>`<tr class="klik" data-k="${s.kode}"><td><b>${s.kode}</b></td><td>${fmt(s.tutup)}</td><td>${f(s)}</td></tr>`).join("");$(id).onclick=e=>{const t=e.target.closest("tr");if(t&&PETA[t.dataset.k])bukaSaham(t.dataset.k)}};
   const urut=(k,t)=>[...GABUNG].filter(s=>s[k]!=null&&s.likuid).sort((a,b)=>t?b[k]-a[k]:a[k]-b[k]).slice(0,6);
