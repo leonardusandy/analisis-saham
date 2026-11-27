@@ -229,7 +229,7 @@ button.chip.aktif{background:var(--latar-aksen);color:var(--aksen);border-color:
 ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{color:var(--kuning)}
 .peta{position:relative;height:460px;border-radius:10px;overflow:hidden}
 .peta .sel{position:absolute;border:1px solid var(--kartu);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:12px;cursor:pointer;overflow:hidden;text-align:center;line-height:1.2}
-.peta .sel b{font-size:13px}.peta .sektor{position:absolute;color:#fff;font-size:10px;font-weight:700;padding:2px 4px;pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,.6);z-index:2;text-transform:uppercase}
+.peta .sel b{font-size:13px}.peta .peta-info{position:absolute;z-index:5;background:var(--kartu);color:var(--teks);border:1px solid var(--garis);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.4;pointer-events:none;box-shadow:0 6px 18px rgba(10,19,34,.18);white-space:nowrap}.peta .sektor{position:absolute;color:#fff;font-size:10px;font-weight:700;padding:2px 4px;pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,.6);z-index:2;text-transform:uppercase}
 .batang{height:8px;border-radius:4px;background:var(--aksen);display:inline-block;vertical-align:middle}
 .batang.neg{background:var(--merah)}
 .rentang{display:flex;gap:4px;margin-bottom:6px}
@@ -1067,13 +1067,19 @@ function gambarPeta(){
   kotakKel.forEach(ks=>{
     html+=`<div class="sektor" style="left:${ks.x}px;top:${ks.y}px;max-width:${ks.w}px">${esc(ks.nama)}</div>`;
     squarify(ks.anggota.map(s=>({...s,nilai:kap(s)})),ks.x,ks.y,ks.w,ks.h).forEach(k=>{
-      const kecil=k.w<46||k.h<30;
-      html+=`<div class="sel" data-k="${k.kode}" title="${k.kode} ${pct(k.perubahan_pct)} · Rp${rp(kap(k))}" style="left:${k.x}px;top:${k.y}px;width:${k.w}px;height:${k.h}px;background:${warnaUbah(k.perubahan_pct)}">${kecil?"":`<b>${k.kode}</b><span>${pct(k.perubahan_pct)}</span>`}</div>`;
+      const fs=Math.max(7,Math.min(13,k.w/4.3,k.h/2.2)),kode=k.w>=20&&k.h>=11,ubah=k.w>=34&&k.h>=fs*2.6;
+      html+=`<div class="sel" data-k="${k.kode}" style="left:${k.x}px;top:${k.y}px;width:${k.w}px;height:${k.h}px;background:${warnaUbah(k.perubahan_pct)}">${kode?`<b style="font-size:${fs}px">${k.kode}</b>`:""}${ubah?`<span style="font-size:${Math.max(7,fs-1)}px">${pct(k.perubahan_pct)}</span>`:""}</div>`;
     });
   });
-  el.innerHTML=html;el.onclick=e=>{const c=e.target.closest(".sel");if(c)bukaSaham(c.dataset.k)};
+  el.innerHTML=html+'<div class="peta-info" hidden></div>';el.dataset.lebar=W;el.onclick=e=>{const c=e.target.closest(".sel");if(c)bukaSaham(c.dataset.k)};
+  const info=el.querySelector(".peta-info"),cari=Object.fromEntries(ada.map(x=>[x.kode,x]));
+  el.onmousemove=e=>{const c=e.target.closest(".sel");if(!c){info.hidden=true;return}const x=cari[c.dataset.k],r=el.getBoundingClientRect();
+    info.innerHTML=`<b>${x.kode}</b> <span class="${kelas(x.perubahan_pct)}">${pct(x.perubahan_pct)}</span><br><span>${esc((x.nama||"").slice(0,34))}</span><br><span>Harga ${fmt(x.tutup)} · kap. Rp${rp(kap(x))}</span>`;
+    info.hidden=false;const px=e.clientX-r.left,py=e.clientY-r.top;info.style.left=Math.min(px+14,W-info.offsetWidth-4)+"px";info.style.top=(py+info.offsetHeight+20>H?py-info.offsetHeight-10:py+14)+"px"};
+  el.onmouseleave=()=>{info.hidden=true};
 }
-window.addEventListener("resize",()=>{if(sudah.beranda&&$("h-beranda").classList.contains("aktif"))gambarPeta()});
+{let tPeta;const ro=new ResizeObserver(()=>{clearTimeout(tPeta);tPeta=setTimeout(()=>{const el=$("peta");if(el&&el.offsetParent&&String(el.clientWidth)!==el.dataset.lebar&&typeof GABUNG!=="undefined"&&GABUNG.length)gambarPeta()},180)});
+ addEventListener("load",()=>{const el=$("peta");if(el)ro.observe(el)});if(document.readyState==="complete"&&$("peta"))ro.observe($("peta"))}
 
 // ================= berita =================
 const IKON_SN={positif:"▲",negatif:"▼",netral:"■",campuran:"◆"};
