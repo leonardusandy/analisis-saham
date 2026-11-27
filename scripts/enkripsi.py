@@ -59,6 +59,12 @@ def main(asal: str, tujuan: str) -> None:
             continue
         p.write_bytes(bungkus(aes, p.read_bytes()))
         n += 1
+    # keterangan terbit terakhir (untuk tombol Perbarui di web)
+    from datetime import datetime, timedelta, timezone
+    (data / "terbit.json").write_bytes(bungkus(aes, json.dumps({
+        "terbit": datetime.now(timezone(timedelta(hours=7))).isoformat(timespec="seconds"),
+        "mode": os.environ.get("MODE", ""),
+    }).encode()))
     (data / "kunci.json").write_text(json.dumps({
         "v": 1, "garam": base64.b64encode(GARAM).decode(), "iterasi": ITERASI,
         "uji": base64.b64encode(bungkus(aes, b'"ok"')).decode(),

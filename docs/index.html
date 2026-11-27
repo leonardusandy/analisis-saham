@@ -66,7 +66,23 @@ nav.menu.utama svg,nav.bawah svg{width:18px;height:18px;flex:none;stroke:current
 .cari::after{content:"";position:absolute;left:24px;top:57%;width:6px;height:2px;background:var(--redup);transform:rotate(45deg)}
 .saran{position:absolute;top:100%;left:0;right:0;background:var(--kartu);border:1px solid var(--garis);border-radius:10px;margin-top:4px;max-height:340px;overflow:auto;display:none;box-shadow:0 12px 30px rgba(20,33,58,.16);z-index:60}
 .saran div{padding:9px 12px;cursor:pointer;display:flex;gap:10px}.saran div:hover,.saran div.pilih{background:var(--hover)}
-#info-data{margin-left:auto;font-size:12px;color:var(--redup);text-align:right;line-height:1.35}
+.perbarui{position:relative;margin-left:auto;flex:none}
+.tombol-perbarui{display:flex;align-items:center;gap:8px;border:1px solid var(--garis);background:var(--kartu);border-radius:9px;padding:0 12px;height:40px;font:inherit;font-size:13px;color:var(--teks);cursor:pointer;white-space:nowrap}
+.tombol-perbarui:hover{background:var(--hover)}
+.tombol-perbarui svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tombol-perbarui.jalan svg{animation:putar 1.1s linear infinite}
+@keyframes putar{to{transform:rotate(360deg)}}
+.titik{width:8px;height:8px;border-radius:50%;background:var(--redup);flex:none}
+.titik.segar{background:var(--hijau)}.titik.lama{background:var(--kuning)}
+.panel-perbarui{position:absolute;right:0;top:calc(100% + 8px);width:min(360px,calc(100vw - 20px));background:var(--kartu);border:1px solid var(--garis);border-radius:12px;padding:16px;box-shadow:0 16px 40px rgba(20,33,58,.18);z-index:70}
+.panel-perbarui h3{margin:0 0 10px;font-size:15px}
+.panel-perbarui dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0 0 10px;font-size:13px}
+.panel-perbarui dt{color:var(--redup)}.panel-perbarui dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
+#info-data{font-size:12px;margin-bottom:10px}
+#perbarui-status{font-size:13px;margin-bottom:10px}#perbarui-status:empty{display:none}
+#perbarui-aksi .tombol{width:100%;padding:10px}
+#perbarui-aksi details{margin-top:10px;font-size:12px;color:var(--redup)}#perbarui-aksi summary{cursor:pointer}
+#perbarui-aksi input{width:100%;margin:6px 0;font-size:13px}
 .tombol-ikon{display:none;flex:none;width:40px;height:40px;border-radius:9px;border:1px solid var(--garis);background:var(--kartu);color:var(--teks);cursor:pointer;place-items:center;padding:0}
 .tombol-ikon svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .jam-kecil{display:none;font-size:12px;line-height:1.25;text-align:right;color:var(--redup);font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -193,7 +209,6 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
   body.laci-sisi .sisi{transform:none}
   #tombol-menu{display:grid}
   .atas{padding:8px 12px}
-  #info-data{display:none}
   .jam-kecil{display:block}
   body.laci-sisi .tirai,body.laci-pantau .tirai{display:block;position:fixed;inset:0;background:rgba(10,19,34,.45);z-index:34}
 }
@@ -219,6 +234,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
   nav.bawah svg{width:22px;height:22px}
   .pk-tabel td,.pk-tabel th{padding:5px 6px}
 }
+@media (max-width:760px){#perbarui-ringkas{display:none}.tombol-perbarui{padding:0 11px}.panel-perbarui{position:fixed;left:10px;right:10px;top:62px;width:auto;max-height:calc(100vh - 140px);overflow:auto}}
 @media (max-width:420px){.cari{max-width:none}.jam-kecil .st{display:none}}
 </style>
 </head>
@@ -257,7 +273,16 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
 <header class="atas">
   <button class="tombol-ikon" id="tombol-menu" aria-label="Buka menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   <div class="cari"><input id="cari" placeholder="Cari kode atau nama saham" autocomplete="off" aria-label="Cari saham"><div class="saran" id="saran"></div></div>
-  <div id="info-data">Memuat data…</div>
+  <div class="perbarui" id="perbarui">
+    <button class="tombol-perbarui" id="tombol-perbarui" aria-haspopup="dialog" aria-expanded="false" aria-controls="panel-perbarui"><span class="titik" id="perbarui-titik"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg><span id="perbarui-ringkas">Memuat…</span></button>
+    <div class="panel-perbarui" id="panel-perbarui" role="dialog" aria-label="Pembaruan data" hidden>
+      <h3>Pembaruan data</h3>
+      <div id="perbarui-isi"></div>
+      <div id="info-data" class="redup">Memuat data…</div>
+      <div id="perbarui-status"></div>
+      <div id="perbarui-aksi"></div>
+    </div>
+  </div>
   <div class="jam-kecil" id="jam-kecil"></div>
   <button class="tombol-ikon" id="tombol-pantau" aria-label="Buka daftar pantau"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l2.4 5 5.6.6-4.2 3.8 1.2 5.6L12 16.3 7 19l1.2-5.6L4 9.6l5.6-.6z"/></svg></button>
 </header>
@@ -670,7 +695,8 @@ siapkanKunci().then(()=>Promise.allSettled([ambil("data/ringkasan.json"),ambil("
   if(a.status==="fulfilled")A=a.value;if(b.status==="fulfilled")B=b.value;if(br.status==="fulfilled")BR=br.value;if(k.status==="fulfilled")K=k.value;
   R.saham.forEach(s=>PETA[s.kode]=s);
   GABUNG=R.saham.map(s=>gabungSaham(s.kode));
-  $("info-data").textContent=`Harga penutupan ${R.tanggal_data} · diperbarui ${R.dibuat}`+(B?` · berita ${B.dibuat}`:"");
+  $("info-data").textContent=`Data harga dibuat ${R.dibuat}`+(B?`, berita ${B.dibuat}`:"")+".";
+  siapkanPerbarui();
   isiPengaturan(R.pengaturan);tampilPantau();pasangPantau();route();
 });
 function asingBeruntun(kode){
@@ -747,6 +773,87 @@ function pasangPantau(){
     const k=b.dataset.hapus;PANTAU=PANTAU.filter(x=>x!==k);simpanLokal("pantau-v1",PANTAU);tampilPantau();
     if($("s-bintang"))$("s-bintang").textContent=PANTAU.includes(location.hash.split("/")[1])?"★":"☆"});
 }
+// ================= Tombol perbarui & keterangan pembaruan terakhir =================
+// Token GitHub (opsional) hanya disimpan di peramban perangkat ini dan hanya dikirim ke api.github.com.
+let TERBIT=null,AWAS_RUN=null;
+const REPO="leonardusandy/analisis-saham",ALUR="terbitkan.yml",GH="https://api.github.com/repos/"+REPO;
+const tokenLokal=()=>localStorage.getItem("token-perbarui-v1")||"";
+function hariBursaTerakhirJS(){
+  const p=Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Jakarta",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(new Date()).map(x=>[x.type,x.value]));
+  let d=new Date(Date.UTC(+p.year,+p.month-1,+p.day));const m=(+p.hour%24)*60+(+p.minute);
+  const libur=x=>[0,6].includes(x.getUTCDay());
+  if(libur(d)||m<990)d=new Date(d-864e5);while(libur(d))d=new Date(d-864e5);
+  return d.toISOString().slice(0,10);
+}
+function selang(iso){const mnt=Math.round((Date.now()-new Date(iso))/6e4);return mnt<1?"baru saja":mnt<60?`${mnt} menit lalu`:mnt<1440?`${Math.floor(mnt/60)} jam lalu`:`${Math.floor(mnt/1440)} hari lalu`}
+const jamWIB=iso=>new Date(iso).toLocaleString("id-ID",{timeZone:"Asia/Jakarta",weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+async function siapkanPerbarui(){
+  try{TERBIT=await ambil("data/terbit.json")}catch(e){TERBIT=null}
+  tulisPerbarui();setInterval(tulisPerbarui,60000);
+  const t=$("tombol-perbarui"),p=$("panel-perbarui");
+  t.onclick=e=>{e.stopPropagation();p.hidden=!p.hidden;t.setAttribute("aria-expanded",!p.hidden);if(!p.hidden)cekProses()};
+  document.addEventListener("click",e=>{if(!p.hidden&&!e.target.closest("#perbarui")){p.hidden=true;t.setAttribute("aria-expanded","false")}});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!p.hidden){p.hidden=true;t.setAttribute("aria-expanded","false");t.focus()}});
+  cekProses();
+}
+function tulisPerbarui(){
+  const segar=R&&R.tanggal_data>=hariBursaTerakhirJS();
+  $("perbarui-titik").className="titik "+(R?(segar?"segar":"lama"):"");
+  $("perbarui-ringkas").textContent=TERBIT?`Diperbarui ${selang(TERBIT.terbit)}`:"Perbarui";
+  $("tombol-perbarui").title=segar?"Data harga sudah terbaru":"Data harga belum mencakup hari bursa terakhir";
+  $("perbarui-isi").innerHTML=`<dl>
+    <dt>Terakhir diperbarui</dt><dd>${TERBIT?`${jamWIB(TERBIT.terbit)} WIB <span class="redup" style="font-weight:400">(${selang(TERBIT.terbit)})</span>`:"–"}</dd>
+    <dt>Data harga</dt><dd>${R?`penutupan ${tglPendek(R.tanggal_data)} ${R.tanggal_data.slice(0,4)}`:"–"} ${R?(segar?'<span class="naik">· terbaru</span>':`<span style="color:var(--kuning)">· tertinggal (hari bursa terakhir ${tglPendek(hariBursaTerakhirJS())})</span>`):""}</dd>
+    <dt>Jadwal otomatis</dt><dd style="font-weight:400">17.37 WIB hari bursa (semua data), berita tiap 2 jam</dd></dl>`;
+  if(!AWAS_RUN)aksiPerbarui();
+}
+function aksiPerbarui(){
+  const ada=!!tokenLokal();
+  $("perbarui-aksi").innerHTML=(ada?`<button class="tombol" id="perbarui-jalan">Perbarui sekarang</button><div class="redup" style="font-size:12px;margin-top:6px">Mengambil ulang harga, fundamental, berita, analisis, dan prediksi. Biasanya 10–15 menit.</div>`
+    :`<a class="tombol" style="display:block;text-align:center;padding:10px;color:#fff;text-decoration:none;border-radius:8px;background:var(--aksen)" href="https://github.com/${REPO}/actions/workflows/${ALUR}" target="_blank" rel="noopener">Perbarui lewat GitHub</a><div class="redup" style="font-size:12px;margin-top:6px">Di GitHub: klik <b>Run workflow</b>, biarkan mode <b>harian</b>, lalu klik <b>Run workflow</b> hijau. Kembali ke sini; status muncul otomatis.</div>`)
+    +`<details><summary>${ada?"Token di perangkat ini":"Perbarui langsung dari web (pasang token di perangkat ini)"}</summary>${ada?`<p>Token tersimpan hanya di peramban perangkat ini.</p><button class="tombol kedua" id="perbarui-hapus-token" style="width:100%">Hapus token dari perangkat ini</button>`
+      :`<p>Tempel token GitHub fine-grained yang hanya punya izin <b>Actions: Read and write</b> untuk repo analisis-saham. Token disimpan di peramban perangkat ini saja dan hanya dikirim ke GitHub.</p><input type="password" id="perbarui-token" placeholder="github_pat_…" autocomplete="off"><button class="tombol kedua" id="perbarui-simpan-token" style="width:100%">Simpan di perangkat ini</button>`}</details>`;
+  const b=$("perbarui-jalan");if(b)b.onclick=jalankanPerbarui;
+  const s=$("perbarui-simpan-token");if(s)s.onclick=()=>{const v=$("perbarui-token").value.trim();if(!v)return;localStorage.setItem("token-perbarui-v1",v);aksiPerbarui()};
+  const h=$("perbarui-hapus-token");if(h)h.onclick=()=>{localStorage.removeItem("token-perbarui-v1");aksiPerbarui()};
+}
+async function api(jalur,opsi={}){
+  const tk=tokenLokal();
+  const r=await fetch(GH+jalur,{...opsi,headers:{Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28",...(tk?{Authorization:"Bearer "+tk}:{})}});
+  if(!r.ok&&r.status!==204)throw new Error(r.status);return r.status===204?null:r.json();
+}
+async function cekProses(){
+  try{
+    const d=await api(`/actions/workflows/${ALUR}/runs?per_page=5`);
+    const jalan=d.workflow_runs.find(x=>["queued","in_progress","waiting","pending","requested"].includes(x.status));
+    if(jalan){awasi(jalan);return}
+    if(AWAS_RUN){const r=d.workflow_runs.find(x=>x.id===AWAS_RUN);if(r||AWAS_RUN!==-1)selesai(r);else setTimeout(cekProses,8000)}
+  }catch(e){}
+}
+function awasi(run){
+  AWAS_RUN=run.id;$("tombol-perbarui").classList.add("jalan");$("perbarui-ringkas").textContent="Memperbarui…";
+  const mnt=Math.max(0,Math.round((Date.now()-new Date(run.run_started_at||run.created_at))/6e4));
+  $("perbarui-status").innerHTML=`<b>Sedang memperbarui…</b> berjalan ${mnt} menit (${run.status==="queued"?"menunggu giliran":"diproses"}). Halaman dimuat ulang otomatis setelah selesai.`;
+  $("perbarui-aksi").innerHTML=`<a class="redup" style="font-size:12px" href="${run.html_url}" target="_blank" rel="noopener">Lihat proses di GitHub</a>`;
+  clearTimeout(awasi.t);awasi.t=setTimeout(cekProses,20000);
+}
+function selesai(run){
+  $("tombol-perbarui").classList.remove("jalan");AWAS_RUN=null;
+  if(run?.conclusion==="success"){$("perbarui-status").innerHTML='<b class="naik">Pembaruan selesai.</b> Memuat ulang halaman…';setTimeout(()=>location.reload(),4000)}
+  else{$("perbarui-status").innerHTML=`<b class="turun">Pembaruan gagal${run?` (${run.conclusion})`:""}.</b> Coba lagi, atau lihat rinciannya di GitHub.`;tulisPerbarui()}
+}
+async function jalankanPerbarui(){
+  const b=$("perbarui-jalan");b.disabled=true;b.textContent="Menjalankan…";
+  try{
+    await api(`/actions/workflows/${ALUR}/dispatches`,{method:"POST",body:JSON.stringify({ref:"main",inputs:{mode:"harian"}})});
+    $("perbarui-status").innerHTML="<b>Permintaan terkirim.</b> Menunggu proses dimulai…";$("tombol-perbarui").classList.add("jalan");
+    AWAS_RUN=-1;setTimeout(cekProses,6000);
+  }catch(e){
+    $("perbarui-status").innerHTML=`<b class="turun">Tidak bisa menjalankan pembaruan (kode ${e.message}).</b> ${["401","403","404"].includes(e.message)?"Token salah, kedaluwarsa, atau izinnya kurang (perlu Actions: Read and write).":"Periksa koneksi lalu coba lagi."}`;
+    b.disabled=false;b.textContent="Perbarui sekarang";
+  }
+}
+
 function tutupLaci(){document.body.classList.remove("laci-sisi","laci-pantau")}
 function bukaLaci(n){tutupLaci();document.body.classList.add("laci-"+n)}
 $("tombol-menu").onclick=()=>bukaLaci("sisi");$("tombol-pantau").onclick=()=>bukaLaci("pantau");
