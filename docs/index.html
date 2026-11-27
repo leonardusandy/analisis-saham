@@ -227,7 +227,7 @@ button.chip.aktif{background:var(--latar-aksen);color:var(--aksen);border-color:
 .level{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0;text-align:center}
 .level div{border:1px solid var(--garis);border-radius:8px;padding:6px}.level b{display:block;font-size:16px}
 ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{color:var(--kuning)}
-.peta{position:relative;height:460px;border-radius:10px;overflow:hidden}
+.peta{position:relative;height:520px;border-radius:10px;overflow:hidden}
 .peta .sel{position:absolute;border:1px solid var(--kartu);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:12px;cursor:pointer;overflow:hidden;text-align:center;line-height:1.2}
 .peta .sel b{font-size:13px}.peta .peta-info{position:absolute;z-index:5;background:var(--kartu);color:var(--teks);border:1px solid var(--garis);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.4;pointer-events:none;box-shadow:0 6px 18px rgba(10,19,34,.18);white-space:nowrap}.peta .sektor{position:absolute;color:#fff;font-size:10px;font-weight:700;padding:2px 4px;pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,.6);z-index:2;text-transform:uppercase}
 .batang{height:8px;border-radius:4px;background:var(--aksen);display:inline-block;vertical-align:middle}
@@ -251,7 +251,12 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
   body.sisi-ringkas:not(.sisi-intip) nav.menu.utama a.aktif::before{left:-8px}
   body.sisi-ringkas.sisi-intip nav.menu.utama a{white-space:nowrap}
 }
+.pegangan-pantau{display:none;position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:36;border:1px solid var(--garis);border-right:0;background:var(--kartu);color:var(--teks);border-radius:10px 0 0 10px;padding:10px 6px;cursor:pointer;flex-direction:column;align-items:center;gap:6px;box-shadow:-4px 0 14px rgba(10,19,34,.12);font:inherit;font-size:12px;font-weight:600}
+.pegangan-pantau svg{width:16px;height:16px;fill:none;stroke:var(--emas);stroke-width:1.8;stroke-linejoin:round}
+.pegangan-pantau span{writing-mode:vertical-rl;transform:rotate(180deg)}
+.pegangan-pantau:hover{background:var(--hover)}
 @media (min-width:1351px){
+  body.tanpa-pantau .pegangan-pantau{display:flex}
   #tombol-pantau{display:grid}
   body.tanpa-pantau{--pantau:0px}
   body.tanpa-pantau .samping{display:none}
@@ -309,6 +314,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
   <div id="salah-masuk" class="turun" style="font-size:13px;margin-top:8px" hidden>Sandi salah. Coba lagi.</div>
   <button id="tombol-masuk">Masuk</button>
 </form></div>
+<button id="pegangan-pantau" class="pegangan-pantau" title="Tampilkan daftar pantau" aria-label="Tampilkan daftar pantau"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l2.4 5 5.6.6-4.2 3.8 1.2 5.6L12 16.3 7 19l1.2-5.6L4 9.6l5.6-.6z"/></svg><span>Daftar pantau</span></button>
 <div class="aplikasi">
 <nav class="sisi menu utama" id="menu" aria-label="Menu utama">
   <a class="logo" href="#beranda"><svg class="tanda" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#13294B"/><g fill="none" stroke-linecap="square"><path d="M17 12V50H35" stroke="#C9932E" stroke-width="8"/><path d="M44 15H33Q27 15 27 21V25Q27 31 33 31H40Q46 31 46 37V44Q46 50 40 50H25" stroke="#13294B" stroke-width="12"/><path d="M44 15H33Q27 15 27 21V25Q27 31 33 31H40Q46 31 46 37V44Q46 50 40 50H25" stroke="#F3E6C8" stroke-width="8"/><path d="M17 12V50H35" stroke="#13294B" stroke-width="2.2"/><path d="M44 15H33Q27 15 27 21V25Q27 31 33 31H40Q46 31 46 37V44Q46 50 40 50H25" stroke="#13294B" stroke-width="2.2"/></g><path d="M42 8H54V20M44 18L54 8" fill="none" stroke="#C9932E" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="nama">Leading Signals<small>Rencana trading harian</small></span></a>
@@ -954,7 +960,8 @@ $("menu").addEventListener("mouseleave",()=>{clearTimeout(tIntip);if(!lebar(1050
 {const sp=document.querySelector(".samping");if(sp){sp.addEventListener("mouseenter",()=>clearTimeout(tPantau));sp.addEventListener("mouseleave",()=>{if(lebar(1350)&&!bd.classList.contains("tanpa-pantau"))pantauNanti()})}}
 if(lebar(1050))ringkasNanti();if(lebar(1350))pantauNanti();
 $("tombol-menu").onclick=()=>{if(lebar(1050)){bd.classList.remove("sisi-intip");if(bd.classList.toggle("sisi-ringkas"))clearTimeout(tSisi);else ringkasNanti()}else bukaLaci("sisi")};
-$("tombol-pantau").onclick=()=>{if(lebar(1350)){if(bd.classList.toggle("tanpa-pantau"))clearTimeout(tPantau);else pantauNanti()}else bukaLaci("pantau")};
+$("tombol-pantau").onclick=()=>{if(lebar(1350)){clearTimeout(tPantau);bd.classList.toggle("tanpa-pantau")}else bukaLaci("pantau")};
+$("pegangan-pantau").onclick=()=>{clearTimeout(tPantau);if(lebar(1350))bd.classList.remove("tanpa-pantau");else bukaLaci("pantau")};
 document.addEventListener("click",e=>{const b=e.target.closest("[data-laci]");if(b){bukaLaci(b.dataset.laci);return}
   if(e.target.closest("[data-tutup]")||e.target.closest(".sisi a[href^='#']")||e.target.closest(".samping a[href^='#']"))tutupLaci()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")tutupLaci()});
@@ -1067,8 +1074,8 @@ function gambarPeta(){
   kotakKel.forEach(ks=>{
     html+=`<div class="sektor" style="left:${ks.x}px;top:${ks.y}px;max-width:${ks.w}px">${esc(ks.nama)}</div>`;
     squarify(ks.anggota.map(s=>({...s,nilai:kap(s)})),ks.x,ks.y,ks.w,ks.h).forEach(k=>{
-      const fs=Math.max(7,Math.min(13,k.w/4.3,k.h/2.2)),kode=k.w>=20&&k.h>=11,ubah=k.w>=34&&k.h>=fs*2.6;
-      html+=`<div class="sel" data-k="${k.kode}" style="left:${k.x}px;top:${k.y}px;width:${k.w}px;height:${k.h}px;background:${warnaUbah(k.perubahan_pct)}">${kode?`<b style="font-size:${fs}px">${k.kode}</b>`:""}${ubah?`<span style="font-size:${Math.max(7,fs-1)}px">${pct(k.perubahan_pct)}</span>`:""}</div>`;
+      const fs=Math.max(6.5,Math.min(13,k.w/4.1,k.h/2)),kode=k.w>=17&&k.h>=9,ubah=k.w>=30&&k.h>=fs*2.4;
+      html+=`<div class="sel" data-k="${k.kode}" title="${k.kode} ${pct(k.perubahan_pct)}" style="left:${k.x}px;top:${k.y}px;width:${k.w}px;height:${k.h}px;background:${warnaUbah(k.perubahan_pct)}">${kode?`<b style="font-size:${fs}px">${k.kode}</b>`:""}${ubah?`<span style="font-size:${Math.max(7,fs-1)}px">${pct(k.perubahan_pct)}</span>`:""}</div>`;
     });
   });
   el.innerHTML=html+'<div class="peta-info" hidden></div>';el.dataset.lebar=W;el.onclick=e=>{const c=e.target.closest(".sel");if(c)bukaSaham(c.dataset.k)};
