@@ -270,7 +270,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
   <a class="logo" href="#malam"><i></i>Analisis Saham</a>
   <div class="papan"><div id="jam" title="Waktu Jakarta (WIB)"></div><button class="keluar" id="tombol-keluar" hidden title="Kunci web di perangkat ini">Keluar</button></div>
     <div class="grup">Hari ini</div>
-    <a href="#malam" data-h="malam"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>Malam Ini</a>
+    <a href="#malam" data-h="malam"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>Rencana</a>
     <a href="#beranda" data-h="beranda"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Beranda</a>
     <a href="#pilihan" data-h="pilihan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2"/></svg>Pilihan Harian</a>
     <a href="#kandidat" data-h="kandidat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.8 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/></svg>Kandidat Besok</a>
@@ -639,7 +639,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
     </section>
   </main>
 <nav class="menu bawah" aria-label="Menu cepat">
-  <a href="#malam" data-h="malam"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>Malam Ini</a>
+  <a href="#malam" data-h="malam"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>Rencana</a>
   <a href="#pilihan" data-h="pilihan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2"/></svg>Pilihan</a>
   <a href="#model" data-h="model"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>Prediksi</a>
   <button type="button" data-laci="pantau"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l2.4 5 5.6.6-4.2 3.8 1.2 5.6L12 16.3 7 19l1.2-5.6L4 9.6l5.6-.6z"/></svg>Pantau</button>
@@ -1312,6 +1312,15 @@ function hariBursaAntara(a,b){ // jumlah hari kerja setelah a sampai dengan b
   while(d<akhir){d=new Date(+d+864e5);if(![0,6].includes(d.getUTCDay()))n++}
   return n;
 }
+function namaHari(t){const d=new Date(t+"T00:00:00Z"),o={timeZone:"UTC"};
+  return{pendek:d.toLocaleDateString("id-ID",{...o,weekday:"long",day:"numeric",month:"short"}),
+         panjang:d.toLocaleDateString("id-ID",{...o,weekday:"long",day:"numeric",month:"long",year:"numeric"})}}
+// label relatif tanggal tindakan menurut jam Jakarta: "hari ini", "besok", atau kosong
+function labelTindak(t){
+  const kini=new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"});
+  const besok=new Date(Date.parse(kini+"T00:00:00Z")+864e5).toISOString().slice(0,10);
+  return t===kini?"hari ini":t===besok?"besok":t<kini?"lewat":"";
+}
 function tambahHariBursa(a,n){let d=new Date(a+"T00:00:00Z");while(n>0){d=new Date(+d+864e5);if(![0,6].includes(d.getUTCDay()))n--}return d.toISOString().slice(0,10)}
 const bulatHarga=(v,arah)=>{const t=v<200?1:v<500?2:v<2000?5:v<5000?10:25;return arah==="atas"?Math.ceil(v/t)*t:Math.floor(v/t)*t};
 function beritaSaham(k,jam=36){
@@ -1340,10 +1349,10 @@ function nilaiPosisi(p){
   if(neg.length)tanda.push(`${neg.length} berita bernada negatif dalam 1,5 hari terakhir`);
   if((f.bahaya||[]).length)tanda.push("fundamental: "+f.bahaya.join(", "));
   let keputusan,judul,alasan=[],sebab="";
-  if(c<=stop){keputusan="jual";judul="Jual besok pagi";sebab="batas rugi tersentuh";alasan.push(`Harga penutupan ${fmt(c)} sudah di bawah batas rugi ${fmt(stop)}. Jual di pembukaan, jangan menunggu harga kembali.`)}
-  else if(s.distribusi5&&s.perubahan_pct<0){keputusan="jual";judul="Jual besok";sebab="tanda distribusi";alasan.push("Muncul candle merah bervolume besar (tanda distribusi): pemegang besar kemungkinan sedang melepas saham.")}
-  else if(hari>=3&&!kuat){keputusan="jual";judul="Jual besok";sebab=`sudah ${hari} hari, tren tidak kuat`;alasan.push(`Sudah ${hari} hari bursa dipegang. Sesuai strategi (pegang maksimal 3 hari), jual besok kecuali ada alasan kuat untuk bertahan.`)}
-  else if(tanda.length>=2||(tanda.length&&untung<0)){keputusan="waspada";judul="Waspada: siap jual";alasan.push(`Pasang order jual otomatis di ${fmt(stop)}. Jual juga bila besok tidak naik.`)}
+  if(c<=stop){keputusan="jual";judul="Jual saat pembukaan";sebab="batas rugi tersentuh";alasan.push(`Harga penutupan ${fmt(c)} sudah di bawah batas rugi ${fmt(stop)}. Jual di pembukaan, jangan menunggu harga kembali.`)}
+  else if(s.distribusi5&&s.perubahan_pct<0){keputusan="jual";judul="Jual";sebab="tanda distribusi";alasan.push("Muncul candle merah bervolume besar (tanda distribusi): pemegang besar kemungkinan sedang melepas saham.")}
+  else if(hari>=3&&!kuat){keputusan="jual";judul="Jual";sebab=`sudah ${hari} hari, tren tidak kuat`;alasan.push(`Sudah ${hari} hari bursa dipegang. Sesuai strategi (pegang maksimal 3 hari), jual pada hari bursa berikutnya kecuali ada alasan kuat untuk bertahan.`)}
+  else if(tanda.length>=2||(tanda.length&&untung<0)){keputusan="waspada";judul="Waspada: siap jual";alasan.push(`Pasang order jual otomatis di ${fmt(stop)}. Jual juga bila hari itu tidak naik.`)}
   else{keputusan="tahan";judul=hari>=3?"Pertahankan (tren masih kuat)":"Pertahankan";
     alasan.push(hari>=3?`Sudah ${hari} hari, tetapi tren masih kuat${s.sinyal_j?" (sinyal aturan J muncul lagi)":""}. Boleh diperpanjang dengan batas rugi dinaikkan ke ${fmt(stop)}.`
       :`Masih sesuai rencana. Jual paling lambat penutupan ${tglPendek(tambahHariBursa(p.tgl,3))} bila tidak ada perkembangan.`)}
@@ -1352,23 +1361,25 @@ function nilaiPosisi(p){
 async function tampilMalam(){
   if(!SP){try{SP=await ambil("data/stockpick.json")}catch(e){SP={uptrend:[],sideways:[],analisa:[],sektor:[]}}}
   if(!MD){try{MD=await ambil("data/model.json")}catch(e){}}
-  const el=$("ml-isi"),i=R.ihsg||{},segar=R.tanggal_data>=hariBursaTerakhirJS();
+  const el=$("ml-isi"),i=R.ihsg||{},segar=R.tanggal_data>=hariBursaTerakhirJS(),tglTindak=tambahHariBursa(R.tanggal_data,1),hariTindak=namaHari(tglTindak),lbl=labelTindak(tglTindak);
+  const lewat=!segar&&(lbl==="hari ini"||lbl==="lewat");
+  const sebut=lewat?hariTindak.pendek:lbl==="hari ini"||lbl==="besok"?`${lbl} (${hariTindak.pendek})`:hariTindak.pendek;
   const nilai=POSISI.map((p,ix)=>({p,ix,...nilaiPosisi(p)}));
   const dipegang=new Set(POSISI.map(p=>p.kode)),beli=rekomendasiBeli().filter(b=>!dipegang.has(b.kode));
   const sekM=(SP.sektor||[]).filter(x=>x.arah==="better").map(x=>x.nama),sekL=(SP.sektor||[]).filter(x=>x.arah==="worst").map(x=>x.nama);
   const WARNA={jual:"var(--merah)",waspada:"var(--kuning)",tahan:"var(--hijau)",data:"var(--redup)"};
   el.innerHTML=`
    <div class="ml-kepala">
-     <div><h2>Malam ini · ${tglPendek(R.tanggal_data)} ${R.tanggal_data.slice(0,4)}</h2>
-       <p class="redup" style="margin:2px 0 0">${segar?"Data penutupan hari bursa terakhir sudah masuk.":`<span style="color:var(--kuning)"><b>Data belum mencakup penutupan ${tglPendek(hariBursaTerakhirJS())}.</b></span> Tekan tombol Perbarui di kanan atas, atau tunggu pembaruan otomatis 17.37 WIB.`}</p></div>
+     <div><h2>${lewat?`Rencana ${hariTindak.panjang} <span style="color:var(--kuning);font-size:15px;font-weight:700">sudah lewat</span>`:`Rencana ${lbl==="hari ini"||lbl==="besok"?lbl+", ":""}${hariTindak.panjang}`}</h2>
+       <p class="redup" style="margin:2px 0 0">${segar?`Berdasarkan data penutupan ${namaHari(R.tanggal_data).panjang}.`:`<span style="color:var(--kuning)"><b>Data belum mencakup penutupan ${tglPendek(hariBursaTerakhirJS())}.</b></span> Tekan tombol Perbarui di kanan atas, atau tunggu pembaruan otomatis 17.37 WIB.`}</p></div>
      <div class="ml-pasar"><span class="label">IHSG </span><b>${fmt(i.tutup,2)}</b> <span class="${kelas(i.perubahan_pct)}">${pct(i.perubahan_pct)}</span>
        <div class="${R.pasar_mendukung?"naik":"turun"}" style="font-size:13px;font-weight:600">${R.pasar_mendukung?"Pasar mendukung pembelian (IHSG di atas MA20)":"Pasar lemah: tunda pembelian baru"}</div></div>
    </div>
 
-   <div class="kartu ml-rencana" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><h3 style="margin:0">Rencana besok</h3><button class="tombol kedua chip" id="ml-salin">Salin rencana</button></div>
+   <div class="kartu ml-rencana" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><h3 style="margin:0">Yang dilakukan ${sebut}</h3><button class="tombol kedua chip" id="ml-salin">Salin rencana</button></div>
      <ol id="ml-daftar-rencana">${[
-       ...nilai.filter(x=>x.keputusan==="jual").map(x=>`<li><b class="turun">JUAL ${x.p.kode}</b> ${x.p.lot} lot di pembukaan <span class="redup">(${esc(x.sebab)})</span></li>`),
-       ...nilai.filter(x=>x.keputusan==="waspada").map(x=>`<li><b style="color:var(--kuning)">${x.p.kode}</b>: pasang jual otomatis di ${fmt(x.stop)}; jual bila besok melemah</li>`),
+       ...nilai.filter(x=>x.keputusan==="jual").map(x=>`<li><b class="turun">JUAL ${x.p.kode}</b> ${x.p.lot} lot saat pembukaan <span class="redup">(${esc(x.sebab)})</span></li>`),
+       ...nilai.filter(x=>x.keputusan==="waspada").map(x=>`<li><b style="color:var(--kuning)">${x.p.kode}</b>: pasang jual otomatis di ${fmt(x.stop)}; jual bila melemah</li>`),
        ...nilai.filter(x=>x.keputusan==="tahan").map(x=>`<li><b class="naik">TAHAN ${x.p.kode}</b>: batas rugi ${fmt(x.stop)}, ambil untung di ${fmt(x.target)}</li>`),
        ...(R.pasar_mendukung?beli.slice(0,3).map(b=>`<li><b style="color:var(--aksen)">BELI ${b.kode}</b> di ${fmt(b.entry[0])}${b.entry[1]!==b.entry[0]?"–"+fmt(b.entry[1]):""}, ${fmt(hitungLot(b.entry[1],b.cl).lot)} lot; batas rugi ${fmt(b.cl)}, target ${fmt(b.r1)}</li>`):[]),
      ].join("")||'<li class="redup">Tidak ada tindakan: belum ada posisi dan tidak ada saham yang memenuhi syarat beli.</li>'}</ol>
@@ -1388,16 +1399,16 @@ async function tampilMalam(){
          <span class="ml-putusan" style="background:${WARNA[x.keputusan]}">${esc(x.judul)}</span></div>
        ${s?`<div class="ml-angka"><div><span class="label">Penutupan</span><b>${fmt(x.c)}</b><span class="${kelas(s.perubahan_pct)}">${pct(s.perubahan_pct)} hari ini</span></div>
          <div><span class="label">Untung/rugi</span><b class="${kelas(x.untung)}">${pct(x.untung)}</b><span class="${kelas(x.untung)}">Rp${fmt(Math.round(x.p.lot*100*(x.c-x.p.beli)))}</span><span class="redup" title="Setelah biaya beli 0,15% dan jual 0,25%">bersih ${pct(x.bersih)} · Rp${fmt(Math.round(x.p.lot*100*(x.c*(1-0.0025)-x.p.beli*(1+0.0015))))}</span></div>
-         <div><span class="label">Batas rugi besok</span><b class="turun">${fmt(x.stop)}</b><span class="redup">${x.stop>x.stopAwal?"dinaikkan dari "+fmt(x.stopAwal):"−5% dari harga beli"}</span></div>
+         <div><span class="label">Batas rugi</span><b class="turun">${fmt(x.stop)}</b><span class="redup">${x.stop>x.stopAwal?"dinaikkan dari "+fmt(x.stopAwal):"−5% dari harga beli"}</span></div>
          <div><span class="label">Target ambil untung</span><b class="naik">${fmt(x.target)}</b><span class="redup">${pct((x.target/x.c-1)*100)} dari penutupan</span></div></div>`:""}
        <ul class="ml-alasan">${x.alasan.map(a=>`<li>${esc(a)}</li>`).join("")}${x.tanda.map(a=>`<li class="redup">Perhatikan: ${esc(a)}</li>`).join("")}</ul>
        ${x.brt?.length?`<div class="ml-berita">${x.brt.slice(0,3).map(b=>`<a href="${esc(b.tautan)}" target="_blank" rel="noopener"><span class="kode-kecil sn-${b.sn}">${b.sn}</span> ${esc(b.judul)}</a>`).join("")}</div>`:""}
        <div class="ml-aksi"><button class="tombol kedua chip" data-jual="${x.ix}">Sudah dijual</button><button class="tombol kedua chip" data-ubah="${x.ix}">Ubah</button><button class="tombol kedua chip" data-hapus-pos="${x.ix}">Hapus</button></div>
        <div class="ml-jual" id="ml-jual-${x.ix}" hidden><label>Harga jual<input type="number" step="any" min="1" id="ml-hjual-${x.ix}" value="${x.c||""}"></label><label>Tanggal jual<input type="date" id="ml-tjual-${x.ix}"></label><button class="tombol" data-catat="${x.ix}">Catat ke jurnal</button></div>
-     </div>`}).join("")||'<div class="kosong">Belum ada posisi. Setelah membeli saham, klik <b>Tambah posisi</b> (atau tombol <b>Saya beli ini</b> di bawah). Setiap malam web akan menilai: pertahankan atau jual besok.</div>'}</div>
+     </div>`}).join("")||'<div class="kosong">Belum ada posisi. Setelah membeli saham, klik <b>Tambah posisi</b> (atau tombol <b>Saya beli ini</b> di bawah). Setiap malam web akan menilai: pertahankan atau jual pada hari bursa berikutnya.</div>'}</div>
      <p class="redup" style="font-size:12px;margin:10px 0 0">Posisi tersimpan di peramban perangkat ini. Aturan: jual bila penutupan di bawah batas rugi, ada tanda distribusi, atau sudah 3 hari tanpa tren kuat. Batas rugi naik ke harga beli setelah untung 4%, lalu mengikuti harga setelah untung 8%.</p></div>
 
-   <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Saham potensial untuk dibeli besok</h3>
+   <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Saham potensial dibeli ${sebut}</h3>
      ${!R.pasar_mendukung?'<div class="pita waspada" style="margin-bottom:10px"><b>Pasar lemah (IHSG di bawah MA20).</b> Menurut uji 3 tahun, membeli saat pasar lemah lebih sering rugi. Daftar ini hanya untuk dipantau.</div>':""}
      <div class="ml-beli">${beli.map(b=>{const u=hitungLot(b.entry[1],b.cl),br=beritaSaham(b.kode);return`<div class="ml-kartu" style="border-left-color:var(--aksen)">
        <div class="ml-atas"><div><a href="#saham/${b.kode}" class="ml-kode">${b.kode}</a> <span class="redup">${esc(b.sektor||"")}</span></div>${b.lencana}</div>
@@ -1454,7 +1465,7 @@ function pasangMalam(){
       const j=bacaJurnal();j.push({tgl:$("ml-tjual-"+ix).value||p.tgl,kode:p.kode,beli:p.beli,jual:hj,lot:p.lot,catatan:`beli ${p.tgl}, dicatat dari Malam Ini`});tulisJurnal(j);
       POSISI.splice(ix,1);simpanPosisi();tampilMalam()}
     else if(t.dataset.beli){bukaForm({kode:t.dataset.beli,beli:+t.dataset.harga,lot:+t.dataset.lot,stop:+t.dataset.cl})}
-    else if(t.id==="ml-salin"){const teks="Rencana besok ("+tglPendek(R.tanggal_data)+"):\n"+[...document.querySelectorAll("#ml-daftar-rencana li")].map((li,i)=>`${i+1}. ${li.textContent.trim()}`).join("\n");
+    else if(t.id==="ml-salin"){const teks="Rencana trading "+namaHari(tambahHariBursa(R.tanggal_data,1)).panjang+":\n"+[...document.querySelectorAll("#ml-daftar-rencana li")].map((li,i)=>`${i+1}. ${li.textContent.trim()}`).join("\n");
       navigator.clipboard?.writeText(teks).then(()=>{t.textContent="Tersalin";setTimeout(()=>t.textContent="Salin rencana",1500)})}
   };
 }
