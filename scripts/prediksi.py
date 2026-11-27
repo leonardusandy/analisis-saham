@@ -295,6 +295,9 @@ def catat_hari_ini(rk: dict, sp: dict, fund: dict, st: dict | None = None) -> li
         for nama in ("B", "A"):
             for x in st.get(nama, []):
                 tag_strategi.setdefault(x["kode"], []).append(nama if x.get("utama", True) else nama + "-cadangan")
+        # daftar saham potensial (maks 10): semua anggota hari itu dinilai; tanda U-baru untuk yang baru masuk
+        for x in (st.get("unggulan") or {}).get("daftar", []):
+            tag_strategi.setdefault(x["kode"], []).extend(["U"] + (["U-baru"] if x.get("status") == "baru" else []))
     pilih_analisa = {a["kode"]: a for a in (sp or {}).get("analisa", [])}
     kandidat = set(rk.get("kandidat", [])) | set(rk.get("kandidat_tunda", []))
     baris_sp = {b["kode"]: b for b in (sp or {}).get("uptrend", []) + (sp or {}).get("sideways", [])}
@@ -453,11 +456,16 @@ def statistik(cat: list[dict]) -> dict:
             "B": ringkas([c for c in beli if "B" in c.get("dipilih", [])]),
             "B_saat_pasar_naik": ringkas([c for c in beli if "B" in c.get("dipilih", []) and c["fitur"].get("ihsg_naik")]),
             "A": ringkas([c for c in beli if "A" in c.get("dipilih", [])]),
-            "J": ringkas([c for c in beli if "J" in c.get("dipilih", []) or not any(x in c.get("dipilih", []) for x in ("A", "B", "A-cadangan", "B-cadangan"))]),
+            "J": ringkas([c for c in beli if "J" in c.get("dipilih", []) or not any(x in c.get("dipilih", []) for x in ("A", "B", "A-cadangan", "B-cadangan", "U"))]),
             "S": ringkas([c for c in cat if c["jenis"] == "swing" and "S" in c.get("dipilih", [])]),
+            "U": ringkas([c for c in beli if "U" in c.get("dipilih", [])]),
+            "U_baru": ringkas([c for c in beli if "U-baru" in c.get("dipilih", [])]),
             "S_saat_pasar_naik": ringkas([c for c in cat if c["jenis"] == "swing" and "S" in c.get("dipilih", []) and c["fitur"].get("ihsg_naik")]),
         },
         "beli_analisa": ringkas([c for c in beli if "analisa" in c.get("dipilih", [])]),
+        "potensial_h1": (lambda v: {"n": len(v), "naik": round(sum(c["h1"]["pct"] > 0 for c in v) / len(v) * 100, 1),
+                                    "rata": round(sum(c["h1"]["pct"] for c in v) / len(v), 2)} if v else None)(
+            [c for c in beli if "U" in c.get("dipilih", []) and c.get("h1")]),
         "antrean": {"terisi": sum(c.get("status") in ("selesai", "berjalan") for c in pilih),
                     "tidak_terisi": sum(c.get("status") == "tidak terisi" for c in pilih)},
         "kena": {"r1": round(sum(c["hasil"]["kena_r1"] for c in r1) / len(r1) * 100, 1) if r1 else None,
