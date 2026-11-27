@@ -37,7 +37,8 @@ main{grid-area:utama;min-width:0;padding:16px 20px 40px}
 
 .logo{font-weight:800;font-size:16px;color:#fff;display:flex;align-items:center;gap:10px;white-space:nowrap;padding:18px 18px 14px;letter-spacing:-.01em}
 .logo:hover{text-decoration:none}
-.logo .tanda{width:30px;height:30px;flex:none;border-radius:8px;box-shadow:0 0 0 1px rgba(201,147,46,.45)}
+.logo .tanda{width:40px;height:40px;flex:none;border-radius:10px;box-shadow:0 0 0 1px rgba(201,147,46,.45)}
+.logo .nama{font-size:17px}
 .logo .nama{display:flex;flex-direction:column;line-height:1.1}.logo .nama small{font-weight:500;font-size:11px;color:rgba(255,255,255,.55);letter-spacing:.02em}
 
 /* jam bursa: satu-satunya unsur menonjol */
@@ -116,7 +117,8 @@ body.terkunci{overflow:hidden}
 .ringkas-angka{display:flex;flex-direction:column;justify-content:center;min-width:104px;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.06);color:#fff;text-decoration:none}
 .ringkas-angka:hover{background:rgba(255,255,255,.11);text-decoration:none}.ringkas-angka b{font-size:26px;line-height:1.1}.ringkas-angka b[style*="inherit"]{color:#fff!important}
 .ringkas-angka span{font-size:12px;color:rgba(255,255,255,.65)}
-.ringkas-buka{align-self:center;background:var(--emas)!important;color:var(--tinta)!important;font-weight:700}
+.ringkas-buka{align-self:center;display:inline-flex;align-items:center;padding:12px 18px;border-radius:10px;background:var(--emas)!important;color:var(--tinta)!important;font-weight:700;font-size:14px;text-decoration:none}
+.ringkas-buka:hover{filter:brightness(1.07);text-decoration:none}
 @media (max-width:700px){.ringkas-beranda{padding:18px}.ringkas-angka{min-width:calc(50% - 5px)}.ringkas-buka{width:100%;text-align:center}}
 .layar-masuk{position:fixed;inset:0;z-index:1000;background:var(--tinta);display:flex;align-items:center;justify-content:center;padding:20px}
 .layar-masuk form{width:100%;max-width:360px;background:var(--kartu);border-radius:14px;padding:28px}
