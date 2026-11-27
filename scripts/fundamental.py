@@ -6,6 +6,7 @@ Jika sebuah saham gagal diambil, data lamanya dipertahankan.
 """
 from __future__ import annotations
 
+import re
 import json
 import math
 import sys
@@ -219,16 +220,28 @@ SYARAT_KUALITAS = [
 ]
 
 
+# Bank dan perusahaan pembiayaan: arus kas operasi negatif biasanya karena penyaluran kredit bertambah
+# (kredit dicatat di arus kas operasi), jadi bukan tanda bahaya.
+RX_PEMBERI_KREDIT = re.compile(r"bank|credit|mortgage|financ|pembiayaan", re.I)
+
+
+def pemberi_kredit(d: dict) -> bool:
+    return d.get("sektor") == "Keuangan" and bool(RX_PEMBERI_KREDIT.search(f"{d.get('industri') or ''} {d.get('nama') or ''}"))
+
+
 def periksa(d: dict) -> dict:
     hasil = []
+    kredit = pemberi_kredit(d)
     for nama, k, uji in SYARAT_KUALITAS:
         v = d.get(k)
+        if kredit and k == "arus_kas_operasi":
+            v = None
         hasil.append(None if v is None else bool(uji(v)))
     terdata = [x for x in hasil if x is not None]
     bahaya = []
     if (d.get("eps") is not None and d["eps"] < 0) or (d.get("margin_laba") is not None and d["margin_laba"] < 0):
         bahaya.append("rugi bersih")
-    if d.get("arus_kas_operasi") is not None and d["arus_kas_operasi"] < 0:
+    if d.get("arus_kas_operasi") is not None and d["arus_kas_operasi"] < 0 and not kredit:
         bahaya.append("arus kas operasi negatif")
     if d.get("piotroski") is not None and (d.get("piotroski_terdata") or 0) >= 7 and d["piotroski"] <= 2:
         bahaya.append(f"Piotroski F-Score rendah ({d['piotroski']}/{d['piotroski_terdata']})")

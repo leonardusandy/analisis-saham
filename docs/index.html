@@ -1446,7 +1446,6 @@ function nilaiPosisi(p){
   if(!sp)tanda.push("sudah tidak termasuk saham uptrend/sideways");
   if(s.distribusi5&&s.perubahan_pct<0)tanda.push("ada candle merah bervolume besar (tanda distribusi)");
   if(m&&m.arah_rel==="tertinggal"&&m.keyakinan_rel!=="rendah")tanda.push(`model memperkirakan tertinggal dari pasar (peluang unggul ${fmt(m.p_rel,1)}%)`);
-  if(neg.length)tanda.push(`${neg.length} berita bernada negatif dalam 1,5 hari terakhir${neg.some(b=>b.tp)?` (termasuk dari media terpercaya: ${esc(neg.find(b=>b.tp).sumber||"")})`:""}`);
   if((f.bahaya||[]).length)tanda.push("fundamental: "+f.bahaya.join(", "));
   let keputusan,judul,alasan=[],sebab="";
   const sisaHari=Math.max(0,batasHari-hari);
@@ -1459,6 +1458,7 @@ function nilaiPosisi(p){
       :`Harga penutupan ${fmt(c)} masih di atas MA${nMA} (${fmt(ma10)}), ${swing?"tren menengah masih utuh":"kenaikan masih berjalan"}. Tahan; jual di pembukaan bila suatu hari penutupan turun di bawah MA${nMA}. Paling lama ${sisaHari} hari bursa lagi.`);
     if(c>=target)alasan.push(`Sasaran 1:3 (${fmt(target)}) sudah tercapai. Jangan buru-buru jual: biarkan untung berjalan selama masih di atas MA${nMA}.`);
     if(swing){const lk=lkSemua()[p.kode]?.[0];if(lk&&["lemah","waspada"].includes(lk.putusan))tanda.push(`laporan keuangan unggahan ${lk.periode}: ${lk.putusan}`)}}
+  if(neg.length)alasan.push(`Masukan berita (tidak mengubah keputusan): ${neg.length} berita bernada negatif dalam 1,5 hari terakhir${neg.some(b=>b.tp)?`, termasuk dari media terpercaya (${esc(neg.find(b=>b.tp).sumber||"")})`:""}. Baca dan nilai sendiri.`);
   return{keputusan,judul,sebab,alasan,tanda,s,sp,m,c,untung,bersih,hari,stop,stopAwal,target,ma10,nMA,swing,brt,pos,neg};
 }
 let SW=null,PSI=null;
@@ -1621,13 +1621,13 @@ function rekomendasiBeli(){
     if(m&&!b.ib)alasan.push(`Model: ${m.arah_rel==="unggul"?"diperkirakan lebih kuat":"diperkirakan lebih lemah"} dari pasar (peluang unggul ${fmt(m.p_rel,1)}%).`);
     if(s.sinyal_macd)alasan.push("MACD baru memotong ke atas.");
     if(f.lolos_kualitas)alasan.push("Lolos saringan kualitas fundamental.");
-    if(negTp.length)alasan.push(`DITUNDA: berita negatif dari media terpercaya (${esc(negTp[0].sumber||"")}: "${negTp[0].judul.slice(0,90)}"). Pembelian dialihkan ke cadangan.`);
+    if(negTp.length)alasan.push(`Masukan berita: ada berita negatif dari media terpercaya (${esc(negTp[0].sumber||"")}: "${esc(negTp[0].judul.slice(0,90))}"). Tidak mengubah keputusan; baca dan nilai sendiri.`);
     else if(neg)alasan.push(`Ada ${neg} berita negatif dari media lain: baca dulu sebelum membeli.`);
     else if(pos)alasan.push(`${pos} berita positif terbaru.`);
     const skor=b.ib?(b.ib.utama?100:50)-b.ib.urutan:(m?m.p_rel:50)-neg*5;
     const lencana=b.ib?`<span class="lencana">${b.ib.utama?"Pilihan #"+b.ib.urutan:"Cadangan"}</span>`:`<span class="lencana" title="Peluang lebih kuat dari pasar">${m?"unggul "+fmt(m.p_rel,0)+"%":"model –"}</span>`;
     const hi=b.entry[1],t3=bulatHarga(hi+3*(hi-b.cl),"atas");
-    return{...b,t3,sektor:s.sektor,alasan,skor,lencana,tunda:negTp.length>0};
+    return{...b,t3,sektor:s.sektor,alasan,skor,lencana,tunda:false};
   }).sort((a,b)=>b.skor-a.skor);
 }
 function kartuSwing(sebut,dipegang){
@@ -2451,10 +2451,9 @@ async function tampilAnalisa(kode){
     ok(!!per&&per[0]<=20,"Peringkat skor strategi B ≤ 20 (momentum + model)",per?`#${per[0]} dari ${nLayak} (momentum ${per[1]}, model ${per[2]})`:tl?`tidak dinilai: ${tl}`:"tidak dinilai"),
     ok(c>=x.ma20,"Harga di atas MA20",fmt(x.ma20)),
     ok(!x.dist,"Tidak ada jejak distribusi 5 hari (candle merah bervolume ≥ 2,5×)",x.dist?"ada":"tidak ada"),
-    ok(!negTp.length,"Tidak ada berita negatif dari media terpercaya (36 jam)",negTp.length?negTp[0].judul.slice(0,60)+"…":"tidak ada"),
     ok(pasar,"Pasar mendukung: IHSG di atas MA20",pasar?"ya":"tidak (pembelian baru ditunda)")];
   const gagalC=syaratC.filter(z=>!z.b);
-  const putusC=bB&&pasar&&!negTp.length?["beli","Layak beli",`Termasuk ${bB.utama?"pilihan #"+bB.urutan:"cadangan"} strategi B hari ini.`]
+  const putusC=bB&&pasar?["beli","Layak beli",`Termasuk ${bB.utama?"pilihan #"+bB.urutan:"cadangan"} strategi B hari ini.`]
     :(per&&per[0]<=8&&!gagalC.length)?["beli","Layak beli","Masuk 8 besar skor strategi B dan semua syarat terpenuhi."]
     :(per&&per[0]<=20&&c>=x.ma20&&!(F0.bahaya||[]).length)?["pantau","Pantau",`Peringkat #${per[0]}: cukup kuat, tetapi belum termasuk yang terbaik${gagalC.length?"; yang belum terpenuhi: "+gagalC.map(z=>z.teks.split(" (")[0].split(":")[0]).join(", "):""}.`]
     :["hindari","Belum layak","Belum terpenuhi: "+gagalC.map(z=>z.teks.split(" (")[0].replace(/^Tidak ada /,"ada ").replace(/^Peringkat skor strategi B ≤ 20.*/,"peringkat skor B ≤ 20")).join("; ")+"."];
@@ -2507,7 +2506,7 @@ async function tampilAnalisa(kode){
      <div class="kartu"><h3 style="margin-top:0">Syarat swing fundamental</h3>${daftarSyarat(syaratS)}</div></div>
    <div class="kisi2" style="margin-bottom:14px">
      <div class="kartu"><h3 style="margin-top:0">Indikator & parameter</h3><table class="pk-tabel" style="font-size:13px"><tbody>${interp.map(([a,b])=>`<tr><td style="text-align:left;white-space:nowrap;vertical-align:top"><b>${a}</b></td><td style="text-align:left">${esc(b)}</td></tr>`).join("")}</tbody></table></div>
-     <div class="kartu"><h3 style="margin-top:0">Psikologi pasar & berita</h3>${htmlPsikologi(kode)||'<div class="redup" style="font-size:13px">Data antrean penutupan belum tersedia untuk tanggal ini.</div>'}
+     <div class="kartu"><h3 style="margin-top:0">Psikologi pasar & berita</h3><p class="redup" style="font-size:12px;margin:-4px 0 8px">Berita hanya masukan untuk Anda baca; tidak ikut menentukan putusan.</p>${htmlPsikologi(kode)||'<div class="redup" style="font-size:13px">Data antrean penutupan belum tersedia untuk tanggal ini.</div>'}
        ${ungg?`<div style="margin-top:8px;font-size:13px">Daftar saham potensial: <b>${ungg.status==="baru"?"baru masuk":"bertahan "+ungg.hari+" hari"}</b> (peringkat #${ungg.peringkat}).</div>`:""}
        <div style="margin-top:10px">${brt.slice(0,5).map(b=>`<div style="font-size:13px;margin-top:4px"><span class="kode-kecil sn-${b.sn}">${b.sn}</span> ${b.tp?'<span class="lencana" title="Media terpercaya" style="background:var(--hover);color:var(--teks)">terpercaya</span> ':""}<a href="${esc(b.tautan)}" target="_blank" rel="noopener">${esc(b.judul)}</a></div>`).join("")||'<div class="redup" style="font-size:13px">Tidak ada berita dalam 36 jam terakhir.</div>'}</div>
        <div style="margin-top:10px">${TAUTAN_IDX(kode).slice(0,2).map(([n,u])=>`<a class="tombol kedua chip" href="${u}" target="_blank" rel="noopener">${n} ↗</a>`).join(" ")}</div></div></div>
