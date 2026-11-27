@@ -220,7 +220,7 @@ button.chip.aktif{background:var(--latar-aksen);color:var(--aksen);border-color:
 @media (max-width:760px){.ml-angka{grid-template-columns:1fr 1fr}.ml-kepala h2{font-size:20px}.ml-pasar{text-align:left}}
 .pk-baru{background:#fff4b3}.pk-beli{background:#d7e9fb}.pk-naik{background:#dcf2dc}.pk-turun{background:#fde2cf}
 @media (prefers-color-scheme:dark){.pk-baru{background:#4a4210}.pk-beli{background:#16324d}.pk-naik{background:#173a22}.pk-turun{background:#4a2a14}}
-.pk-tabel td,.pk-tabel th{padding:5px 8px}.pk-tabel tr.klik:hover{filter:brightness(.96)}
+.pk-tabel td,.pk-tabel th{padding:5px 8px}.bungkus td{white-space:normal;overflow-wrap:anywhere}.bungkus td:first-child{white-space:nowrap}.pk-tabel tr.klik:hover{filter:brightness(.96)}
 .legenda span.kotak{display:inline-block;width:28px;height:14px;border-radius:3px;vertical-align:middle;margin-right:6px;border:1px solid var(--garis)}
 .saham-kepala{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
 .bintang{cursor:pointer;font-size:22px;background:none;border:1px solid var(--garis);border-radius:8px;padding:2px 10px;color:var(--kuning)}
@@ -2401,6 +2401,42 @@ async function simpanLK(){
 }
 
 // ================= analisa emiten =================
+function kartuFundamentalAnalisa(kode,fd,f0,lk){
+  const f={...f0,...(fd||{})};
+  if(!fd&&!Object.keys(f0).length)return'<div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Data fundamental</h3><div class="redup">Belum tersedia untuk saham ini.</div></div>';
+  const M=x=>x==null?"–":(Math.abs(x)>=1e12?fmt(x/1e12,2)+" T":fmt(x/1e9,1)+" M"),P=(x,d=1)=>x==null?"–":fmt(x,d)+"%",N=(x,d=2)=>x==null?"–":fmt(x,d);
+  const kredit=f.sektor==="Keuangan"&&/bank|credit|mortgage|financ|pembiayaan/i.test((f.industri||"")+" "+(f.nama||""));
+  const kotak=[["Kapitalisasi pasar","Rp"+M(f.kapitalisasi)],["PER (laba 12 bulan)",N(f.per,1)+"×"],["PER perkiraan",f.per_maju==null?"–":N(f.per_maju,1)+"×"],["PBV",N(f.pbv)+"×"],
+    ["ROE",P(f.roe)],["ROA",P(f.roa)],["Margin laba bersih",P(f.margin_laba)],["DER (utang/ekuitas)",N(f.der)],
+    ["Pertumbuhan pendapatan",f.tumbuh_pendapatan==null?"–":pct(f.tumbuh_pendapatan)],["Pertumbuhan laba",f.tumbuh_laba==null?"–":pct(f.tumbuh_laba)],["Laba per saham",N(f.eps,1)],["Nilai buku per saham",N(f.nilai_buku,0)],
+    ["Imbal dividen",P(f.imbal_dividen,2)],["Rasio lancar",N(f.rasio_lancar)],["Rasio cepat",N(f.rasio_cepat)],["Arus kas operasi","Rp"+M(f.arus_kas_operasi)+(kredit&&f.arus_kas_operasi<0?" (wajar untuk pemberi kredit)":"")],
+    ["PEG",N(f.peg)],["Beta",N(f.beta)],["Piotroski F-Score",f.piotroski==null?"–":`${f.piotroski}/${f.piotroski_terdata||9}`],["Beneish M-Score",f.beneish==null?"–":N(f.beneish)+(f.beneish>-1.78?" (perlu dicermati)":"")],
+    ["Saringan kualitas",f.kualitas_terdata?`${f.kualitas}/${f.kualitas_terdata} syarat${f.lolos_kualitas?" · lolos":""}`:"–"],["Jumlah saham",f.jumlah_saham?fmt(f.jumlah_saham/1e9,2)+" miliar lembar":"–"]];
+  // laba bersih: kuartal & tahunan
+  const baris=(lap,nama)=>{const i=lap?.data?.[nama];return i?lap.periode.map((p,k)=>({p,v:i[k]})).filter(x=>x.v!=null):[]};
+  const lbK=baris(fd?.laba_rugi_kuartal,"Laba bersih"),pdK=baris(fd?.laba_rugi_kuartal,"Pendapatan"),lbT=baris(fd?.laba_rugi_tahunan,"Laba bersih"),pdT=baris(fd?.laba_rugi_tahunan,"Pendapatan");
+  const yoy=(arr,k,jarak)=>{const a=arr[k],b=arr.find(x=>x.p.slice(0,4)==String(+a.p.slice(0,4)-1)&&x.p.slice(5,7)===a.p.slice(5,7));return b&&b.v?(a.v/Math.abs(b.v)-(b.v<0?-1:1))*100:null};
+  const tabelLaba=(lb,pd,judul,kuartal)=>{if(!lb.length)return"";const urut=[...lb].sort((a,b)=>b.p.localeCompare(a.p)),pend=Object.fromEntries(pd.map(x=>[x.p,x.v]));
+    return`<h4 style="margin:14px 0 6px">${judul}</h4><div class="gulir"><table class="pk-tabel" style="font-size:13px"><thead><tr><th style="text-align:left">Periode</th><th>Pendapatan</th><th>Laba bersih</th><th>Margin</th><th>Laba vs ${kuartal?"kuartal sama tahun lalu":"tahun sebelumnya"}</th></tr></thead><tbody>${
+      urut.map(x=>{const k=lb.indexOf(x),g=kuartal?yoy(lb,k):(()=>{const b=lb.find(y=>+y.p.slice(0,4)===+x.p.slice(0,4)-1);return b&&b.v?(x.v/Math.abs(b.v)-(b.v<0?-1:1))*100:null})(),pv=pend[x.p];
+        return`<tr><td style="text-align:left">${kuartal?x.p.slice(0,7):x.p.slice(0,4)}</td><td>Rp${M(pv)}</td><td class="${x.v<0?"turun":""}"><b>Rp${M(x.v)}</b></td><td>${pv?P(x.v/pv*100):"–"}</td><td class="${kelas(g)}">${g==null?"–":pct(g)}</td></tr>`}).join("")}</tbody></table></div>`};
+  const lap=(judul,l)=>{if(!l?.periode?.length)return"";return`<h4 style="margin:14px 0 6px">${judul} <span class="redup" style="font-weight:400;font-size:12px">(Rp miliar)</span></h4><div class="gulir"><table class="pk-tabel" style="font-size:13px"><thead><tr><th></th>${l.periode.map(p=>`<th>${p.slice(0,4)}</th>`).join("")}</tr></thead><tbody>${Object.entries(l.data).filter(([n])=>n!=="Laba per saham").map(([n,v])=>`<tr><td style="text-align:left">${n}</td>${v.map(x=>`<td class="${x<0?"turun":""}">${x==null?"–":fmt(x/1e9,0)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`};
+  const NP=["ROA positif","Arus kas operasi positif","ROA naik","Arus kas > laba","Utang jangka panjang turun","Rasio lancar naik","Tidak menerbitkan saham baru","Margin kotor naik","Perputaran aset naik"];
+  const div=(fd?.dividen||[]).slice(-6).reverse();
+  return`<div class="kartu" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><h3 style="margin:0">Data fundamental</h3><span class="redup" style="font-size:12px">${esc(f.industri||f.sektor||"")}${f.diperbarui?" · diperbarui "+esc(f.diperbarui):""}</span></div>
+    ${(f.bahaya||[]).length?`<div class="pita waspada" style="margin-top:8px">Tanda bahaya: ${esc(f.bahaya.join(", "))}</div>`:""}${(f.peringatan||[]).length?`<div class="redup" style="font-size:12px;margin-top:6px">Perhatian: ${esc(f.peringatan.join("; "))}</div>`:""}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px 14px;margin-top:10px">${kotak.map(([a,b])=>`<div><span class="redup" style="font-size:12px;display:block">${a}</span><b style="font-size:14px">${esc(b)}</b></div>`).join("")}</div>
+    ${(f.piotroski_rinci||[]).some(x=>x!=null)?`<div style="font-size:12px;margin-top:10px">${f.piotroski_rinci.map((x,i)=>`<span style="display:inline-block;margin:2px 10px 2px 0" class="${x==null?"redup":x?"naik":"turun"}">${x==null?"–":x?"✓":"✗"} ${NP[i]}</span>`).join("")}</div>`:""}
+    <div class="kisi2">
+      <div>${tabelLaba(lbK,pdK,"Laba bersih per kuartal",true)||'<h4 style="margin:14px 0 6px">Laba bersih per kuartal</h4><div class="redup" style="font-size:13px">Tidak tersedia.</div>'}</div>
+      <div>${tabelLaba(lbT,pdT,"Laba bersih tahunan",false)||'<h4 style="margin:14px 0 6px">Laba bersih tahunan</h4><div class="redup" style="font-size:13px">Tidak tersedia.</div>'}</div></div>
+    <details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600">Neraca, arus kas, dan dividen</summary><div class="kisi2">
+      <div>${lap("Neraca",fd?.neraca_tahunan)||'<div class="redup">Neraca tidak tersedia.</div>'}</div><div>${lap("Arus kas",fd?.arus_kas_tahunan)||'<div class="redup">Arus kas tidak tersedia.</div>'}</div></div>
+      ${div.length?`<h4 style="margin:14px 0 6px">Dividen terakhir (per saham)</h4><div style="font-size:13px">${div.map(x=>`${tglPendek(x.t)}: <b>Rp${fmt(x.nilai,2)}</b>`).join(" · ")}</div>`:""}</details>
+    ${lk?`<div style="font-size:13px;margin-top:10px">Laporan unggahan Anda (${esc(lk.periode)}): <b>${esc(lk.putusan)}</b>${lk.rasio?.laba_tumbuh!=null?`, laba ${pct(lk.rasio.laba_tumbuh)} vs tahun lalu`:""}. Bila ada, angka ROE dari laporan ini dipakai untuk syarat swing.</div>`:""}
+    ${fd?.kurs_konversi?`<p class="redup" style="font-size:12px">Laporan asli dalam ${esc(fd.mata_uang_laporan)}, dikonversi ke Rupiah (kurs ${fmt(fd.kurs_konversi)}).</p>`:""}
+    <p class="redup" style="font-size:12px;margin:8px 0 0">Sumber: Yahoo Finance; M = miliar, T = triliun. Angka bisa berbeda dari laporan resmi IDX. Untuk bank, laba kotor dan rasio lancar biasanya kosong.</p></div>`;
+}
 let AN_GRAFIK=[];
 function rataN(a,n,i){if(i+1<n)return null;let s=0;for(let k=i-n+1;k<=i;k++)s+=a[k];return s/n}
 function levelSR(L,atr){
@@ -2436,7 +2472,7 @@ async function tampilAnalisa(kode){
   await Promise.all([muatStrategi(),muatSwing(),muatLK(),muatPsi(),muatPrediksi()]);
   if(!SP){try{SP=await ambil("data/stockpick.json")}catch(e){SP={uptrend:[],sideways:[],analisa:[],sektor:[]}}}
   if(!MD){try{MD=await ambil("data/model.json")}catch(e){}}
-  let d;try{d=await ambil(`data/saham/${kode}.json`)}catch(e){el.innerHTML='<div class="kartu kosong">Data harga saham ini belum tersedia.</div>';return}
+  let d,FD=null;try{[d,FD]=await Promise.all([ambil(`data/saham/${kode}.json`),ambil(`data/fundamental/${kode}.json`).catch(()=>null)])}catch(e){el.innerHTML='<div class="kartu kosong">Data harga saham ini belum tersedia.</div>';return}
   const s=G(kode),F0=F[kode]||{},x=hitungIndikator(d),c=x.c,atr=x.atr||c*0.03,lv=levelSR(d.lilin,atr);
   const per=STR?.peringkat?.[kode],nLayak=STR?.n_layak,tl=STR?.tidak_layak?.[kode],ungg=STR?.unggulan?.daftar?.find(z=>z.kode===kode),bB=STR?.B?.find(z=>z.kode===kode);
   const m=MD?.prediksi?.find(z=>z.kode===kode),lk=lkSemua()[kode]?.[0],brt=beritaSaham(kode),negTp=brt.filter(b=>b.sn==="negatif"&&b.tp);
@@ -2472,7 +2508,7 @@ async function tampilAnalisa(kode){
   const putusS=!gagalS.length?["beli","Layak swing",swPil?`Termasuk ${swPil.utama?"pilihan swing #"+swPil.urutan:"cadangan swing"} hari ini.`:"Semua syarat terpenuhi."]
     :gagalS.length<=2&&c>x.ma50?["pantau","Pantau",`Belum terpenuhi: ${gagalS.map(z=>z.teks).join("; ")}.`]:["hindari","Belum layak","Belum terpenuhi: "+gagalS.map(z=>z.teks.replace(/^Tidak ada /,"ada ")).join("; ")+"."];
   const W={beli:"var(--hijau)",pantau:"var(--kuning)",hindari:"var(--merah)"};
-  const daftarSyarat=a=>`<table class="pk-tabel" style="font-size:13px"><tbody>${a.map(z=>`<tr><td style="width:22px">${z.b?'<span class="naik">✓</span>':'<span class="turun">✗</span>'}</td><td style="text-align:left">${z.teks}</td><td style="text-align:right" class="redup">${esc(String(z.nilai))}</td></tr>`).join("")}</tbody></table>`;
+  const daftarSyarat=a=>`<table class="pk-tabel bungkus" style="font-size:13px"><tbody>${a.map(z=>`<tr><td style="width:22px">${z.b?'<span class="naik">✓</span>':'<span class="turun">✗</span>'}</td><td style="text-align:left">${z.teks}</td><td style="text-align:right" class="redup">${esc(String(z.nilai))}</td></tr>`).join("")}</tbody></table>`;
   const hi=bulatHarga(c,"bawah"),lo=bulatHarga(Math.max(lv.S1.v,c-0.5*atr),"bawah"),cl5=bulatHarga(hi*0.95,"atas"),cl8=bulatHarga(hi*0.92,"atas"),uk=hitungLot(hi,cl5);
   const interp=[
     ["Harga vs MA",`${c>x.ma10?"di atas":"di bawah"} MA10 ${fmt(x.ma10)} · ${c>x.ma20?"di atas":"di bawah"} MA20 ${fmt(x.ma20)} · ${c>x.ma50?"di atas":"di bawah"} MA50 ${fmt(x.ma50)}${x.ma200?` · ${c>x.ma200?"di atas":"di bawah"} MA200 ${fmt(x.ma200)}`:""}`],
@@ -2505,11 +2541,12 @@ async function tampilAnalisa(kode){
      <div class="kartu"><h3 style="margin-top:0">Syarat trading cepat</h3>${daftarSyarat(syaratC)}<div class="redup" style="font-size:12px;margin-top:6px">Ukuran disarankan: <b style="color:var(--teks)">${fmt(uk.lot)} lot</b> (Rp${fmt(uk.nilai)}, rugi maks Rp${fmt(uk.rugi)}).</div></div>
      <div class="kartu"><h3 style="margin-top:0">Syarat swing fundamental</h3>${daftarSyarat(syaratS)}</div></div>
    <div class="kisi2" style="margin-bottom:14px">
-     <div class="kartu"><h3 style="margin-top:0">Indikator & parameter</h3><table class="pk-tabel" style="font-size:13px"><tbody>${interp.map(([a,b])=>`<tr><td style="text-align:left;white-space:nowrap;vertical-align:top"><b>${a}</b></td><td style="text-align:left">${esc(b)}</td></tr>`).join("")}</tbody></table></div>
+     <div class="kartu"><h3 style="margin-top:0">Indikator & parameter</h3><table class="pk-tabel bungkus" style="font-size:13px"><tbody>${interp.map(([a,b])=>`<tr><td style="text-align:left;white-space:nowrap;vertical-align:top"><b>${a}</b></td><td style="text-align:left">${esc(b)}</td></tr>`).join("")}</tbody></table></div>
      <div class="kartu"><h3 style="margin-top:0">Psikologi pasar & berita</h3><p class="redup" style="font-size:12px;margin:-4px 0 8px">Berita hanya masukan untuk Anda baca; tidak ikut menentukan putusan.</p>${htmlPsikologi(kode)||'<div class="redup" style="font-size:13px">Data antrean penutupan belum tersedia untuk tanggal ini.</div>'}
        ${ungg?`<div style="margin-top:8px;font-size:13px">Daftar saham potensial: <b>${ungg.status==="baru"?"baru masuk":"bertahan "+ungg.hari+" hari"}</b> (peringkat #${ungg.peringkat}).</div>`:""}
        <div style="margin-top:10px">${brt.slice(0,5).map(b=>`<div style="font-size:13px;margin-top:4px"><span class="kode-kecil sn-${b.sn}">${b.sn}</span> ${b.tp?'<span class="lencana" title="Media terpercaya" style="background:var(--hover);color:var(--teks)">terpercaya</span> ':""}<a href="${esc(b.tautan)}" target="_blank" rel="noopener">${esc(b.judul)}</a></div>`).join("")||'<div class="redup" style="font-size:13px">Tidak ada berita dalam 36 jam terakhir.</div>'}</div>
        <div style="margin-top:10px">${TAUTAN_IDX(kode).slice(0,2).map(([n,u])=>`<a class="tombol kedua chip" href="${u}" target="_blank" rel="noopener">${n} ↗</a>`).join(" ")}</div></div></div>
+   ${kartuFundamentalAnalisa(kode,FD,F0,lk)}
    <p class="redup" style="font-size:12px">Analisis otomatis dari data penutupan terakhir, bukan nasihat investasi. Keputusan dan risiko transaksi ada pada Anda.</p>`;
   // grafik
   const L=d.lilin.slice(-160),cs=d.lilin.map(z=>z.c),off=d.lilin.length-L.length;
