@@ -8,6 +8,7 @@ Bagian yang belum pernah ada di folder terbitan selalu dibangun, apa pun modenya
 """
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
