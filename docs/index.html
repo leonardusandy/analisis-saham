@@ -1790,7 +1790,7 @@ async function tampilPilihan(){
 
 // ================= Prediksi model (semua saham) =================
 let MD=null,PRD=null,SARING_MD={likuid:"1"},urutMD={k:"p",turun:true},arahMD="semua";
-async function muatPrediksi(){if(!PRD){try{PRD=await ambil("data/prediksi.json")}catch(e){PRD={}}}return PRD}
+async function muatPrediksi(){if(!PRD?.statistik){try{PRD=await ambil("data/prediksi.json")}catch(e){PRD={}}}return PRD}
 async function tampilModel(){
   const el=$("md-isi");
   try{MD??=await ambil("data/model.json")}catch(e){el.innerHTML='<div class="kartu kosong">Prediksi model belum tersedia. Dibuat setiap hari bursa pukul 17.30.</div>';return}
@@ -1884,7 +1884,7 @@ function kartuPenilaian(h){
 let gEval=null;
 async function tampilEvaluasi(){
   const el=$("ev-isi");await muatPrediksi();
-  if(!PRD?.statistik){el.innerHTML='<div class="kartu kosong">Belum ada catatan prediksi. Catatan pertama dibuat pada pembaruan harian berikutnya (17.30 WIB), lalu dinilai otomatis setelah 3–5 hari bursa.</div>';return}
+  if(!PRD?.statistik){el.innerHTML='<div class="kartu kosong">Catatan prediksi belum terbaca. Biasanya karena web sedang diperbarui; tunggu sebentar lalu muat ulang halaman.</div>';return}
   const st=PRD.statistik,n=st.jumlah;
   const r=(x,j)=>x?`<div><span class="label">${j}</span><b class="${kelas(x.rata)}">${pct(x.rata)}</b><span class="redup" style="font-size:12px;display:block">${fmt(x.n)} transaksi · menang ${fmt(x.menang,0)}%${x.pf?` · PF ${fmt(x.pf,2)}`:""}</span></div>`:`<div><span class="label">${j}</span><b class="redup">menunggu</b></div>`;
   const akr=(x,j)=>`<div><span class="label">${j}</span><b>${x?.benar==null?"–":fmt(x.benar,1)+"%"}</b><span class="redup" style="font-size:12px;display:block">${fmt(x?.n||0)} dinilai</span></div>`;
