@@ -158,8 +158,17 @@ def gabung(baru: list[dict], lama: list[dict], batas: int) -> list[dict]:
     return hasil[:batas]
 
 
+# Media yang dianggap terpercaya untuk keputusan trading: media bisnis/ekonomi arus utama, kantor berita,
+# dan situs resmi. Berita dari sumber lain tetap ditampilkan, tetapi tidak dipakai untuk menunda pembelian.
+TERPERCAYA = re.compile(
+    r"kontan|bisnis\.com|bisnis indonesia|cnbc|idx ?channel|idxchannel|investor\.id|investor daily|katadata|emiten ?news|"
+    r"idn ?financials|antara|reuters|bloomberg|kompas|tempo|detik|investortrust|jakarta post|jakarta globe|"
+    r"liputan6|kumparan|idx\.co\.id|bursa efek|ojk", re.I)
+
+
 def lengkapi(b: dict) -> dict:
     """Saham terkait lewat tema dan sentimen kata kunci untuk satu berita."""
+    b["terpercaya"] = bool(TERPERCAYA.search(b.get("sumber") or ""))
     b["kode"] = sorted(set(b.get("kode", [])) | set(tandai(b["judul"])))
     b["sentimen"] = snt.sentimen_aturan(b["judul"])
     # saham terkait tema hanya bila beritanya bersentimen jelas, agar berita umum tidak penuh label

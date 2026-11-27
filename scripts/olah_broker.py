@@ -73,6 +73,7 @@ def main():
         "tanggal": sorted(semua), "libur": sorted(libur),
         "broker": sorted(t for t, d in semua.items() if d.get("saham")),
         "idx": sorted(t for t, d in semua.items() if d.get("idx")),
+        "idx_lengkap": sorted(t for t, d in semua.items() if d.get("idx") and any(len(v) >= 13 for v in d["idx"].values())),
     }, separators=(",", ":")))
     if not tanggal:
         print("Belum ada hari bursa.")
@@ -194,7 +195,7 @@ def main():
         t = idx_tgl[-1]
         baris = []
         for k, v in semua[t]["idx"].items():
-            fb, fs, close, prev, nilai, frek = v
+            fb, fs, close, prev, nilai, frek = v[:6]
             if nilai <= 0:
                 continue
             baris.append({"kode": k, "tutup": close, "ubah_pct": round((close - prev) / prev * 100, 2) if prev else 0,
@@ -211,6 +212,35 @@ def main():
             "harian": harian, "pasar": pasar, "tanggal_terakhir": t,
             "kolom": ["asing_beli_lembar", "asing_jual_lembar", "tutup", "nilai", "frekuensi"],
             "dibuat": ringkasan["dibuat"]}, ensure_ascii=False, separators=(",", ":")))
+
+    # ----- psikologi penutupan: antrean terbaik, lot per transaksi, pasar negosiasi -----
+    lengkap = [t for t in tanggal if semua[t].get("idx") and any(len(v) >= 13 for v in semua[t]["idx"].values())]
+    if lengkap:
+        t = lengkap[-1]
+        hasil = {}
+        for k, v in semua[t]["idx"].items():
+            if len(v) < 13 or v[4] <= 0 or v[5] <= 0:
+                continue
+            close, nilai, frek = v[2], v[4], v[5]
+            bid, bidv, off, offv, vol, nego = v[7:13]
+            lot_trx = vol / 100 / frek
+            riw = [semua[x]["idx"][k] for x in lengkap[-21:-1] if k in semua[x]["idx"] and len(semua[x]["idx"][k]) >= 13
+                   and semua[x]["idx"][k][5] > 0]
+            rata = sum(r[11] / 100 / r[5] for r in riw) / len(riw) if riw else None
+            asing5 = sum((semua[x]["idx"][k][0] - semua[x]["idx"][k][1]) * semua[x]["idx"][k][2]
+                         for x in lengkap[-5:] if k in semua[x]["idx"])
+            hasil[k] = {
+                "bid": bid, "bid_lot": round(bidv / 100), "offer": off, "offer_lot": round(offv / 100),
+                "rasio_antrean": round(bidv / (bidv + offv), 3) if bidv + offv > 0 else None,
+                "tutup_di": "offer" if off and close >= off else "bid" if bid and close <= bid else "tengah",
+                "lot_per_trx": round(lot_trx, 1), "lot_per_trx_rata20": round(rata, 1) if rata else None,
+                "rasio_lot": round(lot_trx / rata, 2) if rata else None,
+                "nego_pct": round(nego / (nilai + nego) * 100, 1) if nilai + nego > 0 else 0,
+                "asing5": round(asing5), "hari_data": len(riw) + 1,
+            }
+        (AKAR / "psikologi.json").write_text(json.dumps({"tanggal": t, "saham": hasil, "hari": len(lengkap)},
+                                                        ensure_ascii=False, separators=(",", ":")))
+        print(f"Psikologi penutupan: {len(hasil)} saham, data {t}, riwayat {len(lengkap)} hari")
 
     print(f"Broker: {len(tanggal)} hari ({tanggal[0]}…{terakhir}), {len(kode_list)} saham, "
           f"{len(ringkasan['broker_1h'])} broker; data IDX {len(idx_tgl)} hari.")

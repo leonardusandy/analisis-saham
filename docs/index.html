@@ -558,6 +558,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
           <button class="tombol kedua chip aktif" data-b="semua">Semua</button>
           <button class="tombol kedua chip" data-b="pantau">Daftar pantau saya</button>
           <button class="tombol kedua chip" data-b="aksi">Aksi korporasi</button>
+          <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="berita-tp"> Hanya media terpercaya</label>
           <label>Sentimen<select id="berita-sn"><option value="">Semua</option><option value="positif">▲ Positif</option><option value="negatif">▼ Negatif</option><option value="netral">■ Netral</option></select></label>
           <label>Kode saham<input id="berita-kode" placeholder="mis. BBCA" size="8"></label>
         </div>
@@ -998,6 +999,8 @@ function analisisBerita(b){
   const lab=b.sentimen?.label||"netral";
   return[...(b.kode||[]).map(k=>({kode:k,sentimen:lab})),...(b.terkait||[]).map(k=>({kode:k,sentimen:lab,tema:true}))];
 }
+const RX_TERPERCAYA=/kontan|bisnis\.com|bisnis indonesia|cnbc|idx ?channel|idxchannel|investor\.id|investor daily|katadata|emiten ?news|idn ?financials|antara|reuters|bloomberg|kompas|tempo|detik|investortrust|jakarta post|jakarta globe|liputan6|kumparan|idx\.co\.id|bursa efek|ojk/i;
+function terpercaya(b){return b.terpercaya??RX_TERPERCAYA.test(b.sumber||"")}
 function sentimenUntuk(b,kode){const a=analisisBerita(b);const x=a.find(z=>z.kode===kode);return x?x.sentimen:(b.sentimen?.label||"netral")}
 function daftarBerita(arr,fokus){
   if(!arr.length)return'<div class="kosong">Belum ada berita. Berita diperbarui setiap 2 jam.</div>';
@@ -1012,7 +1015,7 @@ function daftarBerita(arr,fokus){
 let modeBerita="semua";
 function tampilBerita(){
   document.querySelectorAll("#h-berita [data-b]").forEach(b=>b.onclick=()=>{modeBerita=b.dataset.b;document.querySelectorAll("#h-berita [data-b]").forEach(x=>x.classList.toggle("aktif",x===b));$("berita-kode").value="";saringBerita()});
-  $("berita-kode").oninput=saringBerita;$("berita-sn").onchange=saringBerita;saringBerita();
+  $("berita-kode").oninput=saringBerita;$("berita-sn").onchange=saringBerita;$("berita-tp").onchange=saringBerita;saringBerita();
 }
 // ----- aksi korporasi dari judul berita -----
 const POLA_AKSI=[["Dividen",/dividen|cum[ -]date|ex[ -]date|tanggal pembayaran/i],["RUPS",/\bRUPS|rapat umum pemegang saham/i],
@@ -1045,6 +1048,7 @@ function saringBerita(){
   else if(modeBerita==="pantau"){const m=new Map();PANTAU.forEach(k=>(B.per_saham[k]||[]).forEach(b=>m.set(b.judul,b)));arr=[...m.values()].sort((a,b)=>b.waktu.localeCompare(a.waktu))}
   else if(modeBerita==="aksi"){const m=new Map();[...B.pasar,...Object.values(B.per_saham).flat()].forEach(b=>{if(jenisAksi(b.judul).length)m.set(b.judul,b)});arr=[...m.values()].sort((a,b)=>(b.waktu||"").localeCompare(a.waktu||""))}
   else arr=B.pasar;
+  if($("berita-tp").checked)arr=arr.filter(terpercaya);
   const sn=$("berita-sn").value;
   if(sn)arr=arr.filter(b=>q?sentimenUntuk(b,q)===sn:analisisBerita(b).some(x=>x.sentimen===sn)||(!analisisBerita(b).length&&(b.sentimen?.label||"netral")===sn));
   const hitung=l=>arr.filter(b=>(q?sentimenUntuk(b,q):(b.sentimen?.label||"netral"))===l).length;
@@ -1374,7 +1378,7 @@ function beritaSaham(k,jam=36){
   const arr=(B?.per_saham?.[k]||[]).concat((B?.pasar||[]).filter(b=>analisisBerita(b).some(a=>a.kode===k)));
   const batas=Date.now()-jam*36e5,lihat=new Set();
   return arr.filter(b=>{if(lihat.has(b.tautan))return false;lihat.add(b.tautan);return !b.waktu||new Date(b.waktu)>=batas})
-    .map(b=>({...b,sn:sentimenUntuk(b,k)}));
+    .map(b=>({...b,sn:sentimenUntuk(b,k),tp:terpercaya(b)}));
 }
 function nilaiPosisi(p){
   const s=PETA[p.kode]?G(p.kode):null;
@@ -1389,7 +1393,7 @@ function nilaiPosisi(p){
   if(!sp)tanda.push("sudah tidak termasuk saham uptrend/sideways");
   if(s.distribusi5&&s.perubahan_pct<0)tanda.push("ada candle merah bervolume besar (tanda distribusi)");
   if(m&&m.arah_rel==="tertinggal"&&m.keyakinan_rel!=="rendah")tanda.push(`model memperkirakan tertinggal dari pasar (peluang unggul ${fmt(m.p_rel,1)}%)`);
-  if(neg.length)tanda.push(`${neg.length} berita bernada negatif dalam 1,5 hari terakhir`);
+  if(neg.length)tanda.push(`${neg.length} berita bernada negatif dalam 1,5 hari terakhir${neg.some(b=>b.tp)?` (termasuk dari media terpercaya: ${esc(neg.find(b=>b.tp).sumber||"")})`:""}`);
   if((f.bahaya||[]).length)tanda.push("fundamental: "+f.bahaya.join(", "));
   let keputusan,judul,alasan=[],sebab="";
   const sisaHari=Math.max(0,batasHari-hari);
@@ -1404,10 +1408,29 @@ function nilaiPosisi(p){
     if(swing){const lk=lkSemua()[p.kode]?.[0];if(lk&&["lemah","waspada"].includes(lk.putusan))tanda.push(`laporan keuangan unggahan ${lk.periode}: ${lk.putusan}`)}}
   return{keputusan,judul,sebab,alasan,tanda,s,sp,m,c,untung,bersih,hari,stop,stopAwal,target,ma10,nMA,swing,brt,pos,neg};
 }
-let SW=null;
+let SW=null,PSI=null;
+async function muatPsi(){if(PSI===null){try{PSI=await ambil("data/psikologi.json")}catch(e){PSI=false}}return PSI}
+// bacaan psikologi penutupan dari ringkasan saham IDX (kiriman laptop) + pola harian yang teruji
+function bacaPsikologi(k){
+  const x=PSI?.saham?.[k],s=PETA[k]?G(k):null,out=[];
+  if(s){const r=s.perubahan_pct;
+    if(r!=null&&r<=-14)out.push({t:"Turun ≥14% dalam sehari (mendekati batas bawah): secara historis besoknya rata-rata turun lagi sekitar 2,9%. Jangan tangkap pisau jatuh.",w:"turun"});
+    else if(r!=null&&(()=>{const prev=s.tutup/(1+r/100),ara=prev<=200?35:prev<=5000?25:20;return r>=ara*0.97})())out.push({t:"Ditutup di batas atas (ARA): biasanya lanjut naik di pembukaan besok, tetapi membeli di pembukaan itu secara historis tidak menguntungkan.",w:"kuning"})}
+  if(x&&PSI.tanggal===R.tanggal_data){
+    if(x.tutup_di==="offer")out.push({t:"Ditutup di harga offer: pembeli agresif menghabiskan antrean jual.",w:"naik"});
+    else if(x.tutup_di==="bid")out.push({t:"Ditutup di harga bid: penjual agresif membanting ke antrean beli.",w:"turun"});
+    if(x.rasio_antrean!=null)out.push({t:`Antrean penutupan: beli ${fmt(x.bid_lot)} lot di ${fmt(x.bid)} vs jual ${fmt(x.offer_lot)} lot di ${fmt(x.offer)} (${x.rasio_antrean>=0.6?"beli lebih tebal":x.rasio_antrean<=0.4?"jual lebih tebal":"seimbang"}).`,w:x.rasio_antrean>=0.6?"naik":x.rasio_antrean<=0.4?"turun":""});
+    if(x.rasio_lot!=null&&x.hari_data>=10&&(x.rasio_lot>=1.8||x.rasio_lot<=0.5))out.push({t:`Rata-rata ${fmt(x.lot_per_trx,1)} lot per transaksi, ${fmt(x.rasio_lot,1)}× biasanya: ${x.rasio_lot>=1.8?"ada pemain besar ikut bertransaksi":"didominasi transaksi kecil (ritel)"}.`,w:x.rasio_lot>=1.8?"naik":""});
+    if(x.nego_pct>=20)out.push({t:`Transaksi pasar negosiasi ${fmt(x.nego_pct,0)}% dari nilai: ada pindah tangan blok besar, cek beritanya.`,w:"kuning"});
+    if(x.asing5)out.push({t:`Asing 5 hari: ${x.asing5>0?"beli":"jual"} bersih Rp${rp(Math.abs(x.asing5))}.`,w:x.asing5>0?"naik":"turun"});
+  }
+  return out;
+}
+function htmlPsikologi(k){const a=bacaPsikologi(k);if(!a.length)return"";
+  return`<div style="margin:6px 0 2px;font-size:13px"><b>Psikologi pasar</b>${a.map(x=>`<div class="${x.w==="naik"?"naik":x.w==="turun"?"turun":""}" ${x.w==="kuning"?'style="color:var(--kuning)"':""}>• ${esc(x.t)}</div>`).join("")}</div>`}
 async function muatSwing(){if(SW===null){try{SW=await ambil("data/swing.json")}catch(e){SW=false}}return SW}
 async function tampilMalam(){
-  await Promise.all([muatSwing(),muatLK()]);
+  await Promise.all([muatSwing(),muatLK(),muatPsi()]);
   if(!SP){try{SP=await ambil("data/stockpick.json")}catch(e){SP={uptrend:[],sideways:[],analisa:[],sektor:[]}}}
   if(!MD){try{MD=await ambil("data/model.json")}catch(e){}}
   await muatPrediksi();await muatStrategi();
@@ -1415,8 +1438,9 @@ async function tampilMalam(){
   const el=$("ml-isi"),i=R.ihsg||{},segar=R.tanggal_data>=hariBursaTerakhirJS(),tglTindak=tambahHariBursa(R.tanggal_data,1),hariTindak=namaHari(tglTindak),lbl=labelTindak(tglTindak);
   const lewat=!segar&&(lbl==="hari ini"||lbl==="lewat");
   const sebut=lewat?hariTindak.pendek:lbl==="hari ini"||lbl==="besok"?`${lbl} (${hariTindak.pendek})`:hariTindak.pendek;
-  const nilai=POSISI.map((p,ix)=>({p,ix,...nilaiPosisi(p)}));
-  const dipegang=new Set(POSISI.map(p=>p.kode)),beli=rekomendasiBeli().filter(b=>!dipegang.has(b.kode)&&(b.ib?.utama??true));
+  const nilai=POSISI.map((p,ix)=>({p,ix,...nilaiPosisi(p)})),dipegang0=new Set(POSISI.map(p=>p.kode));
+  const semuaRek=rekomendasiBeli().filter(b=>!dipegang0.has(b.kode)),ditunda=semuaRek.filter(b=>b.tunda&&(b.ib?.utama??true));
+  const dipegang=dipegang0,beli=[...semuaRek.filter(b=>!b.tunda&&(b.ib?.utama??true)),...semuaRek.filter(b=>!b.tunda&&b.ib&&!b.ib.utama)].slice(0,3);
   const swingBeli=(SW?.tanggal===R.tanggal_data?SW.pilihan:[]).filter(b=>b.utama&&!dipegang.has(b.kode)&&!beli.slice(0,3).some(x=>x.kode===b.kode));
   const sekM=(SP.sektor||[]).filter(x=>x.arah==="better").map(x=>x.nama),sekL=(SP.sektor||[]).filter(x=>x.arah==="worst").map(x=>x.nama);
   const WARNA={jual:"var(--merah)",waspada:"var(--kuning)",tahan:"var(--hijau)",data:"var(--redup)"};
@@ -1435,6 +1459,7 @@ async function tampilMalam(){
        ...(R.pasar_mendukung?beli.slice(0,3).map(b=>`<li><b style="color:var(--aksen)">ANTRE BELI ${b.kode}</b> <span class="redup">(trading cepat)</span> di ${fmt(b.entry[0])}${b.entry[1]!==b.entry[0]?"–"+fmt(b.entry[1]):""}, ${fmt(hitungLot(b.entry[1],b.cl).lot)} lot; batas rugi ${fmt(b.cl)}, sasaran 1:3 ${fmt(b.t3)}, tahan selama di atas MA10</li>`):[]),
        ...(R.pasar_mendukung?swingBeli.map(b=>`<li><b style="color:var(--aksen)">ANTRE BELI ${b.kode}</b> <span class="redup">(swing fundamental)</span> di ${fmt(b.entry[0])}${b.entry[1]!==b.entry[0]?"–"+fmt(b.entry[1]):""}, ${fmt(hitungLot(b.entry[1],b.cl).lot)} lot; batas rugi ${fmt(b.cl)}, tahan selama di atas MA50</li>`):[]),
      ].join("")||'<li class="redup">Tidak ada tindakan: belum ada posisi dan tidak ada saham yang memenuhi syarat beli.</li>'}</ol>
+     ${ditunda.length?`<p class="redup" style="margin:0 0 6px">Ditunda karena berita negatif dari media terpercaya: ${ditunda.map(b=>`<a href="#saham/${b.kode}">${b.kode}</a>`).join(", ")} (diganti cadangan).</p>`:""}
      ${!R.pasar_mendukung&&beli.length?'<p class="redup" style="margin:0">Ada saham yang memenuhi aturan, tetapi pasar sedang lemah. Menurut aturan, pembelian baru ditunda.</p>':""}</div>
 
    ${hKemarin?`<div class="kartu" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline"><h3 style="margin:0">Benar atau salah? Prediksi untuk ${namaHari(hKemarin.dinilai).pendek}</h3><a href="#evaluasi" class="redup">Lihat semua hari →</a></div>
@@ -1459,6 +1484,7 @@ async function tampilMalam(){
          <div><span class="label">Batas rugi</span><b class="turun">${fmt(x.stop)}</b><span class="redup">pasang order jual otomatis</span></div>
          <div><span class="label">Sasaran 1:3</span><b class="naik">${fmt(x.target)}</b><span class="redup">${x.c>=x.target?"sudah tercapai":pct((x.target/x.c-1)*100)+" lagi"}</span></div></div>`:""}
        <ul class="ml-alasan">${x.alasan.map(a=>`<li>${esc(a)}</li>`).join("")}${x.tanda.map(a=>`<li class="redup">Perhatikan: ${esc(a)}</li>`).join("")}</ul>
+       ${htmlPsikologi(x.p.kode)}
        ${x.brt?.length?`<div class="ml-berita">${x.brt.slice(0,3).map(b=>`<a href="${esc(b.tautan)}" target="_blank" rel="noopener"><span class="kode-kecil sn-${b.sn}">${b.sn}</span> ${esc(b.judul)}</a>`).join("")}</div>`:""}
        <div class="ml-aksi"><button class="tombol kedua chip" data-jual="${x.ix}">Sudah dijual</button><button class="tombol kedua chip" data-ubah="${x.ix}">Ubah</button><button class="tombol kedua chip" data-hapus-pos="${x.ix}">Hapus</button></div>
        <div class="ml-jual" id="ml-jual-${x.ix}" hidden><label>Harga jual<input type="number" step="any" min="1" id="ml-hjual-${x.ix}" value="${x.c||""}"></label><label>Tanggal jual<input type="date" id="ml-tjual-${x.ix}"></label><button class="tombol" data-catat="${x.ix}">Catat ke jurnal</button></div>
@@ -1474,6 +1500,7 @@ async function tampilMalam(){
          <div><span class="label">Batas rugi</span><b class="turun">${fmt(b.cl)}</b><span class="redup">${pct((b.cl/b.entry[1]-1)*100)}</span></div>
          <div><span class="label">Sasaran 1:3</span><b class="naik">${fmt(b.t3)}</b><span class="redup">${pct((b.t3/b.entry[1]-1)*100)} · resistance ${fmt(b.r1)}</span></div>
          <div><span class="label">Jumlah</span><b>${fmt(u.lot)} lot</b><span class="redup">Rp${fmt(u.nilai)}</span></div></div>
+       ${htmlPsikologi(b.kode)}
        <div class="redup" style="font-size:13px;margin:6px 0">Pasang <b>antrean beli</b> di rentang ini (jangan kejar harga di atasnya). Setelah terbeli: tahan selama penutupan di atas MA10, jual di pembukaan bila turun di bawahnya; batas rugi otomatis ${fmt(b.cl)}.</div>
        <ul class="ml-alasan">${b.alasan.map(a=>`<li>${esc(a)}</li>`).join("")}</ul>
        ${br.length?`<div class="ml-berita">${br.slice(0,2).map(n=>`<a href="${esc(n.tautan)}" target="_blank" rel="noopener"><span class="kode-kecil sn-${n.sn}">${n.sn}</span> ${esc(n.judul)}</a>`).join("")}</div>`:""}
@@ -1529,18 +1556,19 @@ function rekomendasiBeli(){
   if(!STR)(SP?.analisa||[]).forEach(a=>peta.set(a.kode,{kode:a.kode,entry:a.entry,r1:a.r1,r2:a.r2,cl:a.cl,sumber:["Analisa harian"]}));
   return[...peta.values()].map(b=>{
     const s=G(b.kode),m=MD?.prediksi?.find(x=>x.kode===b.kode),f=F[b.kode]||{},br=beritaSaham(b.kode);
-    const neg=br.filter(x=>x.sn==="negatif").length,pos=br.filter(x=>x.sn==="positif").length;
+    const neg=br.filter(x=>x.sn==="negatif").length,pos=br.filter(x=>x.sn==="positif").length,negTp=br.filter(x=>x.sn==="negatif"&&x.tp);
     const alasan=b.ib?[`${b.sumber[0]}: naik ${pct(b.ib.r20)} dalam 20 hari (peringkat ${fmt(b.ib.pk_r20,0)} dari 100) dan model peringkat ${fmt(b.ib.pk_model,0)}${b.ib.distribusi?"; ada jejak distribusi":"; tanpa jejak distribusi"}.`]:[`${b.sumber.join(" & ")}.`];
     if((f.peringatan||[]).length)alasan.push("Perhatian: "+f.peringatan.join("; ")+".");
     if(m&&!b.ib)alasan.push(`Model: ${m.arah_rel==="unggul"?"diperkirakan lebih kuat":"diperkirakan lebih lemah"} dari pasar (peluang unggul ${fmt(m.p_rel,1)}%).`);
     if(s.sinyal_macd)alasan.push("MACD baru memotong ke atas.");
     if(f.lolos_kualitas)alasan.push("Lolos saringan kualitas fundamental.");
-    if(neg)alasan.push(`Ada ${neg} berita negatif terbaru: baca dulu sebelum membeli.`);
+    if(negTp.length)alasan.push(`DITUNDA: berita negatif dari media terpercaya (${esc(negTp[0].sumber||"")}: "${negTp[0].judul.slice(0,90)}"). Pembelian dialihkan ke cadangan.`);
+    else if(neg)alasan.push(`Ada ${neg} berita negatif dari media lain: baca dulu sebelum membeli.`);
     else if(pos)alasan.push(`${pos} berita positif terbaru.`);
     const skor=b.ib?(b.ib.utama?100:50)-b.ib.urutan:(m?m.p_rel:50)-neg*5;
     const lencana=b.ib?`<span class="lencana">${b.ib.utama?"Pilihan #"+b.ib.urutan:"Cadangan"}</span>`:`<span class="lencana" title="Peluang lebih kuat dari pasar">${m?"unggul "+fmt(m.p_rel,0)+"%":"model –"}</span>`;
     const hi=b.entry[1],t3=bulatHarga(hi+3*(hi-b.cl),"atas");
-    return{...b,t3,sektor:s.sektor,alasan,skor,lencana};
+    return{...b,t3,sektor:s.sektor,alasan,skor,lencana,tunda:negTp.length>0};
   }).sort((a,b)=>b.skor-a.skor);
 }
 function kartuSwing(sebut,dipegang){

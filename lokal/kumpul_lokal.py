@@ -283,6 +283,10 @@ def ubah_idx(js: dict) -> dict:
             float(d.get("Close") or 0), float(d.get("Previous") or 0),
             float(d.get("Value") or 0), int(d.get("Frequency") or 0),
             float(d.get("ListedShares") or 0),
+            # antrean terbaik saat penutupan & volume (untuk membaca psikologi: siapa yang agresif)
+            float(d.get("Bid") or 0), float(d.get("BidVolume") or 0),
+            float(d.get("Offer") or 0), float(d.get("OfferVolume") or 0),
+            float(d.get("Volume") or 0), float(d.get("NonRegularValue") or 0),
         ]
     aktif = sum(1 for v in hasil.values() if v[4] > 0)
     return hasil if aktif else {}
@@ -457,7 +461,9 @@ def main():
     if "broker" not in ind:  # indeks versi lama: anggap hari yang tercatat sudah punya broker
         ada_broker = set(ind.get("tanggal", []))
     semua_hari = [d for d in hari_bursa_terakhir(HARI_MUNDUR) if d.isoformat() not in libur]
-    perlu_idx = [d for d in semua_hari if d.isoformat() not in ada_idx]
+    # data IDX versi lengkap (dengan antrean penutupan); hari lama tanpa kolom itu diambil ulang sekali
+    lengkap = set(ind.get("idx_lengkap", []))
+    perlu_idx = [d for d in semua_hari if d.isoformat() not in lengkap]
     batas_broker = set(hari_bursa_terakhir(HARI_BROKER_MUNDUR))
     perlu_broker = [d for d in semua_hari if d.isoformat() not in ada_broker and d in batas_broker]
 

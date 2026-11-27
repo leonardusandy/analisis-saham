@@ -298,6 +298,22 @@ def catat_hari_ini(rk: dict, sp: dict, fund: dict, st: dict | None = None) -> li
     pilih_analisa = {a["kode"]: a for a in (sp or {}).get("analisa", [])}
     kandidat = set(rk.get("kandidat", [])) | set(rk.get("kandidat_tunda", []))
     baris_sp = {b["kode"]: b for b in (sp or {}).get("uptrend", []) + (sp or {}).get("sideways", [])}
+    berita = baca(cfg.KELUAR / "berita.json", {}) or {}
+    batas_b = (datetime.now(WIB) - timedelta(hours=36)).strftime("%Y-%m-%dT%H:%M:%S")
+
+    def hitung_berita(k):
+        arr = (berita.get("per_saham") or {}).get(k, []) + [b for b in berita.get("pasar", []) if k in (b.get("kode") or [])]
+        lihat, n = set(), {"neg_tp": 0, "pos_tp": 0, "neg_lain": 0}
+        for b in arr:
+            if b.get("judul") in lihat or (b.get("waktu") or "") < batas_b:
+                continue
+            lihat.add(b.get("judul"))
+            lab = next((a.get("sentimen") for a in (b.get("analisis") or []) if a.get("kode") == k), None) or (b.get("sentimen") or {}).get("label")
+            if lab == "negatif":
+                n["neg_tp" if b.get("terpercaya") else "neg_lain"] += 1
+            elif lab == "positif" and b.get("terpercaya"):
+                n["pos_tp"] += 1
+        return n
     arah_sektor = {x["nama"]: x["arah"] for x in (sp or {}).get("sektor", [])}
     baru = []
     for s in rk["saham"]:
@@ -321,6 +337,7 @@ def catat_hari_ini(rk: dict, sp: dict, fund: dict, st: dict | None = None) -> li
                 "lapis": s.get("lapis"), "lq45": bool(s.get("lq45")), "rsi": s.get("rsi"), "rasio_vol": s.get("rasio_vol"),
                 "skor": s.get("skor"), "tingkat": b.get("tingkat"), "kuat": b.get("kuat"), "murah": b.get("murah"),
                 "ubah_hari": s.get("perubahan_pct"), "ubah_20h": s.get("ubah_20h"), "nilai_miliar": s.get("nilai_rata20_miliar"),
+                "berita": hitung_berita(k),
             },
         })
     for b in (sp or {}).get("uptrend", []) + (sp or {}).get("sideways", []):
@@ -357,6 +374,10 @@ def statistik(cat: list[dict]) -> dict:
                                          else "1,5–3×" if c["fitur"]["rasio_vol"] < 3 else "≥ 3×"),
         "RSI": lambda c: "< 60" if (c["fitur"]["rsi"] or 0) < 60 else "60–70" if c["fitur"]["rsi"] < 70 else "≥ 70",
         "Masuk sesuai rentang entry": lambda c: "ya" if (c.get("hasil") or {}).get("sesuai_entry") else "tidak",
+        "Berita negatif media terpercaya (36 jam)": lambda c: "belum dicatat" if "berita" not in c["fitur"]
+            else "ada" if c["fitur"]["berita"].get("neg_tp") else "tidak ada",
+        "Berita positif media terpercaya (36 jam)": lambda c: "belum dicatat" if "berita" not in c["fitur"]
+            else "ada" if c["fitur"]["berita"].get("pos_tp") else "tidak ada",
     }
     per_ciri = {}
     for nama, fn in ciri.items():
