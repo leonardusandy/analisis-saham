@@ -85,6 +85,8 @@ def main():
             continue
         f = fitur_saham(df)
         f["kode"] = d["kode"]
+        f["c_akhir"] = df["c"]
+        f["v_akhir"] = df["v"]
         bagian.append(f)
         harga[d["kode"]] = df["c"]
     data = pd.concat(bagian)
@@ -177,7 +179,10 @@ def main():
         penting.append({"fitur": NAMA_FITUR[c], "turun_auc": round(float(auc0 - roc_auc_score(contoh["target_rel"], m_uji_rel.predict_proba(x)[:, 1])), 4)})
     penting.sort(key=lambda x: -x["turun_auc"])
 
-    akhir = data[data["t"] == tanggal[-1]].copy()
+    # hanya saham yang benar-benar diperdagangkan pada tanggal terakhir (bukan yang disuspensi),
+    # harga >= Rp50, dan tidak melonjak > 100% dalam 20 hari (ciri saham gorengan)
+    akhir = data[(data["t"] == tanggal[-1]) & (data["c_akhir"] >= 50) & (data["v_akhir"] > 0)
+                 & (data["r20"] < 1.0)].copy()
     akhir["p"] = m_abs.predict_proba(akhir[kolom])[:, 1]
     akhir["p_rel"] = pusatkan(m_rel.predict_proba(akhir[kolom])[:, 1], akhir["t"])
 
