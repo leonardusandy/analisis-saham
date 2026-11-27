@@ -1417,6 +1417,7 @@ async function tampilMalam(){
        <div class="ml-aksi"><button class="tombol kedua chip" data-jual="${x.ix}">Sudah dijual</button><button class="tombol kedua chip" data-ubah="${x.ix}">Ubah</button><button class="tombol kedua chip" data-hapus-pos="${x.ix}">Hapus</button></div>
        <div class="ml-jual" id="ml-jual-${x.ix}" hidden><label>Harga jual<input type="number" step="any" min="1" id="ml-hjual-${x.ix}" value="${x.c||""}"></label><label>Tanggal jual<input type="date" id="ml-tjual-${x.ix}"></label><button class="tombol" data-catat="${x.ix}">Catat ke jurnal</button></div>
      </div>`}).join("")||'<div class="kosong">Belum ada posisi. Setelah membeli saham, klik <b>Tambah posisi</b> (atau tombol <b>Saya beli ini</b> di bawah). Setiap malam web akan menilai: pertahankan atau jual pada hari bursa berikutnya.</div>'}</div>
+     <p class="redup" style="font-size:13px;margin:10px 0 0" id="ml-kirim"></p>
      <p class="redup" style="font-size:12px;margin:10px 0 0">Posisi tersimpan di peramban perangkat ini. Aturan: jual bila penutupan di bawah batas rugi, ada tanda distribusi, atau sudah 3 hari tanpa tren kuat. Batas rugi naik ke harga beli setelah untung 4%, lalu mengikuti harga setelah untung 8%.</p></div>
 
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Saham potensial dibeli ${sebut}</h3>
@@ -1436,6 +1437,30 @@ async function tampilMalam(){
    <div class="kartu"><h3 style="margin-top:0">Berita pasar terbaru</h3><div class="daftar-berita">${daftarBerita((B?.pasar||[]).slice(0,6))}</div>
      <p class="redup" style="font-size:12px;margin:6px 0 0">${sekM.length?"Sektor menguat: "+sekM.join(", ")+". ":""}${sekL.length?"Sektor melemah: "+sekL.join(", ")+".":""}</p></div>`;
   pasangMalam();
+  kirimPosisi(nilai);
+}
+async function kirimPosisi(nilai,paksa=false){
+  const el=$("ml-kirim");if(!el)return;
+  const bit=localStorage.getItem("kunci-v1")||sessionStorage.getItem("kunci-v1");
+  if(!nilai.length){el.textContent="";return}
+  if(!INFO_KUNCI||!bit){el.innerHTML="Keputusan posisi belum bisa dinilai otomatis: web belum dikunci sandi.";return}
+  if(!tokenLokal()){el.innerHTML='Agar keputusan posisi ikut dinilai di penutupan berikutnya, pasang token di panel <b>Perbarui</b> (kanan atas).';return}
+  const isi={tanggal:R.tanggal_data,posisi:nilai.filter(x=>x.s).map(x=>({kode:x.p.kode,tgl:x.p.tgl,beli:x.p.beli,keputusan:x.keputusan,tutup:x.c,stop:x.stop,target:x.target}))};
+  const sidik=JSON.stringify(isi),simpan=localStorage.getItem("posisi-terkirim-v1")||"";
+  const [tSimpan,...rest]=simpan.split("|"),sudah=rest.join("|")===sidik;
+  if(sudah&&!paksa){el.innerHTML=`Keputusan posisi untuk data ${tglPendek(R.tanggal_data)} sudah tercatat (${tSimpan}) dan akan dinilai di penutupan berikutnya. <button class="tombol kedua chip" id="ml-kirim-ulang">Kirim ulang</button>`;$("ml-kirim-ulang").onclick=()=>kirimPosisi(nilai,true);return}
+  el.textContent="Mencatat keputusan posisi untuk dinilai…";
+  try{
+    const kunci=await crypto.subtle.importKey("raw",dariB64(bit),"AES-GCM",false,["encrypt"]);
+    const gz=new Uint8Array(await new Response(new Blob([sidik]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer());
+    const iv=crypto.getRandomValues(new Uint8Array(12));
+    const ct=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},kunci,gz));
+    const gabung=new Uint8Array(12+ct.length);gabung.set(iv);gabung.set(ct,12);
+    await api(`/actions/workflows/${ALUR}/dispatches`,{method:"POST",body:JSON.stringify({ref:"main",inputs:{mode:"posisi",posisi:keB64(gabung)}})});
+    const jam=new Date().toLocaleTimeString("id-ID",{timeZone:"Asia/Jakarta",hour:"2-digit",minute:"2-digit"});
+    localStorage.setItem("posisi-terkirim-v1",jam+" WIB|"+sidik);
+    el.innerHTML=`Keputusan posisi tercatat (${jam} WIB, terenkripsi) dan akan dinilai di penutupan berikutnya.`;
+  }catch(e){el.innerHTML=`<span class="turun">Keputusan posisi gagal dicatat (kode ${e.message}).</span> ${["401","403","404"].includes(e.message)?"Periksa token di panel Perbarui.":""} <button class="tombol kedua chip" id="ml-kirim-ulang">Coba lagi</button>`;$("ml-kirim-ulang").onclick=()=>kirimPosisi(nilai,true)}
 }
 function rekomendasiBeli(){
   const peta=new Map();
@@ -1583,7 +1608,9 @@ function kartuPenilaian(h){
   if(!h)return"";
   const m=h.model,t=h.tren,b=h.beli||[];
   const ok=v=>v?'<span class="naik">✓</span>':'<span class="turun">✗</span>';
-  const bar=[];
+  const bar=[],ps=h.posisi||[];
+  const KP={jual:"jual",waspada:"waspada",tahan:"tahan"};
+  if(ps.length)bar.push(`<div><span class="label">Keputusan posisi Anda</span>${ps.map(x=>`<div style="font-size:13px;margin-top:2px">${ok(x.benar)} <b>${x.kode}</b> ${KP[x.keputusan]} → harga <span class="${kelas(x.pct)}">${pct(x.pct)}</span></div>`).join("")}<span class="redup" style="font-size:12px">jual/waspada benar bila harga turun; tahan benar bila naik/tetap</span></div>`);
   if(b.length)bar.push(`<div><span class="label">Rekomendasi beli</span>${b.map(x=>`<div style="font-size:13px;margin-top:2px">${ok(x.benar)} <a href="#saham/${x.kode}"><b>${x.kode}</b></a> <span class="${kelas(x.pct)}">${pct(x.pct)}</span>${x.dipilih?.length?"":' <span class="redup">(sinyal J)</span>'}${x.entry?` <span class="redup">· ${x.bisa_beli?"harga sempat masuk rentang entry":"tidak sempat masuk rentang entry"}</span>`:""}</div>`).join("")}</div>`);
   if(m)bar.push(`<div><span class="label">Model: arah naik/turun</span><b>${fmt(m.arah_benar,1)}% tepat</b><span class="redup" style="font-size:12px;display:block">diperkirakan naik ${m.naik_diperkirakan}, yang benar naik ${m.naik_nyata} dari ${m.n}</span></div>`);
   if(m&&m.rel_benar!=null)bar.push(`<div><span class="label">Model: unggul/tertinggal</span><b>${fmt(m.rel_benar,1)}% tepat</b><span class="redup" style="font-size:12px;display:block">20% teratas <span class="${kelas(m.atas20)}">${pct(m.atas20)}</span> vs terbawah <span class="${kelas(m.bawah20)}">${pct(m.bawah20)}</span> ${m.atas20>m.bawah20?"✓":"✗"}</span></div>`);
@@ -1606,7 +1633,8 @@ async function tampilEvaluasi(){
      <p class="redup" style="margin:6px 0 0">Setiap hari bursa pukul 17.30 (setelah bursa tutup), web mencatat semua rekomendasi dan perkiraan hari itu, lalu menilai catatan hari-hari sebelumnya dengan harga sebenarnya. Data ini menjadi bahan untuk memperbaiki aturan dan model. Tercatat ${fmt(n.hari)} hari, ${fmt(n.beli)} sinyal beli, ${fmt(n.tren)} perkiraan tren, ${fmt(n.model||0)} perkiraan model; ${fmt(n.menunggu)} masih menunggu hasil. Diperbarui ${PRD.dibuat}.</p></div>
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Penilaian di penutupan berikutnya</h3>
      <p class="redup" style="margin:0 0 10px">Setiap prediksi langsung dinilai dengan harga penutupan hari bursa berikutnya.</p>
-     ${(PRD.harian||[]).length?`<div class="gulir" style="max-height:420px"><table class="keranjang"><thead><tr><th>Prediksi dari data</th><th>Dinilai</th><th>Rekomendasi beli</th><th>Model arah tepat</th><th>Model unggul tepat</th><th>20% teratas vs terbawah</th><th>Uptrend naik</th></tr></thead><tbody>${[...PRD.harian].reverse().map(h=>`<tr><td>${tglPendek(h.tanggal)}</td><td>${tglPendek(h.dinilai)}</td>
+     ${(PRD.harian||[]).length?`<div class="gulir" style="max-height:420px"><table class="keranjang"><thead><tr><th>Prediksi dari data</th><th>Dinilai</th><th>Keputusan posisi</th><th>Rekomendasi beli</th><th>Model arah tepat</th><th>Model unggul tepat</th><th>20% teratas vs terbawah</th><th>Uptrend naik</th></tr></thead><tbody>${[...PRD.harian].reverse().map(h=>`<tr><td>${tglPendek(h.tanggal)}</td><td>${tglPendek(h.dinilai)}</td>
+       <td style="text-align:left">${(h.posisi||[]).map(x=>`<span class="${x.benar?"naik":"turun"}">${x.benar?"✓":"✗"} ${x.kode} ${x.keputusan}</span>`).join(", ")||'<span class="redup">–</span>'}</td>
        <td style="text-align:left">${(h.beli||[]).map(x=>`<span class="${kelas(x.pct)}">${x.benar?"✓":"✗"} ${x.kode} ${pct(x.pct)}</span>`).join(", ")||'<span class="redup">–</span>'}</td>
        <td>${h.model?fmt(h.model.arah_benar,1)+"%":"–"}</td><td>${h.model?.rel_benar!=null?fmt(h.model.rel_benar,1)+"%":"–"}</td>
        <td>${h.model?.atas20!=null?`<span class="${kelas(h.model.atas20-h.model.bawah20)}">${pct(h.model.atas20)} vs ${pct(h.model.bawah20)}</span>`:"–"}</td>

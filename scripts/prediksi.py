@@ -82,6 +82,42 @@ def nilai_h1(c: dict, L: list) -> None:
                "pct": round((n["c"] / L[i]["c"] - 1) * 100, 2)}
 
 
+def nilai_posisi(c: dict, L: list) -> None:
+    """Keputusan posisi pengguna dinilai di penutupan berikutnya:
+    jual/waspada benar bila harga turun; tahan benar bila harga naik atau tetap."""
+    h = c.get("h1")
+    if not h:
+        return
+    c["status"] = "selesai"
+    c["benar"] = h["pct"] < 0 if c["keputusan"] in ("jual", "waspada") else h["pct"] >= 0
+
+
+def catat_posisi() -> list[dict]:
+    """Keputusan posisi yang dikirim halaman Rencana (terenkripsi dengan sandi web)."""
+    data = os.environ.get("POSISI_TERKUNCI", "").strip()
+    sandi = os.environ.get("SANDI_WEB", "")
+    if not data or not sandi:
+        return []
+    try:
+        import base64
+        from enkripsi import buka
+        isi = buka(base64.b64decode(data), sandi)
+    except Exception as e:  # noqa: BLE001
+        print("  ! kiriman posisi tidak bisa dibuka:", e)
+        return []
+    t = isi.get("tanggal")
+    hasil = []
+    for x in isi.get("posisi", [])[:50]:
+        k = str(x.get("kode", "")).upper()[:6]
+        if not t or not k or x.get("keputusan") not in ("jual", "waspada", "tahan"):
+            continue
+        hasil.append({"id": f"{t}|{k}|posisi|{x.get('tgl', '')}", "jenis": "posisi", "tanggal": t, "kode": k,
+                      "status": "menunggu", "keputusan": x["keputusan"], "tgl_beli": x.get("tgl"),
+                      "beli": x.get("beli"), "tutup": x.get("tutup"), "stop": x.get("stop"), "target": x.get("target")})
+    print(f"  posisi pengguna diterima: {len(hasil)} keputusan untuk data {t}")
+    return hasil
+
+
 def penilaian_harian(semua: list[dict]) -> list[dict]:
     """Ringkasan penilaian penutupan berikutnya untuk setiap tanggal prediksi."""
     per = defaultdict(list)
@@ -94,7 +130,11 @@ def penilaian_harian(semua: list[dict]) -> list[dict]:
         mdl = [c for c in v if c["jenis"] == "model"]
         beli = [c for c in v if c["jenis"] == "beli"]
         tren = [c for c in v if c["jenis"] == "tren"]
+        pos = [c for c in v if c["jenis"] == "posisi"]
         d = {"tanggal": t, "dinilai": v[0]["h1"]["t"]}
+        if pos:
+            d["posisi"] = [{"kode": c["kode"], "keputusan": c["keputusan"], "pct": c["h1"]["pct"], "benar": c.get("benar")}
+                           for c in pos]
         if mdl:
             med = float(np.median([c["h1"]["pct"] for c in mdl]))
             rel = [c for c in mdl if c.get("p_rel") is not None]
@@ -303,6 +343,10 @@ def statistik(cat: list[dict]) -> dict:
         kurva.append({"t": t, "v": round(total, 2)})
     r1 = [c for c in pilih if c.get("status") == "selesai"]
     mdl = [c for c in cat if c["jenis"] == "model" and c.get("status") == "selesai"]
+    pos = [c for c in cat if c["jenis"] == "posisi" and c.get("status") == "selesai"]
+    posisi = {k: {"n": len(v), "benar": round(sum(c["benar"] for c in v) / len(v) * 100, 1) if v else None}
+              for k, v in (("semua", pos), ("jual", [c for c in pos if c["keputusan"] in ("jual", "waspada")]),
+                           ("tahan", [c for c in pos if c["keputusan"] == "tahan"]))}
 
     def akurasi(arr):
         return {"n": len(arr), "benar": round(sum(c["benar"] for c in arr) / len(arr) * 100, 1) if arr else None}
@@ -339,7 +383,7 @@ def statistik(cat: list[dict]) -> dict:
         "kena": {"r1": round(sum(c["hasil"]["kena_r1"] for c in r1) / len(r1) * 100, 1) if r1 else None,
                  "r2": round(sum(c["hasil"]["kena_r2"] for c in r1) / len(r1) * 100, 1) if r1 else None,
                  "cl": round(sum(c["hasil"]["kena_cl"] for c in r1) / len(r1) * 100, 1) if r1 else None},
-        "per_ciri": per_ciri, "akurasi_tren": akurasi_tren, "kurva": kurva, "model": model,
+        "per_ciri": per_ciri, "akurasi_tren": akurasi_tren, "kurva": kurva, "model": model, "posisi": posisi,
         "jumlah": {"beli": len(beli), "tren": len(tren), "model": sum(c["jenis"] == "model" for c in cat),
                    "hari": len({c["tanggal"] for c in cat}),
                    "menunggu": sum(c["status"] in ("menunggu", "berjalan") for c in cat if c["jenis"] != "model")},
@@ -369,7 +413,7 @@ def main():
             continue
         nilai_h1(c, L)
         if c["status"] != "selesai":
-            {"beli": nilai_beli, "tren": nilai_tren, "model": nilai_model}[c["jenis"]](c, L)
+            {"beli": nilai_beli, "tren": nilai_tren, "model": nilai_model, "posisi": nilai_posisi}[c["jenis"]](c, L)
 
     # 2) tambah catatan hari ini (id unik: data tanggal yang sama tidak terhitung dua kali)
     n_baru = 0
@@ -377,6 +421,14 @@ def main():
         if c["id"] not in cat:
             cat[c["id"]] = c
             n_baru += 1
+    for c in catat_posisi():  # keputusan terbaru untuk hari yang sama menggantikan yang lama (bila belum dinilai)
+        if c["id"] not in cat or "h1" not in cat[c["id"]]:
+            cat[c["id"]] = c
+            n_baru += 1
+            L = lilin(c["kode"], simpan)
+            if L:  # dikirim terlambat: langsung nilai bila harga hari berikutnya sudah ada
+                nilai_h1(c, L)
+                nilai_posisi(c, L)
 
     semua = sorted(cat.values(), key=lambda c: (c["tanggal"], c["kode"]))
     p_riwayat.parent.mkdir(parents=True, exist_ok=True)

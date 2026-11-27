@@ -13,8 +13,12 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "harian (semua), berita, atau broker"
+        description: "harian (semua), berita, broker, atau posisi"
         default: harian
+      posisi:
+        description: "Keputusan posisi pengguna (terenkripsi dengan sandi web; diisi otomatis oleh halaman Rencana)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -59,6 +63,7 @@ jobs:
       - name: Bangun data (${{ env.MODE }})
         env:
           SANDI_WEB: ${{ secrets.SANDI_WEB || secrets.LEONARDUSANDY }}
+          POSISI_TERKUNCI: ${{ inputs.posisi }}
         run: python scripts/bangun.py "$MODE"
 
       - name: Siapkan halaman
