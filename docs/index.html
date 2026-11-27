@@ -974,8 +974,8 @@ async function ringkasBeranda(){
   const sapa=jam<11?"Selamat pagi":jam<15?"Selamat siang":jam<18?"Selamat sore":"Selamat malam";
   const tglTindak=tambahHariBursa(R.tanggal_data,1),lbl=labelTindak(tglTindak),hari=namaHari(tglTindak);
   const nilai=POSISI.map(p=>nilaiPosisi(p)),jual=nilai.filter(x=>x.keputusan==="jual").length,tahan=nilai.filter(x=>x.keputusan!=="jual"&&x.keputusan!=="data").length;
-  const dipegang=new Set(POSISI.map(p=>p.kode)),cepat=rekomendasiBeli().filter(b=>!dipegang.has(b.kode)&&!b.tunda&&(b.ib?.utama??true)).length;
-  const swing=(SW?.tanggal===R.tanggal_data?SW.pilihan:[]).filter(b=>b.utama&&!dipegang.has(b.kode)).length,boleh=!!R.pasar_mendukung;
+  const dipegang=new Set(POSISI.map(p=>p.kode)),rk=rekomendasiBeli().filter(b=>!dipegang.has(b.kode)&&!b.tunda),cepat=[...rk.filter(b=>b.ib?.utama??true),...rk.filter(b=>b.ib&&!b.ib.utama)].slice(0,3).length;
+  const cepatKode=[...rk.filter(b=>b.ib?.utama??true),...rk.filter(b=>b.ib&&!b.ib.utama)].slice(0,3).map(b=>b.kode),swing=(SW?.tanggal===R.tanggal_data?SW.pilihan:[]).filter(b=>b.utama&&!dipegang.has(b.kode)&&!cepatKode.includes(b.kode)).length,boleh=!!R.pasar_mendukung;
   const angka=(n,l,w,href)=>`<a class="ringkas-angka" href="${href}"><b style="color:${w}">${n}</b><span>${l}</span></a>`;
   $("beranda-ringkas").innerHTML=`<div class="ringkas-beranda">
     <div class="ringkas-kiri"><div class="ringkas-sapa">${sapa}</div>
@@ -1414,9 +1414,12 @@ function tampilAliran(){
   pasangSaringLapis($("aliran-saring"),SARING_A,tampilAliran);
   const r=GABUNG.filter(s=>lolosLapis(s,SARING_A)).filter(PRESET_ALIRAN[presetAliran]).map(s=>({...s,rasio:BR?.metrik[s.kode]?.rasio_akum5??null}));
   const uang=v=>v==null?"–":`<span class="${kelas(v)}">${rp(v)}</span>`;
+  const adaAkum=GABUNG.some(s=>s.akum5!=null||s.akum1!=null);
+  if(!adaAkum)$("aliran-preset").querySelectorAll("button").forEach(b=>{if(/umulasi|istribusi/.test(b.dataset.p))b.hidden=true});
   tabelUrut($("t-aliran"),[["kode","Kode",(v,s)=>`<b>${v}</b> ${lencanaLapis(s)}`],["tutup","Harga",v=>fmt(v)],["perubahan_pct","Ubah",v=>`<span class="${kelas(v)}">${pct(v)}</span>`],
     ["asing1","Asing 1h",uang],["asing5","Asing 5h",uang],["asing20","Asing 20h",uang],["asing_b","Asing beruntun",beruntunTeks],
-    ["akum1","Akumulasi 1h",uang],["akum5","Akumulasi 5h",uang],["akum_b","Akumulasi beruntun",beruntunTeks],["rasio","Akum./nilai 5h",v=>v==null?"–":`<span class="${kelas(v)}">${fmt(v,1)}%</span>`]],r,urutAliran);
+    ["akum1","Akumulasi 1h",uang],["akum5","Akumulasi 5h",uang],["akum_b","Akumulasi beruntun",beruntunTeks],["rasio","Akum./nilai 5h",v=>v==null?"–":`<span class="${kelas(v)}">${fmt(v,1)}%</span>`]].filter(k=>adaAkum||!/^akum|^rasio/.test(k[0])),r,urutAliran);
+  const kp=$("t-pasar-broker").closest(".kartu");if(kp)kp.hidden=!BR?.pasar_broker;
   const pb=BR?.pasar_broker;
   if(pb){$("pasar-broker-tgl").textContent="· "+(BR.pasar_broker_tanggal||"");
     tabelUrut($("t-pasar-broker"),[["kode","Broker",(v,s)=>`${lencanaBroker(v,s.kelas)} <span class="redup">${esc((s.nama||"").slice(0,24))}</span>`],["tval","Total",v=>rp(v)],["nval","Bersih",uang],["bval","Beli",v=>rp(v)],["sval","Jual",v=>rp(v)],["freq","Frekuensi",v=>fmt(v)]],pb.map(b=>({...b})),{k:"tval",turun:true},k=>{location.hash="#broker/"+k});
