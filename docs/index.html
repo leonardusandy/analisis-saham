@@ -801,10 +801,14 @@ function pasangPantau(){
 let TERBIT=null,AWAS_RUN=null;
 const REPO="leonardusandy/analisis-saham",ALUR="terbitkan.yml",GH="https://api.github.com/repos/"+REPO;
 const tokenLokal=()=>localStorage.getItem("token-perbarui-v1")||"";
+// Kalender Libur Bursa BEI 2026 (Peng-00171/BEI.POP/09-2025) dan 2027 (pengumuman 16 Sep 2026).
+// Sumber yang sama: scripts/data/libur_bursa.json. Tambahkan tahun berikutnya saat BEI mengumumkannya.
+const LIBUR_BURSA=new Set(["2026-01-01","2026-01-16","2026-02-16","2026-02-17","2026-03-18","2026-03-19","2026-03-20","2026-03-23","2026-03-24","2026-04-03","2026-05-01","2026-05-14","2026-05-15","2026-05-27","2026-05-28","2026-06-01","2026-06-16","2026-08-17","2026-08-25","2026-12-24","2026-12-25","2026-12-31","2027-01-01","2027-01-05","2027-02-05","2027-03-08","2027-03-09","2027-03-10","2027-03-11","2027-03-12","2027-03-15","2027-03-25","2027-03-26","2027-05-06","2027-05-17","2027-05-18","2027-05-19","2027-05-20","2027-06-01","2027-08-17","2027-12-24","2027-12-31"]);
+const bukanHariBursa=d=>[0,6].includes(d.getUTCDay())||LIBUR_BURSA.has(d.toISOString().slice(0,10));
 function hariBursaTerakhirJS(){
   const p=Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Jakarta",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(new Date()).map(x=>[x.type,x.value]));
   let d=new Date(Date.UTC(+p.year,+p.month-1,+p.day));const m=(+p.hour%24)*60+(+p.minute);
-  const libur=x=>[0,6].includes(x.getUTCDay());
+  const libur=bukanHariBursa;
   if(libur(d)||m<990)d=new Date(d-864e5);while(libur(d))d=new Date(d-864e5);
   return d.toISOString().slice(0,10);
 }
@@ -887,9 +891,10 @@ addEventListener("hashchange",tutupLaci);
 function jalankanJam(){
   const f=new Intl.DateTimeFormat("id-ID",{timeZone:"Asia/Jakarta",weekday:"long",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
   const tik=()=>{const p=Object.fromEntries(f.formatToParts(new Date()).map(x=>[x.type,x.value]));
-    const hari=p.weekday,m=(+p.hour)*60+(+p.minute),jumat=hari==="Jumat",kerja=!["Sabtu","Minggu"].includes(hari);
+    const hari=p.weekday,m=(+p.hour)*60+(+p.minute),jumat=hari==="Jumat",akhirPekan=["Sabtu","Minggu"].includes(hari),
+      tglIni=new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"}),liburBursa=LIBUR_BURSA.has(tglIni),kerja=!akhirPekan&&!liburBursa;
     const s1=m>=540&&m<(jumat?690:720), s2=m>=(jumat?840:810)&&m<950, pra=m>=525&&m<540;
-    const st=!kerja?"Bursa tutup (akhir pekan)":s1?"Sesi 1 berjalan":s2?"Sesi 2 berjalan":pra?"Pra-pembukaan":m>=950&&m<960?"Pra-penutupan":"Bursa tutup";
+    const st=!kerja?(liburBursa?"Libur bursa":"Bursa tutup (akhir pekan)"):s1?"Sesi 1 berjalan":s2?"Sesi 2 berjalan":pra?"Pra-pembukaan":m>=950&&m<960?"Pra-penutupan":"Bursa tutup";
     const kls=s1||s2?"buka":pra||(m>=950&&m<960)?"pra":"";
     $("jam").innerHTML=`<span class="waktu">${p.hour}.${p.minute}.${p.second}</span><span class="tgl">${hari}, ${p.day} ${p.month} ${p.year} · WIB</span><span class="sesi ${kls}">${st}</span>`;
     $("jam-kecil").innerHTML=`<b>${p.hour}.${p.minute}.${p.second} WIB</b><span class="st ${kls==="buka"?"buka":""}">${st}</span>`};
@@ -1309,7 +1314,7 @@ let POSISI=bacaLokal("posisi-v1",[]);
 const simpanPosisi=()=>simpanLokal("posisi-v1",POSISI);
 function hariBursaAntara(a,b){ // jumlah hari kerja setelah a sampai dengan b
   let n=0,d=new Date(a+"T00:00:00Z");const akhir=new Date(b+"T00:00:00Z");
-  while(d<akhir){d=new Date(+d+864e5);if(![0,6].includes(d.getUTCDay()))n++}
+  while(d<akhir){d=new Date(+d+864e5);if(!bukanHariBursa(d))n++}
   return n;
 }
 function namaHari(t){const d=new Date(t+"T00:00:00Z"),o={timeZone:"UTC"};
@@ -1321,7 +1326,7 @@ function labelTindak(t){
   const besok=new Date(Date.parse(kini+"T00:00:00Z")+864e5).toISOString().slice(0,10);
   return t===kini?"hari ini":t===besok?"besok":t<kini?"lewat":"";
 }
-function tambahHariBursa(a,n){let d=new Date(a+"T00:00:00Z");while(n>0){d=new Date(+d+864e5);if(![0,6].includes(d.getUTCDay()))n--}return d.toISOString().slice(0,10)}
+function tambahHariBursa(a,n){let d=new Date(a+"T00:00:00Z");while(n>0){d=new Date(+d+864e5);if(!bukanHariBursa(d))n--}return d.toISOString().slice(0,10)}
 const bulatHarga=(v,arah)=>{const t=v<200?1:v<500?2:v<2000?5:v<5000?10:25;return arah==="atas"?Math.ceil(v/t)*t:Math.floor(v/t)*t};
 function beritaSaham(k,jam=36){
   const arr=(B?.per_saham?.[k]||[]).concat((B?.pasar||[]).filter(b=>analisisBerita(b).some(a=>a.kode===k)));

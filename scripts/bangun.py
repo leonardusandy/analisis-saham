@@ -30,10 +30,13 @@ def jalan(nama: str, *args: str, wajib: bool = False) -> None:
 def hari_bursa_terakhir(kini):
     """Tanggal hari bursa terakhir yang sudah tutup (data Yahoo biasanya tersedia ±16.30 WIB)."""
     from datetime import timedelta
+    import json
+    libur = set(json.loads((Path(__file__).parent / "data" / "libur_bursa.json").read_text())["tanggal"])
+    bukan = lambda d: d.weekday() >= 5 or d.isoformat() in libur  # noqa: E731
     t = kini.date()
-    if kini.weekday() >= 5 or (kini.hour * 60 + kini.minute) < 16 * 60 + 30:
+    if bukan(t) or (kini.hour * 60 + kini.minute) < 16 * 60 + 30:
         t -= timedelta(days=1)
-    while t.weekday() >= 5:
+    while bukan(t):
         t -= timedelta(days=1)
     return t.isoformat()
 
