@@ -1,0 +1,25 @@
+name: Riset model (manual)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  riset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      DATA_KELUAR: _site/data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Pulihkan data (daftar saham & sektor)
+        uses: actions/cache/restore@v4
+        with:
+          path: _site/data
+          key: data-${{ github.run_id }}
+          restore-keys: data-
+      - run: pip install -r requirements.txt
+      - run: python scripts/riset_model.py
