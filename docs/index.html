@@ -277,6 +277,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
     <a href="#kandidat" data-h="kandidat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.8 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/></svg>Kandidat Besok</a>
     <a href="#model" data-h="model"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>Prediksi Model</a>
     <a href="#evaluasi" data-h="evaluasi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11"/></svg>Evaluasi</a>
+    <a href="#lapkeu" data-h="lapkeu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h7"/></svg>Laporan Keuangan Saya</a>
     <div class="grup">Pasar</div>
     <a href="#pasar" data-h="pasar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Pasar</a>
     <a href="#aliran" data-h="aliran"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11l-3-3M20 17H9l3 3"/></svg>Aliran Dana</a>
@@ -424,6 +425,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
     <section class="halaman" id="h-model"><div id="md-isi"><div class="kosong">Memuat…</div></div></section>
 
     <!-- EVALUASI PREDIKSI -->
+    <section class="halaman" id="h-lapkeu"><div id="lk-isi"><div class="kosong">Memuat…</div></div></section>
     <section class="halaman" id="h-evaluasi"><div id="ev-isi"><div class="kosong">Memuat…</div></div></section>
 
     <!-- ANALISA MANDIRI (TRADINGVIEW) -->
@@ -555,6 +557,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
         <div class="baris" style="margin-bottom:8px">
           <button class="tombol kedua chip aktif" data-b="semua">Semua</button>
           <button class="tombol kedua chip" data-b="pantau">Daftar pantau saya</button>
+          <button class="tombol kedua chip" data-b="aksi">Aksi korporasi</button>
           <label>Sentimen<select id="berita-sn"><option value="">Semua</option><option value="positif">▲ Positif</option><option value="negatif">▼ Negatif</option><option value="netral">■ Netral</option></select></label>
           <label>Kode saham<input id="berita-kode" placeholder="mis. BBCA" size="8"></label>
         </div>
@@ -755,13 +758,13 @@ window.addEventListener("hashchange",route);
 const sudah={};
 function route(){
   if(!R)return;const h=(location.hash||"#malam").slice(1);const [hal,arg]=h.split("/");
-  const nama=["malam","beranda","saham","pilihan","model","evaluasi","mandiri","pasar","aliran","bandar","broker","penyaring","kandidat","bandingkan","berita","jurnal","panduan"].includes(hal)?hal:"malam";
+  const nama=["malam","beranda","saham","pilihan","model","evaluasi","lapkeu","mandiri","pasar","aliran","bandar","broker","penyaring","kandidat","bandingkan","berita","jurnal","panduan"].includes(hal)?hal:"malam";
   document.querySelectorAll(".halaman").forEach(x=>x.classList.toggle("aktif",x.id==="h-"+nama));
   document.querySelectorAll("nav.menu a").forEach(x=>x.classList.toggle("aktif",x.dataset.h===nama));
   document.querySelectorAll(".pantau a").forEach(x=>x.classList.toggle("aktif",nama==="saham"&&x.dataset.k===arg));
   if(nama==="saham")tampilSaham((arg||"BBCA").toUpperCase());
   else if(nama==="broker"&&R){sudah.broker=1;tampilPelacak()}
-  else if(!sudah[nama]){sudah[nama]=1;({malam:tampilMalam,beranda:tampilBeranda,pilihan:tampilPilihan,model:tampilModel,evaluasi:tampilEvaluasi,mandiri:tampilMandiri,pasar:tampilPasar,aliran:tampilAliran,bandar:tampilBandar,broker:tampilPelacak,penyaring:tampilPenyaring,kandidat:tampilKandidat,bandingkan:tampilBandingkan,berita:tampilBerita,jurnal:tampilJurnal}[nama]||(()=>{}))()}
+  else if(!sudah[nama]){sudah[nama]=1;({malam:tampilMalam,beranda:tampilBeranda,pilihan:tampilPilihan,model:tampilModel,evaluasi:tampilEvaluasi,lapkeu:tampilLapkeu,mandiri:tampilMandiri,pasar:tampilPasar,aliran:tampilAliran,bandar:tampilBandar,broker:tampilPelacak,penyaring:tampilPenyaring,kandidat:tampilKandidat,bandingkan:tampilBandingkan,berita:tampilBerita,jurnal:tampilJurnal}[nama]||(()=>{}))()}
   window.scrollTo(0,0);
 }
 function bukaSaham(k){location.hash="#saham/"+k}
@@ -1009,17 +1012,37 @@ function tampilBerita(){
   document.querySelectorAll("#h-berita [data-b]").forEach(b=>b.onclick=()=>{modeBerita=b.dataset.b;document.querySelectorAll("#h-berita [data-b]").forEach(x=>x.classList.toggle("aktif",x===b));$("berita-kode").value="";saringBerita()});
   $("berita-kode").oninput=saringBerita;$("berita-sn").onchange=saringBerita;saringBerita();
 }
+// ----- aksi korporasi dari judul berita -----
+const POLA_AKSI=[["Dividen",/dividen|cum[ -]date|ex[ -]date|tanggal pembayaran/i],["RUPS",/\bRUPS|rapat umum pemegang saham/i],
+  ["Laporan keuangan",/laporan keuangan|lapkeu|laba bersih|rugi bersih|kinerja (kuartal|semester|9 bulan)|kuartal (i|ii|iii|iv|1|2|3|4)\b|semester [i1]\b|9M ?20|kuartal (pertama|kedua|ketiga)/i],
+  ["Right issue",/rights? issue|HMETD|private placement|penambahan modal/i],["Buyback",/buy ?back|pembelian kembali saham/i],
+  ["Stock split",/stock split|pemecahan (nilai )?saham|reverse split/i],["Akuisisi/merger",/akuisisi|mengakuisisi|caplok|merger|tender offer|penggabungan usaha/i],
+  ["Suspensi/UMA",/suspen|\bUMA\b|unusual market|papan pemantauan|full call auction|gembok/i],["Pergantian pengurus",/direktur utama baru|rombak (direksi|pengurus)|mundur dari jabatan/i]];
+function jenisAksi(judul){return POLA_AKSI.filter(([,r])=>r.test(judul||"")).map(([n])=>n)}
+function aksiSaham(k,hari=14){const batas=Date.now()-hari*864e5,lihat=new Set();
+  return(B?.per_saham?.[k]||[]).concat((B?.pasar||[]).filter(b=>(b.kode||[]).includes(k)))
+    .filter(b=>{if(lihat.has(b.judul))return false;lihat.add(b.judul);return(!b.waktu||new Date(b.waktu)>=batas)&&jenisAksi(b.judul).length})
+    .sort((a,b)=>(b.waktu||"").localeCompare(a.waktu||""))}
+function lencanaAksi(k){const j=[...new Set(aksiSaham(k).flatMap(b=>jenisAksi(b.judul)))];return j.map(x=>`<span class="lencana" title="Berita 14 hari terakhir" style="background:var(--hover);color:var(--teks)">📢 ${x}</span>`).join(" ")}
+const TAUTAN_IDX=k=>[["Profil & pengumuman emiten",`https://www.idx.co.id/id/perusahaan-tercatat/profil-perusahaan-tercatat/detail-profile-perusahaan?kodeEmiten=${k}`],
+  ["Laporan keuangan & tahunan","https://www.idx.co.id/id/perusahaan-tercatat/laporan-keuangan-dan-tahunan/"],
+  ["Keterbukaan informasi","https://www.idx.co.id/id/perusahaan-tercatat/keterbukaan-informasi/"]];
+function kotakIDX(k){return`<div class="kartu" style="padding:10px 12px;margin-bottom:10px"><b>Dokumen resmi ${k} di IDX</b>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0">${TAUTAN_IDX(k).map(([n,u])=>`<a class="tombol kedua chip" href="${u}" target="_blank" rel="noopener">${n} ↗</a>`).join("")}</div>
+  <div class="redup" style="font-size:12px">Di halaman laporan keuangan, isi kode <b>${k}</b>, pilih tahun dan periode, lalu unduh file <b>Excel (.xlsx)</b>. Unggah file itu di menu <a href="#lapkeu">Laporan Keuangan Saya</a>.</div></div>`}
 function saringBerita(){
   if(!B){$("berita-semua").innerHTML='<div class="kosong">Berita belum tersedia.</div>';return}
   const q=$("berita-kode").value.trim().toUpperCase();let arr;
   if(q)arr=B.per_saham[q]||[];
   else if(modeBerita==="pantau"){const m=new Map();PANTAU.forEach(k=>(B.per_saham[k]||[]).forEach(b=>m.set(b.judul,b)));arr=[...m.values()].sort((a,b)=>b.waktu.localeCompare(a.waktu))}
+  else if(modeBerita==="aksi"){const m=new Map();[...B.pasar,...Object.values(B.per_saham).flat()].forEach(b=>{if(jenisAksi(b.judul).length)m.set(b.judul,b)});arr=[...m.values()].sort((a,b)=>(b.waktu||"").localeCompare(a.waktu||""))}
   else arr=B.pasar;
   const sn=$("berita-sn").value;
   if(sn)arr=arr.filter(b=>q?sentimenUntuk(b,q)===sn:analisisBerita(b).some(x=>x.sentimen===sn)||(!analisisBerita(b).length&&(b.sentimen?.label||"netral")===sn));
   const hitung=l=>arr.filter(b=>(q?sentimenUntuk(b,q):(b.sentimen?.label||"netral"))===l).length;
   $("berita-info").innerHTML=`${arr.length} berita · diperbarui ${B.dibuat}${B.ai?" · analisis AI aktif":" · sentimen dari kata kunci"}${q?` · untuk ${esc(q)}: <span class="naik">▲ ${hitung("positif")}</span> <span class="turun">▼ ${hitung("negatif")}</span>`:""}`;
-  $("berita-semua").innerHTML=daftarBerita(arr.slice(0,100),q||null);
+  $("berita-semua").innerHTML=(q&&PETA[q]?kotakIDX(q):"")+(modeBerita==="aksi"&&!q?`<p class="redup" style="margin:4px 0 8px">Berita dividen, RUPS, laporan keuangan, right issue, buyback, stock split, akuisisi, dan suspensi dari media, dikenali dari judulnya. Untuk dokumen resmi, buka halaman IDX lewat halaman tiap saham.</p>`:"")
+    +daftarBerita(arr.slice(0,100),q||null);
 }
 
 // ================= halaman saham =================
@@ -1036,8 +1059,8 @@ async function tampilSaham(kode){
   $("s-bintang").textContent=PANTAU.includes(kode)?"★":"☆";$("s-bintang").onclick=()=>togglePantau(kode);
   $("s-statcepat").innerHTML=[["Kapitalisasi","Rp"+rp(s.kapitalisasi)],["PER",fmt(s.per,1)],["PBV",fmt(s.pbv,2)],["ROE",s.roe==null?"–":fmt(s.roe,1)+"%"],["Imbal dividen",s.imbal_dividen==null?"–":fmt(s.imbal_dividen,2)+"%"],["RSI",fmt(s.rsi,0)],["Skor sinyal",s.skor],["Asing 5 hari",s.asing5==null?"–":`<span class="${kelas(s.asing5)}">Rp${rp(s.asing5)}</span>`]].map(([a,b])=>`<div><span class="label">${a}</span><b>${b}</b></div>`).join("");
   ["p-kunci","p-keuangan","p-dividen","p-asing","p-sinyal"].forEach(id=>$(id).innerHTML='<div class="kosong">Memuat…</div>');
-  {const bs=B?.per_saham[kode]||[];const n=l=>bs.filter(b=>sentimenUntuk(b,kode)===l).length;
-   $("s-berita").innerHTML=(bs.length?`<div class="statistik" style="margin-bottom:8px"><div><span class="label">Berita 14 hari</span><b>${bs.length}</b></div><div><span class="label">Positif</span><b class="naik">▲ ${n("positif")}</b></div><div><span class="label">Negatif</span><b class="turun">▼ ${n("negatif")}</b></div><div><span class="label">Netral/campuran</span><b>${n("netral")+n("campuran")}</b></div></div>`:"")+daftarBerita(bs,kode);}
+  {const bs=B?.per_saham[kode]||[];const n=l=>bs.filter(b=>sentimenUntuk(b,kode)===l).length;const ak=aksiSaham(kode);
+   $("s-berita").innerHTML=kotakIDX(kode)+(ak.length?`<div class="kartu" style="padding:10px 12px;margin-bottom:10px"><b>Aksi korporasi (berita 14 hari)</b>${ak.slice(0,6).map(b=>`<div style="margin-top:6px">${jenisAksi(b.judul).map(x=>`<span class="lencana">${x}</span>`).join(" ")} <a href="${esc(b.tautan)}" target="_blank" rel="noopener">${esc(b.judul)}</a> <span class="redup" style="font-size:12px">${esc(b.sumber||"")}</span></div>`).join("")}</div>`:"")+(bs.length?`<div class="statistik" style="margin-bottom:8px"><div><span class="label">Berita 14 hari</span><b>${bs.length}</b></div><div><span class="label">Positif</span><b class="naik">▲ ${n("positif")}</b></div><div><span class="label">Negatif</span><b class="turun">▼ ${n("negatif")}</b></div><div><span class="label">Netral/campuran</span><b>${n("netral")+n("campuran")}</b></div></div>`:"")+daftarBerita(bs,kode);}
   const [h,f]=await Promise.allSettled([ambil(`data/saham/${kode}.json`),ambil(`data/fundamental/${kode}.json`)]);
   DETAIL={h:h.value,f:f.status==="fulfilled"?f.value:null,kode};
   gambarGrafik();panelKunci();panelKeuangan("tahunan");panelDividen();panelAsing(kode);panelSinyal();panelMilik(kode);panelBrokerSaham(kode);
@@ -1413,7 +1436,7 @@ async function tampilMalam(){
        <input type="hidden" id="ml-ubah"><div class="ml-form-tombol"><button class="tombol" type="submit">Simpan posisi</button><button class="tombol kedua" type="button" id="ml-batal">Batal</button></div>
      </form>
      <div class="ml-posisi">${nilai.map(x=>{const s=x.s;return`<div class="ml-kartu" style="border-left-color:${WARNA[x.keputusan]}">
-       <div class="ml-atas"><div><a href="#saham/${x.p.kode}" class="ml-kode">${x.p.kode}</a> <span class="redup">${x.p.lot} lot · beli ${fmt(x.p.beli)} · ${tglPendek(x.p.tgl)} · hari ke-${x.hari}</span></div>
+       <div class="ml-atas"><div><a href="#saham/${x.p.kode}" class="ml-kode">${x.p.kode}</a> ${lencanaAksi(x.p.kode)} <span class="redup">${x.p.lot} lot · beli ${fmt(x.p.beli)} · ${tglPendek(x.p.tgl)} · hari ke-${x.hari}</span></div>
          <span class="ml-putusan" style="background:${WARNA[x.keputusan]}">${esc(x.judul)}</span></div>
        ${s?`<div class="ml-angka"><div><span class="label">Penutupan</span><b>${fmt(x.c)}</b><span class="${kelas(s.perubahan_pct)}">${pct(s.perubahan_pct)} hari ini</span></div>
          <div><span class="label">Untung/rugi</span><b class="${kelas(x.untung)}">${pct(x.untung)}</b><span class="${kelas(x.untung)}">Rp${fmt(Math.round(x.p.lot*100*(x.c-x.p.beli)))}</span><span class="redup" title="Setelah biaya beli 0,15% dan jual 0,25%">bersih ${pct(x.bersih)} · Rp${fmt(Math.round(x.p.lot*100*(x.c*(1-0.0025)-x.p.beli*(1+0.0015))))}</span></div>
@@ -1431,7 +1454,7 @@ async function tampilMalam(){
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Saham potensial dibeli ${sebut}</h3>
      ${!R.pasar_mendukung?'<div class="pita waspada" style="margin-bottom:10px"><b>Pasar lemah (IHSG di bawah MA20).</b> Menurut uji 3 tahun, membeli saat pasar lemah lebih sering rugi. Daftar ini hanya untuk dipantau.</div>':""}
      <div class="ml-beli">${beli.map(b=>{const u=hitungLot(b.entry[1],b.cl),br=beritaSaham(b.kode);return`<div class="ml-kartu" style="border-left-color:var(--aksen)">
-       <div class="ml-atas"><div><a href="#saham/${b.kode}" class="ml-kode">${b.kode}</a> <span class="redup">${esc(b.sektor||"")}</span></div>${b.lencana}</div>
+       <div class="ml-atas"><div><a href="#saham/${b.kode}" class="ml-kode">${b.kode}</a> <span class="redup">${esc(b.sektor||"")}</span> ${lencanaAksi(b.kode)}</div>${b.lencana}</div>
        <div class="ml-angka"><div><span class="label">Beli di</span><b>${fmt(b.entry[0])}${b.entry[1]!==b.entry[0]?"–"+fmt(b.entry[1]):""}</b></div>
          <div><span class="label">Batas rugi</span><b class="turun">${fmt(b.cl)}</b><span class="redup">${pct((b.cl/b.entry[1]-1)*100)}</span></div>
          <div><span class="label">Sasaran 1:3</span><b class="naik">${fmt(b.t3)}</b><span class="redup">${pct((b.t3/b.entry[1]-1)*100)} · resistance ${fmt(b.r1)}</span></div>
@@ -1447,6 +1470,17 @@ async function tampilMalam(){
      <p class="redup" style="font-size:12px;margin:6px 0 0">${sekM.length?"Sektor menguat: "+sekM.join(", ")+". ":""}${sekL.length?"Sektor melemah: "+sekL.join(", ")+".":""}</p></div>`;
   pasangMalam();
   kirimPosisi(nilai);
+}
+async function kirimTerkunci(isi,mode){
+  const bit=localStorage.getItem("kunci-v1")||sessionStorage.getItem("kunci-v1");
+  if(!INFO_KUNCI||!bit)throw new Error("kunci");
+  if(!tokenLokal())throw new Error("token");
+  const kunci=await crypto.subtle.importKey("raw",dariB64(bit),"AES-GCM",false,["encrypt"]);
+  const gz=new Uint8Array(await new Response(new Blob([JSON.stringify(isi)]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer());
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},kunci,gz));
+  const gabung=new Uint8Array(12+ct.length);gabung.set(iv);gabung.set(ct,12);
+  await api(`/actions/workflows/${ALUR}/dispatches`,{method:"POST",body:JSON.stringify({ref:"main",inputs:{mode,posisi:keB64(gabung)}})});
 }
 async function kirimPosisi(nilai,paksa=false){
   const el=$("ml-kirim");if(!el)return;
@@ -1991,6 +2025,143 @@ async function tampilKandidat(){
       <div class="redup">Ukuran disarankan <b style="color:var(--teks)">${fmt(uk.lot)} lot</b> (≈Rp${fmt(uk.nilai)}; rugi maks ≈Rp${fmt(uk.rugi)})</div>
       <ul class="alasan">${s.alasan.map(a=>`<li class="${a.startsWith("Peringatan")?"peringatan":""}">${a}</li>`).join("")}</ul>
       <div class="redup">Uji balik saham ini: ${u.jumlah?`${u.jumlah} sinyal, menang ${fmt(u.persen_menang,0)}%, rata-rata <span class="${kelas(u.rata_hasil_pct)}">${pct(u.rata_hasil_pct)}</span>`:"belum ada sinyal"}</div></div>`}).join("");
+}
+
+// ================= laporan keuangan saya (unggahan Excel IDX) =================
+let LK=null,LK_BARU=[],XLSX_SIAP=null;
+async function muatLK(){if(LK===null){try{LK=await ambil("data/lapkeu.json")}catch(e){LK={saham:{}}}}return LK}
+function lkSemua(){
+  const a={},tambah=(k,x)=>{(a[k]=a[k]||[]);const i=a[k].findIndex(y=>y.periode===x.periode);if(i<0)a[k].push(x);else if((x.diunggah||"")>(a[k][i].diunggah||""))a[k][i]=x};
+  Object.entries(LK?.saham||{}).forEach(([k,v])=>v.forEach(x=>tambah(k,x)));
+  Object.entries(bacaLokal("lapkeu-v1",{})).forEach(([k,v])=>v.forEach(x=>tambah(k,x)));
+  const hapus=new Set(bacaLokal("lapkeu-hapus-v1",[]));
+  for(const k in a){a[k]=a[k].filter(x=>!hapus.has(k+"|"+x.periode)).sort((x,y)=>(y.akhir||"").localeCompare(x.akhir||""));if(!a[k].length)delete a[k]}
+  return a;
+}
+function muatXLSX(){return XLSX_SIAP||(XLSX_SIAP=new Promise((ok,gagal)=>{const el=document.createElement("script");el.src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";el.onload=()=>ok(window.XLSX);el.onerror=()=>{XLSX_SIAP=null;gagal(new Error("Pustaka pembaca Excel gagal dimuat. Periksa internet lalu coba lagi."))};document.head.appendChild(el)}))}
+const LK_POLA={
+  total_aset:[/^total assets$/,/^jumlah aset$/],
+  aset_lancar:[/^total current assets$/,/^jumlah aset lancar$/],
+  liab_lancar:[/^total current liabilities$/,/^jumlah liabilitas jangka pendek$/],
+  total_liab:[/^total liabilities$/,/^jumlah liabilitas$/],
+  ekuitas_induk:[/^total equity attributable to (equity )?owners of (the )?parent( entity)?$/,/^jumlah ekuitas yang dapat diatribusikan kepada pemilik entitas induk$/],
+  total_ekuitas:[/^total equity$/,/^jumlah ekuitas$/],
+  pendapatan:[/^(total )?(sales and revenues?|revenues?|net revenues?|net sales|sales)$/,/^(jumlah )?(penjualan dan pendapatan usaha|pendapatan( usaha)?|penjualan( bersih)?|pendapatan bersih)$/,/^(total )?interest income$/,/^(jumlah )?pendapatan bunga$/],
+  laba_kotor:[/^(total )?gross profit( \(loss\))?$/,/^(jumlah )?laba( \(rugi\))? bruto$/],
+  laba_induk:[/^profit \(loss\) attributable to (equity owners of )?(the )?parent( entity)?$/,/^laba \(rugi\) yang dapat diatribusikan ke(pada)? (pemilik )?entitas induk$/],
+  laba:[/^(total )?profit \(loss\)( for the period)?$/,/^(jumlah )?laba \(rugi\)( periode berjalan)?$/],
+  cfo:[/^(total )?net cash flows? received from \(used in\) operating activities$/,/^(jumlah )?arus kas bersih yang diperoleh dari \(digunakan untuk\) aktivitas operasi$/],
+};
+const LK_INFO={kode:/^(entity code|kode entitas)$/,periode:/^(period of financial statements submissions|periode penyampaian laporan keuangan)$/,
+  akhir:/^(current period end date|tanggal akhir periode berjalan)$/,nama:/^(entity name|nama entitas)$/,bulat:/^(level of rounding used in financial statements|pembulatan yang digunakan dalam penyajian jumlah dalam laporan keuangan)$/};
+const lkTeks=x=>String(x).replace(/\s+/g," ").trim().toLowerCase();
+function lkBulan(teks,akhir){const t=(teks||"").toLowerCase();
+  if(/tahunan|annual/.test(t))return 12;if(/kuartal iii|third quarter|\bq3\b|triwulan iii/.test(t))return 9;
+  if(/kuartal ii|second quarter|semester|tengah tahun|\bq2\b|triwulan ii/.test(t))return 6;if(/kuartal i|first quarter|\bq1\b|triwulan i/.test(t))return 3;
+  const m=+(akhir||"").slice(5,7);return m?({3:3,6:6,9:9,12:12}[m]||12):12}
+function lkTanggal(v){if(typeof v==="number"){const d=new Date(Math.round((v-25569)*864e5));return d.toISOString().slice(0,10)}
+  const t=String(v||"").trim();let m=t.match(/(\d{4})-(\d{2})-(\d{2})/);if(m)return m[0];m=t.match(/(\d{1,2})[\/ -](\d{1,2})[\/ -](\d{4})/);return m?`${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`:""}
+async function lkBaca(file){
+  const XLSX=await muatXLSX();
+  const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});
+  const nilai={},info={};
+  for(const nm of wb.SheetNames){
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[nm],{header:1,raw:true,blankrows:false});
+    for(const r of rows){
+      const teks=r.filter(c=>typeof c==="string"&&c.trim()),angka=r.filter(c=>typeof c==="number"&&isFinite(c));
+      for(const t of teks){const tl=lkTeks(t);
+        for(const[kunci,pola] of Object.entries(LK_INFO))if(!info[kunci]&&pola.test(tl)){
+          const lain=r.find(c=>c!==t&&c!==""&&c!=null&&!(typeof c==="string"&&Object.values(LK_INFO).some(p=>p.test(lkTeks(c)))));
+          if(lain!=null)info[kunci]=lain}
+        if(!angka.length)continue;
+        for(const[kunci,pola] of Object.entries(LK_POLA))if(!nilai[kunci]&&pola.some(p=>p.test(tl)))nilai[kunci]={kini:angka[0],lalu:angka.length>1?angka[1]:null,lembar:nm};
+      }
+    }
+  }
+  let kode=String(info.kode||"").trim().toUpperCase().slice(0,4);
+  if(!/^[A-Z]{4}$/.test(kode))kode=(file.name.match(/([A-Z]{4})(?=[^A-Za-z]*\.xlsx?$)/i)||[])[1]?.toUpperCase()||"";
+  const akhir=lkTanggal(info.akhir),bulan=lkBulan(String(info.periode||""),akhir);
+  const bt=String(info.bulat||"").toLowerCase(),kali=/miliar|billion/.test(bt)?1e9:/juta|million/.test(bt)?1e6:/ribu|thousand/.test(bt)?1e3:1;
+  return lkHitung({kode,nama:info.nama?String(info.nama):"",periode_teks:String(info.periode||""),akhir,bulan,nilai,kali,berkas:file.name});
+}
+function lkHitung(x){
+  const v=x.nilai,k=(n,i)=>v[n]?.[i];const bagi=(a,b)=>a!=null&&b?a/b:null;
+  const ni=k("laba_induk","kini")??k("laba","kini"),ni1=k("laba_induk","lalu")??k("laba","lalu");
+  const eq=k("ekuitas_induk","kini")??k("total_ekuitas","kini"),f=12/x.bulan;
+  const pend=k("pendapatan","kini"),pend1=k("pendapatan","lalu"),gp=k("laba_kotor","kini"),gp1=k("laba_kotor","lalu");
+  const cfo=k("cfo","kini"),te=k("total_ekuitas","kini"),te1=k("total_ekuitas","lalu"),tl=k("total_liab","kini"),tl1=k("total_liab","lalu");
+  const bank=!v.aset_lancar||/interest/.test(String(v.pendapatan?.lembar||""));
+  const r={roe:ni!=null&&eq>0?ni*f/eq*100:null,roa:bagi(ni!=null?ni*f:null,k("total_aset","kini")),
+    laba_tumbuh:ni!=null&&ni1>0?(ni/ni1-1)*100:null,pend_tumbuh:pend!=null&&pend1>0?(pend/pend1-1)*100:null,
+    margin_kotor:bagi(gp,pend),margin_kotor_lalu:bagi(gp1,pend1),margin_bersih:bagi(ni,pend),
+    der:bagi(tl,te),der_lalu:bagi(tl1,te1),cr:bagi(k("aset_lancar","kini"),k("liab_lancar","kini")),cr_lalu:bagi(k("aset_lancar","lalu"),k("liab_lancar","lalu")),
+    laba:ni==null?null:ni*(x.kali||1),laba_lalu:ni1==null?null:ni1*(x.kali||1),cfo:cfo==null?null:cfo*(x.kali||1)};
+  if(r.roa!=null)r.roa*=100;
+  const syarat=[["Laba positif",ni==null?null:ni>0],["Arus kas operasi positif",cfo==null?null:cfo>0],["Arus kas > laba (laba berkualitas)",cfo==null||ni==null?null:cfo>ni],
+    ["Laba tumbuh vs periode sama tahun lalu",r.laba_tumbuh==null?(ni!=null&&ni1!=null&&ni1<=0?ni>ni1:null):r.laba_tumbuh>0],["Pendapatan tumbuh",r.pend_tumbuh==null?null:r.pend_tumbuh>0],
+    ["Margin kotor naik",r.margin_kotor==null||r.margin_kotor_lalu==null?null:r.margin_kotor>r.margin_kotor_lalu],
+    ["Utang/ekuitas turun vs akhir tahun lalu",r.der==null||r.der_lalu==null?null:r.der<=r.der_lalu],["Likuiditas membaik",bank||r.cr==null||r.cr_lalu==null?null:r.cr>r.cr_lalu]];
+  const ada=syarat.filter(s=>s[1]!=null);
+  const skor=ada.filter(s=>s[1]).length,terdata=ada.length;
+  const putusan=ni==null?"tidak terbaca":ni<=0?"lemah":(cfo!=null&&cfo<0)?"waspada":(r.laba_tumbuh!=null&&r.laba_tumbuh>0&&(r.roe??0)>=10&&(bank||r.der==null||r.der<=2))?"kuat":"sedang";
+  const periode=`${(x.akhir||"").slice(0,4)}-${x.bulan===12?"TAHUNAN":"Q"+x.bulan/3}`;
+  return{kode:x.kode,nama:x.nama,periode,periode_teks:x.periode_teks,akhir:x.akhir,bulan:x.bulan,bank,putusan,syarat,skor,terdata,
+    rasio:Object.fromEntries(Object.entries(r).map(([a,b])=>[a,b==null||!isFinite(b)?null:Math.round(b*100)/100])),
+    terbaca:Object.keys(v).length,berkas:x.berkas,diunggah:new Date().toISOString().slice(0,16)};
+}
+const LK_WARNA={kuat:"var(--hijau)",sedang:"var(--kuning)",waspada:"var(--kuning)",lemah:"var(--merah)","tidak terbaca":"var(--redup)"};
+function kartuLK(x,baru=false){const r=x.rasio||{};
+  return`<div class="ml-kartu" style="border-left-color:${LK_WARNA[x.putusan]}">
+    <div class="ml-atas"><div><a href="#saham/${x.kode}" class="ml-kode">${x.kode||"????"}</a> <span class="redup">${esc(x.periode)} · akhir ${esc(x.akhir||"–")}${x.bank?" · format bank/keuangan":""}</span></div><span class="ml-putusan" style="background:${LK_WARNA[x.putusan]}">Fundamental ${x.putusan}</span></div>
+    <div class="ml-angka"><div><span class="label">Laba bersih</span><b class="${kelas(r.laba)}">Rp${rp(r.laba)}</b><span class="${kelas(r.laba_tumbuh)}">${r.laba_tumbuh==null?"–":pct(r.laba_tumbuh)} vs tahun lalu</span></div>
+      <div><span class="label">ROE (disetahunkan)</span><b>${r.roe==null?"–":fmt(r.roe,1)+"%"}</b><span class="redup">ROA ${r.roa==null?"–":fmt(r.roa,1)+"%"}</span></div>
+      <div><span class="label">Pendapatan</span><b class="${kelas(r.pend_tumbuh)}">${r.pend_tumbuh==null?"–":pct(r.pend_tumbuh)}</b><span class="redup">margin bersih ${r.margin_bersih==null?"–":fmt(r.margin_bersih*100,1)+"%"}</span></div>
+      <div><span class="label">Utang/ekuitas</span><b>${r.der==null?"–":fmt(r.der,2)+"×"}</b><span class="redup">${r.cr==null?"":"rasio lancar "+fmt(r.cr,2)}</span></div></div>
+    <div class="redup" style="font-size:12px;margin-top:6px">Skor sehat <b style="color:var(--teks)">${x.skor??r.skor??"–"}/${x.terdata??"–"}</b>: ${(x.syarat||[]).filter(s=>s[1]!=null).map(s=>`${s[1]?"✓":"✗"} ${s[0]}`).join(" · ")}</div>
+    ${x.terbaca<6?`<div style="color:var(--kuning);font-size:12px;margin-top:4px">Hanya ${x.terbaca} pos terbaca dari file ini; hasil mungkin kurang lengkap.</div>`:""}
+    ${baru?"":`<div class="ml-aksi"><button class="tombol kedua chip" data-lk-hapus="${x.kode}|${esc(x.periode)}">Hapus</button></div>`}</div>`}
+async function tampilLapkeu(){
+  await muatLK();
+  const semua=lkSemua(),daftar=Object.entries(semua).sort(([a],[b])=>a.localeCompare(b));
+  $("lk-isi").innerHTML=`
+   <div class="kartu" style="margin-bottom:14px"><h3 style="margin:0">Laporan Keuangan Saya</h3>
+     <p class="redup" style="margin:6px 0 10px">Untuk saham yang Anda anggap potensial: unduh laporan keuangan terbaru dari IDX, lalu unggah di sini. Web membaca file Excel di perangkat Anda, menghitung rasio dan skor sehat, lalu menyimpannya (terenkripsi) agar terlihat di semua perangkat dan dipakai di Rencana swing.</p>
+     <ol style="margin:0 0 10px 18px;padding:0;font-size:14px"><li>Buka <a href="https://www.idx.co.id/id/perusahaan-tercatat/laporan-keuangan-dan-tahunan/" target="_blank" rel="noopener"><b>Laporan Keuangan dan Tahunan di IDX ↗</b></a>.</li>
+       <li>Pilih <b>Saham</b>, isi kode emiten, pilih tahun dan periode terbaru (misalnya Triwulan III), lalu klik Cari.</li>
+       <li>Unduh file berakhiran <b>.xlsx</b> (biasanya bernama <i>FinancialStatement-…-KODE.xlsx</i>), bukan PDF.</li>
+       <li>Pilih file itu di bawah ini. Boleh beberapa file sekaligus.</li></ol>
+     <label class="tombol" style="display:inline-block;cursor:pointer">Pilih file Excel IDX<input type="file" id="lk-file" accept=".xlsx,.xls" multiple hidden></label>
+     <span class="redup" id="lk-status" style="margin-left:8px"></span>
+     <div id="lk-pratinjau" style="margin-top:12px"></div></div>
+   <div class="kartu"><h3 style="margin-top:0">Tersimpan (${daftar.length} saham)</h3>
+     <div class="ml-posisi">${daftar.map(([k,v])=>kartuLK(v[0])+(v.length>1?`<div class="redup" style="font-size:12px;margin:-4px 0 8px 6px">Periode lain: ${v.slice(1).map(y=>`${esc(y.periode)} (${y.putusan})`).join(", ")}</div>`:"")).join("")||'<div class="kosong">Belum ada laporan yang diunggah.</div>'}</div>
+     <p class="redup" style="font-size:12px;margin:10px 0 0">Penilaian: <b>kuat</b> = laba positif dan tumbuh, ROE ≥ 10%, arus kas operasi tidak negatif, utang/ekuitas ≤ 2 (kecuali bank). <b>Lemah</b> = rugi. <b>Waspada</b> = laba positif tetapi arus kas operasi negatif. Laba kuartalan dibandingkan dengan periode yang sama tahun lalu; ROE disetahunkan.</p></div>`;
+  $("lk-file").onchange=async e=>{
+    const files=[...e.target.files];if(!files.length)return;$("lk-status").textContent="Membaca file…";LK_BARU=[];
+    for(const f of files){try{LK_BARU.push(await lkBaca(f))}catch(err){LK_BARU.push({gagal:f.name+": "+err.message})}}
+    $("lk-status").textContent="";
+    const ok=LK_BARU.filter(x=>!x.gagal);
+    $("lk-pratinjau").innerHTML=LK_BARU.filter(x=>x.gagal).map(x=>`<div class="turun">${esc(x.gagal)}</div>`).join("")
+      +ok.map(x=>`${!/^[A-Z]{4}$/.test(x.kode)?`<label>Kode saham untuk ${esc(x.berkas)} <input data-lk-kode="${esc(x.berkas)}" size="6" style="text-transform:uppercase"></label>`:""}${kartuLK(x,true)}`).join("")
+      +(ok.length?`<button class="tombol" id="lk-simpan">Simpan ${ok.length} laporan</button> <span class="redup" id="lk-kirim"></span>`:"");
+    if(ok.length)$("lk-simpan").onclick=simpanLK;
+  };
+  document.querySelectorAll("[data-lk-hapus]").forEach(b=>b.onclick=async()=>{
+    const h=bacaLokal("lapkeu-hapus-v1",[]);h.push(b.dataset.lkHapus);simpanLokal("lapkeu-hapus-v1",h);
+    const [k,p]=b.dataset.lkHapus.split("|");const lok=bacaLokal("lapkeu-v1",{});if(lok[k]){lok[k]=lok[k].filter(x=>x.periode!==p);simpanLokal("lapkeu-v1",lok)}
+    try{await kirimTerkunci({hapus_lapkeu:[b.dataset.lkHapus]},"lapkeu")}catch(e){}
+    tampilLapkeu()});
+}
+async function simpanLK(){
+  document.querySelectorAll("[data-lk-kode]").forEach(i=>{const x=LK_BARU.find(y=>y.berkas===i.dataset.lkKode);if(x&&/^[A-Za-z]{4}$/.test(i.value.trim()))x.kode=i.value.trim().toUpperCase()});
+  const ok=LK_BARU.filter(x=>!x.gagal&&/^[A-Z]{4}$/.test(x.kode));
+  if(!ok.length){$("lk-kirim").textContent="Isi kode saham dulu.";return}
+  const lok=bacaLokal("lapkeu-v1",{}),hapus=new Set(bacaLokal("lapkeu-hapus-v1",[]));
+  ok.forEach(x=>{lok[x.kode]=(lok[x.kode]||[]).filter(y=>y.periode!==x.periode);lok[x.kode].push(x);hapus.delete(x.kode+"|"+x.periode)});
+  simpanLokal("lapkeu-v1",lok);simpanLokal("lapkeu-hapus-v1",[...hapus]);
+  $("lk-kirim").textContent="Tersimpan di perangkat ini. Mengirim ke web…";
+  try{await kirimTerkunci({lapkeu:ok},"lapkeu");$("lk-kirim").innerHTML='<span class="naik">Terkirim (terenkripsi).</span> Muncul di semua perangkat setelah pembaruan berikutnya selesai (±5 menit).';setTimeout(tampilLapkeu,1500)}
+  catch(e){$("lk-kirim").innerHTML=e.message==="token"?'Tersimpan di perangkat ini saja. Agar muncul di perangkat lain, pasang token di panel <b>Perbarui</b> (kanan atas).':`<span class="turun">Gagal mengirim (kode ${esc(e.message)}).</span> Tersimpan di perangkat ini.`;setTimeout(tampilLapkeu,2500)}
 }
 
 // ================= bandingkan =================

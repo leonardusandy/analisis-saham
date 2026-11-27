@@ -75,6 +75,7 @@ def main():
         print("Data harga tertinggal dari hari bursa terakhir: dijalankan sebagai mode harian (susulan).")
 
     jalan("semesta", wajib=True)
+    jalan("lapkeu")  # laporan keuangan unggahan pengguna (hanya berubah bila ada kiriman mode lapkeu)
     if mode == "harian" or not ada("ringkasan.json"):
         jalan("jalankan", wajib=True)
     if mode == "harian" or not ada("fundamental.json"):

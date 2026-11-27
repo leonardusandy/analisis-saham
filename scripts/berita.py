@@ -36,6 +36,10 @@ SUMBER_PASAR = [
         "(IHSG OR saham OR emiten OR bursa) when:2d (site:kontan.co.id OR site:bisnis.com OR "
         "site:idxchannel.com OR site:emitennews.com OR site:investor.id OR site:katadata.co.id OR "
         "site:cnbcindonesia.com OR site:idnfinancials.com)")),
+    # aksi korporasi: dividen, RUPS, laporan keuangan, right issue, buyback, stock split
+    ("Google News", GN + quote_plus(
+        '(dividen OR "cum date" OR RUPS OR "laporan keuangan" OR "right issue" OR HMETD OR buyback OR "stock split") '
+        '(saham OR emiten OR Tbk) when:3d')),
 ]
 
 # Nama lain yang sering dipakai media untuk emiten LQ45
