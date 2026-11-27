@@ -1,6 +1,10 @@
 name: Riset model (manual)
 on:
   workflow_dispatch:
+    inputs:
+      skrip:
+        description: "riset_model atau riset_model2"
+        default: riset_model2
 permissions:
   contents: read
 jobs:
@@ -22,4 +26,4 @@ jobs:
           key: data-${{ github.run_id }}
           restore-keys: data-
       - run: pip install -r requirements.txt
-      - run: python scripts/riset_model.py
+      - run: python scripts/${{ inputs.skrip }}.py

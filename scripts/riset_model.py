@@ -147,7 +147,7 @@ def ciri_saham(df: pd.DataFrame) -> pd.DataFrame:
     return f
 
 
-def main():
+def bangun_data():
     t0 = time.time()
     kode = cfg.kode_semesta()
     data = jalankan.ambil_yahoo(kode)
@@ -223,6 +223,11 @@ def main():
     d = d.dropna(subset=["ma100", "r60", "rv1", "ihsg_ma50"])
     print(f"Baris: {len(d):,}, ciri: {len(CIRI)}, layak: {int(d['layak'].sum()):,} ({time.time() - t0:.0f} dtk)")
 
+    return d, CIRI, KELOMPOK, t0
+
+
+def main():
+    d, CIRI, KELOMPOK, t0 = bangun_data()
     from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
     from sklearn.linear_model import LogisticRegression
     from sklearn.pipeline import make_pipeline
