@@ -154,6 +154,11 @@ def main():
         "tanggal": str(pd.Timestamp(t_akhir).date()),
         "pasar_mendukung": pasar_naik,
         "B": B, "A": A, "unggulan": unggulan,
+        # peringkat skor B semua saham layak (untuk halaman Analisa Emiten): [peringkat, pk_r20, pk_model]
+        "peringkat": {r["kode"]: [i + 1, round(float(r["pk_r20"]) * 100), round(float(r["pk_model"]) * 100)]
+                      for i, (_, r) in enumerate(layak.sort_values("skor_B", ascending=False).iterrows())},
+        "tidak_layak": {**{k: "kenaikan 20 hari > 100%" for k in h.loc[h["r20"] > 1.0, "kode"]},
+                        **{k: "fundamental bermasalah: " + ", ".join(v) for k, v in bahaya.items() if k in set(h["kode"])}},
         "tersaring": [{"kode": k, "alasan": bahaya[k]} for k in tersaring],
         "n_layak": int(len(layak)), "n_latih": int(len(lat)),
         "uji": UJI,
