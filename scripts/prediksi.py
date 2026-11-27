@@ -299,6 +299,10 @@ def catat_hari_ini(rk: dict, sp: dict, fund: dict, st: dict | None = None) -> li
     kandidat = set(rk.get("kandidat", [])) | set(rk.get("kandidat_tunda", []))
     baris_sp = {b["kode"]: b for b in (sp or {}).get("uptrend", []) + (sp or {}).get("sideways", [])}
     berita = baca(cfg.KELUAR / "berita.json", {}) or {}
+    psi = (baca(cfg.KELUAR / "psikologi.json", {}) or {})
+    psi = psi.get("saham", {}) if psi.get("tanggal") == t else {}
+    offer = sorted((v["rasio_antrean"], k2) for k2, v in psi.items() if v.get("tutup_di") == "offer" and v.get("rasio_antrean") is not None)
+    pers = {k2: (i + 1) / len(offer) for i, (_, k2) in enumerate(offer)}
     batas_b = (datetime.now(WIB) - timedelta(hours=36)).strftime("%Y-%m-%dT%H:%M:%S")
 
     def hitung_berita(k):
@@ -338,6 +342,8 @@ def catat_hari_ini(rk: dict, sp: dict, fund: dict, st: dict | None = None) -> li
                 "skor": s.get("skor"), "tingkat": b.get("tingkat"), "kuat": b.get("kuat"), "murah": b.get("murah"),
                 "ubah_hari": s.get("perubahan_pct"), "ubah_20h": s.get("ubah_20h"), "nilai_miliar": s.get("nilai_rata20_miliar"),
                 "berita": hitung_berita(k),
+                "antrean": {"tutup_di": (psi.get(k) or {}).get("tutup_di"), "rasio": (psi.get(k) or {}).get("rasio_antrean"),
+                            "persentil_offer": round(pers[k], 2) if k in pers else None, "rasio_lot": (psi.get(k) or {}).get("rasio_lot")},
             },
         })
     for b in (sp or {}).get("uptrend", []) + (sp or {}).get("sideways", []):
@@ -376,6 +382,10 @@ def statistik(cat: list[dict]) -> dict:
         "Masuk sesuai rentang entry": lambda c: "ya" if (c.get("hasil") or {}).get("sesuai_entry") else "tidak",
         "Berita negatif media terpercaya (36 jam)": lambda c: "belum dicatat" if "berita" not in c["fitur"]
             else "ada" if c["fitur"]["berita"].get("neg_tp") else "tidak ada",
+        "Sinyal antrean penutupan": lambda c: "belum dicatat" if not (c["fitur"].get("antrean") or {}).get("tutup_di")
+            else "kuat (offer, 20% teratas)" if ((c["fitur"]["antrean"].get("persentil_offer") or 0) >= 0.8)
+            else "lemah (offer, 20% terbawah)" if (c["fitur"]["antrean"].get("persentil_offer") is not None and c["fitur"]["antrean"]["persentil_offer"] <= 0.2)
+            else "lainnya",
         "Berita positif media terpercaya (36 jam)": lambda c: "belum dicatat" if "berita" not in c["fitur"]
             else "ada" if c["fitur"]["berita"].get("pos_tp") else "tidak ada",
     }

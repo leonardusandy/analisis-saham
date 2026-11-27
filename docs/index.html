@@ -1462,15 +1462,21 @@ function bacaPsikologi(k){
     if(r!=null&&r<=-14)out.push({t:"Turun ≥14% dalam sehari (mendekati batas bawah): secara historis besoknya rata-rata turun lagi sekitar 2,9%. Jangan tangkap pisau jatuh.",w:"turun"});
     else if(r!=null&&(()=>{const prev=s.tutup/(1+r/100),ara=prev<=200?35:prev<=5000?25:20;return r>=ara*0.97})())out.push({t:"Ditutup di batas atas (ARA): biasanya lanjut naik di pembukaan besok, tetapi membeli di pembukaan itu secara historis tidak menguntungkan.",w:"kuning"})}
   if(x&&PSI.tanggal===R.tanggal_data){
-    if(x.tutup_di==="offer")out.push({t:"Ditutup di harga offer: pembeli agresif menghabiskan antrean jual.",w:"naik"});
-    else if(x.tutup_di==="bid")out.push({t:"Ditutup di harga bid: penjual agresif membanting ke antrean beli.",w:"turun"});
-    if(x.rasio_antrean!=null)out.push({t:`Antrean penutupan: beli ${fmt(x.bid_lot)} lot di ${fmt(x.bid)} vs jual ${fmt(x.offer_lot)} lot di ${fmt(x.offer)} (${x.rasio_antrean>=0.6?"beli lebih tebal":x.rasio_antrean<=0.4?"jual lebih tebal":"seimbang"}).`,w:x.rasio_antrean>=0.6?"naik":x.rasio_antrean<=0.4?"turun":""});
-    if(x.rasio_lot!=null&&x.hari_data>=10&&(x.rasio_lot>=1.8||x.rasio_lot<=0.5))out.push({t:`Rata-rata ${fmt(x.lot_per_trx,1)} lot per transaksi, ${fmt(x.rasio_lot,1)}× biasanya: ${x.rasio_lot>=1.8?"ada pemain besar ikut bertransaksi":"didominasi transaksi kecil (ritel)"}.`,w:x.rasio_lot>=1.8?"naik":""});
+    const kuat=sinyalAntrean(k);
+    if(kuat==="kuat")out.push({t:`Sinyal antrean kuat: ditutup di offer dan antrean beli (${fmt(x.bid_lot)} lot) jauh lebih tebal dari antrean jual (${fmt(x.offer_lot)} lot), masuk 20% teratas hari ini. Dalam data 47 hari, kelompok ini rata-rata unggul ±1,2% dalam 3–5 hari dibanding 20% terbawah, walau baru dibeli di penutupan besok.`,w:"naik"});
+    else if(kuat==="lemah")out.push({t:`Antrean lemah: ditutup di offer tetapi antrean jual (${fmt(x.offer_lot)} lot) lebih tebal dari antrean beli (${fmt(x.bid_lot)} lot). Kelompok ini cenderung tertinggal beberapa hari ke depan.`,w:"turun"});
+    else if(x.rasio_antrean!=null)out.push({t:`Antrean penutupan: beli ${fmt(x.bid_lot)} lot di ${fmt(x.bid)} vs jual ${fmt(x.offer_lot)} lot di ${fmt(x.offer)}; ditutup di ${x.tutup_di==="offer"?"offer":x.tutup_di==="bid"?"bid (kenaikan besok sering hanya pantulan)":"tengah"}.`,w:""});
+    if(x.rasio_lot!=null&&x.hari_data>=10&&x.rasio_lot>=1.8)out.push({t:`Rata-rata ${fmt(x.lot_per_trx,1)} lot per transaksi (${fmt(x.rasio_lot,1)}× biasanya). Dalam data, lonjakan lot besar justru sedikit diikuti pelemahan: bisa pemain besar sedang keluar.`,w:"kuning"});
     if(x.nego_pct>=20)out.push({t:`Transaksi pasar negosiasi ${fmt(x.nego_pct,0)}% dari nilai: ada pindah tangan blok besar, cek beritanya.`,w:"kuning"});
-    if(x.asing5)out.push({t:`Asing 5 hari: ${x.asing5>0?"beli":"jual"} bersih Rp${rp(Math.abs(x.asing5))}.`,w:x.asing5>0?"naik":"turun"});
   }
   return out;
 }
+let PSI_PERS=null;
+function sinyalAntrean(k){
+  if(!PSI||PSI.tanggal!==R.tanggal_data)return null;
+  if(!PSI_PERS){const arr=Object.entries(PSI.saham).filter(([kk,v])=>v.tutup_di==="offer"&&v.rasio_antrean!=null&&PETA[kk]&&G(kk).likuid).map(([kk,v])=>[kk,v.rasio_antrean]).sort((a,b)=>a[1]-b[1]);
+    PSI_PERS={};arr.forEach(([kk],i)=>PSI_PERS[kk]=(i+1)/arr.length)}
+  const p=PSI_PERS[k];return p==null?null:p>=0.8?"kuat":p<=0.2?"lemah":"sedang"}
 function htmlPsikologi(k){const a=bacaPsikologi(k);if(!a.length)return"";
   return`<div style="margin:6px 0 2px;font-size:13px"><b>Psikologi pasar</b>${a.map(x=>`<div class="${x.w==="naik"?"naik":x.w==="turun"?"turun":""}" ${x.w==="kuning"?'style="color:var(--kuning)"':""}>• ${esc(x.t)}</div>`).join("")}</div>`}
 async function muatSwing(){if(SW===null){try{SW=await ambil("data/swing.json")}catch(e){SW=false}}return SW}
@@ -1540,7 +1546,7 @@ async function tampilMalam(){
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Rencana 1 · Trading cepat: saham potensial dibeli ${sebut}</h3>
      ${!R.pasar_mendukung?'<div class="pita waspada" style="margin-bottom:10px"><b>Pasar lemah (IHSG di bawah MA20).</b> Menurut uji 3 tahun, membeli saat pasar lemah lebih sering rugi. Daftar ini hanya untuk dipantau.</div>':""}
      <div class="ml-beli">${beli.map(b=>{const u=hitungLot(b.entry[1],b.cl),br=beritaSaham(b.kode);return`<div class="ml-kartu" style="border-left-color:var(--aksen)">
-       <div class="ml-atas"><div><a href="#saham/${b.kode}" class="ml-kode">${b.kode}</a> <span class="redup">${esc(b.sektor||"")}</span> ${lencanaAksi(b.kode)}</div>${b.lencana}</div>
+       <div class="ml-atas"><div><a href="#saham/${b.kode}" class="ml-kode">${b.kode}</a> <span class="redup">${esc(b.sektor||"")}</span> ${lencanaAksi(b.kode)}${sinyalAntrean(b.kode)==="kuat"?' <span class="lencana" style="background:var(--hijau);color:#fff">Antrean kuat</span>':sinyalAntrean(b.kode)==="lemah"?' <span class="lencana" style="background:var(--merah);color:#fff">Antrean lemah</span>':""}</div>${b.lencana}</div>
        <div class="ml-angka"><div><span class="label">Beli di</span><b>${fmt(b.entry[0])}${b.entry[1]!==b.entry[0]?"–"+fmt(b.entry[1]):""}</b></div>
          <div><span class="label">Batas rugi</span><b class="turun">${fmt(b.cl)}</b><span class="redup">${pct((b.cl/b.entry[1]-1)*100)}</span></div>
          <div><span class="label">Sasaran 1:3</span><b class="naik">${fmt(b.t3)}</b><span class="redup">${pct((b.t3/b.entry[1]-1)*100)} · resistance ${fmt(b.r1)}</span></div>
