@@ -2589,6 +2589,8 @@ async function tampilAnalisa(kode){
          <div class="redup" style="font-size:12px">Bila membeli: antre di ${fmt(lo)}–${fmt(hi)}, batas rugi ${fmt(cl8)} (−8%), tahan selama penutupan di atas MA50 (${fmt(x.ma50)}), maks 40 hari.</div></div></div></div>
    <div class="kartu" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="margin:0">Grafik & level harga</h3><span class="redup" style="font-size:12px">MA10 <b style="color:#8e44ad">━</b> MA20 <b style="color:#2f6fed">━</b> MA50 <b style="color:#e8710a">━</b></span></div>
      <div id="an-grafik" style="height:380px;margin-top:8px"></div>
+     <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:12px"><span class="label">MACD (12, 26, 9)</span><span class="redup">MACD <b style="color:#2f6fed">━</b> sinyal <b style="color:#e8710a">━</b> histogram <b style="color:var(--hijau)">▮</b><b style="color:var(--merah)">▮</b> · ${fmt(x.macd,1)} / ${fmt(x.macdSig,1)}</span></div>
+     <div id="an-macd" style="height:140px"></div>
      <div class="statistik" style="margin-top:10px">${["R2","R1","S1","S2"].map(k=>`<div><span class="label">${k}</span><b style="color:${SRw[k]}">${fmt(lv[k].v)}</b><span class="redup" style="font-size:12px;display:block">${pct((lv[k].v/c-1)*100)} · ${esc(lv[k].nama)}</span></div>`).join("")}</div>
      <p class="redup" style="font-size:12px;margin:8px 0 0">Support (S1, S2) = level terdekat di bawah harga dari harga terendah 10/20/60/120 hari dan MA20/50/100/200; resistance (R1, R2) = level terdekat di atas dari harga tertinggi 20/60/120 hari dan 1 tahun. Bila harga di puncak tertinggi, R diproyeksikan dengan ATR. Rencana: target pertama R1, batas rugi sedikit di bawah S1 atau −5%, mana yang lebih dekat.</p></div>
    <div class="kisi2" style="margin-bottom:14px">
@@ -2613,6 +2615,13 @@ async function tampilAnalisa(kode){
   [[10,"#8e44ad"],[20,"#2f6fed"],[50,"#e8710a"]].forEach(([n,w])=>gr.addLineSeries({color:w,lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false})
     .setData(L.map((z,k)=>{const v=rataN(cs,n,off+k);return v==null?{time:z.t}:{time:z.t,value:v}})));
   ["R2","R1","S1","S2"].forEach(k=>lil.createPriceLine({price:lv[k].v,color:SRw[k],lineStyle:2,lineWidth:1,title:k}));
+  // MACD
+  const I=d.indikator||{},sub=a=>(a||[]).slice(off),tm=L.map(z=>z.t);
+  const gm=LightweightCharts.createChart($("an-macd"),opsiGrafik());AN_GRAFIK.push(gm);
+  gm.addHistogramSeries({priceLineVisible:false,lastValueVisible:false}).setData(sub(I.MACD_HIST).map((v,k)=>v==null?{time:tm[k]}:{time:tm[k],value:v,color:v>=0?"rgba(0,168,107,.55)":"rgba(229,72,77,.55)"}));
+  gm.addLineSeries({color:"#2f6fed",lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}).setData(sub(I.MACD).map((v,k)=>v==null?{time:tm[k]}:{time:tm[k],value:v}));
+  gm.addLineSeries({color:"#e8710a",lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}).setData(sub(I.MACD_SIG).map((v,k)=>v==null?{time:tm[k]}:{time:tm[k],value:v}));
+  let sinkron=false;[gr,gm].forEach(a=>a.timeScale().subscribeVisibleLogicalRangeChange(rg=>{if(!rg||sinkron)return;sinkron=true;[gr,gm].forEach(b=>{if(b!==a)b.timeScale().setVisibleLogicalRange(rg)});sinkron=false}));
   gr.timeScale().setVisibleLogicalRange({from:L.length-90,to:L.length+3});
 }
 
