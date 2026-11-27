@@ -82,6 +82,76 @@ def nilai_h1(c: dict, L: list) -> None:
                "pct": round((n["c"] / L[i]["c"] - 1) * 100, 2)}
 
 
+JEJAK_HARI = 5
+
+
+def isi_jejak(c: dict, L: list) -> None:
+    """Perubahan penutupan kumulatif hari ke-1, 2, ... (dibanding penutupan hari prediksi),
+    diperbarui setiap penutupan sampai JEJAK_HARI hari."""
+    if len(c.get("jejak") or []) >= JEJAK_HARI:
+        return
+    tgl = [x["t"] for x in L]
+    if c["tanggal"] not in tgl:
+        return
+    i = tgl.index(c["tanggal"])
+    dasar = L[i]["c"]
+    if not dasar:
+        return
+    c["jejak"] = [round((x["c"] / dasar - 1) * 100, 2) for x in L[i + 1:i + 1 + JEJAK_HARI]]
+
+
+def perkembangan_harian(semua: list[dict]) -> list[dict]:
+    """Untuk setiap tanggal prediksi: hasil rata-rata tiap kelompok pada hari ke-1..5, dibanding rata-rata pasar
+    (semua saham yang dinilai model). Diperbarui setiap penutupan."""
+    per = defaultdict(list)
+    for c in semua:
+        if c.get("jejak"):
+            per[c["tanggal"]].append(c)
+    hasil = []
+    for t in sorted(per)[-30:]:
+        v = per[t]
+        mdl = [c for c in v if c["jenis"] == "model"]
+        rel = sorted([c for c in mdl if c.get("p_rel") is not None], key=lambda c: -c["p_rel"])
+        kel = {
+            "potensial": [c for c in v if c["jenis"] == "potensial"],
+            "beli": [c for c in v if c["jenis"] == "beli" and c.get("dipilih")],
+            "model_atas": rel[:max(1, len(rel) // 5)] if rel else [],
+            "uptrend": [c for c in v if c["jenis"] == "tren" and c.get("prediksi") == "up"],
+            "swing": [c for c in v if c["jenis"] == "swing"],
+        }
+        hari = max(len(c["jejak"]) for c in v)
+        d = {"tanggal": t, "hari": hari, "pasar": [], "kelompok": {}}
+        for n in range(hari):
+            ps = [c["jejak"][n] for c in mdl if len(c["jejak"]) > n]
+            d["pasar"].append(round(float(np.mean(ps)), 2) if ps else None)
+        for nama, arr in kel.items():
+            if not arr:
+                continue
+            baris = []
+            for n in range(hari):
+                x = [c["jejak"][n] for c in arr if len(c["jejak"]) > n]
+                if not x:
+                    baris.append(None)
+                    continue
+                m = float(np.mean(x))
+                pm = d["pasar"][n]
+                baris.append({"rata": round(m, 2), "naik": round(sum(y > 0 for y in x) / len(x) * 100),
+                              "selisih": round(m - pm, 2) if pm is not None else None, "n": len(x)})
+            d["kelompok"][nama] = baris
+        hasil.append(d)
+    # rata-rata semua tanggal untuk tiap hari ke-n
+    rata = {}
+    for nama in ("potensial", "beli", "model_atas", "uptrend", "swing"):
+        baris = []
+        for n in range(JEJAK_HARI):
+            x = [d["kelompok"][nama][n] for d in hasil if nama in d["kelompok"] and len(d["kelompok"][nama]) > n
+                 and d["kelompok"][nama][n] and d["kelompok"][nama][n]["selisih"] is not None]
+            baris.append({"selisih": round(float(np.mean([y["selisih"] for y in x])), 2),
+                          "naik": round(float(np.mean([y["naik"] for y in x]))), "tanggal": len(x)} if x else None)
+        rata[nama] = baris
+    return [{"rata": rata}] + hasil
+
+
 def nilai_posisi(c: dict, L: list) -> None:
     """Keputusan posisi pengguna dinilai di penutupan berikutnya:
     jual/waspada benar bila harga turun; tahan benar bila harga naik atau tetap."""
@@ -587,6 +657,7 @@ def main():
     t_data = rk["tanggal_data"]
     # 0a) penilaian yang memakai harga SETELAH tanggal data terakhir (mis. candle belum final) dibatalkan
     for c in cat.values():
+        c.pop("jejak", None)  # dihitung ulang dari harga terbaru setiap kali
         h1 = c.get("h1")
         hs = c.get("hasil") or {}
         if (h1 and h1.get("t", "") > t_data) or (hs.get("sampai", "") > t_data):
@@ -597,13 +668,16 @@ def main():
     for cid in [cid for cid, c in cat.items()
                 if c["tanggal"] == t_data and c["jenis"] in ("beli", "tren", "model", "swing", "potensial") and "h1" not in c]:
         del cat[cid]
-    # 1) nilai catatan yang belum selesai
+    # 1) nilai catatan yang belum selesai; jejak harian diperbarui setiap penutupan
     simpan = {}
     for c in cat.values():
-        if c["status"] == "selesai" and "h1" in c:
+        if c["status"] == "selesai" and "h1" in c and len(c.get("jejak") or []) >= JEJAK_HARI:
             continue
         L = lilin(c["kode"], simpan)
         if not L:
+            continue
+        isi_jejak(c, L)
+        if c["status"] == "selesai" and "h1" in c:
             continue
         nilai_h1(c, L)
         if c["status"] != "selesai":
@@ -634,7 +708,7 @@ def main():
     beli_akhir = [c for c in semua if c["jenis"] == "beli"][-300:]
     (k / "prediksi.json").write_text(json.dumps({
         "dibuat": datetime.now(WIB).strftime("%Y-%m-%d %H:%M WIB"), "tanggal_data": rk["tanggal_data"],
-        "statistik": st, "beli": beli_akhir, "harian": penilaian_harian(semua),
+        "statistik": st, "beli": beli_akhir, "harian": penilaian_harian(semua), "perkembangan": perkembangan_harian(semua),
         "tren_terbaru": [c for c in semua if c["jenis"] == "tren"][-400:],
     }, ensure_ascii=False, separators=(",", ":")))
     print(f"Prediksi: {n_baru} catatan baru, total {len(semua)} ({st['jumlah']['hari']} hari), "
