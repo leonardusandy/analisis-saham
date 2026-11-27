@@ -1029,13 +1029,15 @@ function lencanaAksi(k){const j=[...new Set(aksiSaham(k).flatMap(b=>jenisAksi(b.
 // periode laporan terbaru yang biasanya sudah terbit (batas lapor: Q1 akhir April, Q2 akhir Juli/Agustus, Q3 akhir Oktober)
 function periodeLapkeuTerbaru(){const d=new Date(),y=d.getFullYear(),m=d.getMonth()+1;
   return m<=4?{th:y-1,tw:"TW3",ro:"III",teks:`Triwulan III ${y-1}`}:m<=7?{th:y,tw:"TW1",ro:"I",teks:`Triwulan I ${y}`}:m<=10?{th:y,tw:"TW2",ro:"II",teks:`Triwulan II ${y}`}:{th:y,tw:"TW3",ro:"III",teks:`Triwulan III ${y}`}}
-function tautanXlsx(k,p=periodeLapkeuTerbaru()){return`https://www.idx.co.id/Portals/0/StaticData/ListedCompanies/Corporate_Actions/New_Info_JSX/Jenis_Informasi/01_Laporan_Keuangan/02_Soft_Copy_Laporan_Keuangan//Laporan%20Keuangan%20Tahun%20${p.th}/${p.tw}/${k}/FinancialStatement-${p.th}-${p.ro}-${k}.xlsx`}
+function tautanXlsx(k,p=periodeLapkeuTerbaru(),ext="xlsx"){return`https://www.idx.co.id/Portals/0/StaticData/ListedCompanies/Corporate_Actions/New_Info_JSX/Jenis_Informasi/01_Laporan_Keuangan/02_Soft_Copy_Laporan_Keuangan//Laporan%20Keuangan%20Tahun%20${p.th}/${p.tw}/${k}/FinancialStatement-${p.th}-${p.ro}-${k}.${ext}`}
+function periodeTahunan(){const d=new Date(),y=d.getFullYear(),m=d.getMonth()+1,th=m>=4?y-1:y-2;return{th,tw:"Audit",ro:"Tahunan",teks:`Tahunan ${th}`}}
 const TAUTAN_IDX=k=>[["Profil, dividen, pengumuman & kalender",`https://www.idx.co.id/id/perusahaan-tercatat/profil-perusahaan-tercatat/${k}`],
-  [`Unduh Excel laporan ${periodeLapkeuTerbaru().teks}`,tautanXlsx(k)],
+  [`Unduh PDF laporan ${periodeLapkeuTerbaru().teks}`,tautanXlsx(k,periodeLapkeuTerbaru(),"pdf")],
+  [`Unduh PDF laporan ${periodeTahunan().teks}`,tautanXlsx(k,periodeTahunan(),"pdf")],
   ["Keterbukaan informasi (semua emiten)","https://www.idx.co.id/id/perusahaan-tercatat/keterbukaan-informasi/"]];
 function kotakIDX(k){return`<div class="kartu" style="padding:10px 12px;margin-bottom:10px"><b>Dokumen resmi ${k} di IDX</b>
   <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0">${TAUTAN_IDX(k).map(([n,u])=>`<a class="tombol kedua chip" href="${u}" target="_blank" rel="noopener">${n} ↗</a>`).join("")}</div>
-  <div class="redup" style="font-size:12px">Tombol unduh mengambil file <b>Excel (.xlsx)</b> laporan terbaru langsung dari IDX; unggah file itu di menu <a href="#lapkeu">Laporan Keuangan Saya</a>. Bila belum terbit atau gagal, buka profil emiten → tab <b>Laporan Keuangan</b>. Pengumuman resmi (RUPS, dividen, aksi korporasi) ada di tab <b>Pengumuman</b> dan <b>Kalender</b> di profil emiten.</div></div>`}
+  <div class="redup" style="font-size:12px">Tombol unduh mengambil file <b>PDF</b> laporan langsung dari IDX; unggah file itu di menu <a href="#lapkeu">Laporan Keuangan Saya</a>. Bila belum terbit atau gagal, buka profil emiten → tab <b>Laporan Keuangan</b>. Pengumuman resmi (RUPS, dividen, aksi korporasi) ada di tab <b>Pengumuman</b> dan <b>Kalender</b> di profil emiten.</div></div>`}
 function saringBerita(){
   if(!B){$("berita-semua").innerHTML='<div class="kosong">Berita belum tersedia.</div>';return}
   const q=$("berita-kode").value.trim().toUpperCase();let arr;
@@ -2079,13 +2081,14 @@ const LK_POLA={
   aset_lancar:[/^total current assets$/,/^jumlah aset lancar$/],
   liab_lancar:[/^total current liabilities$/,/^jumlah liabilitas jangka pendek$/],
   total_liab:[/^total liabilities$/,/^jumlah liabilitas$/],
-  ekuitas_induk:[/^total equity attributable to (equity )?owners of (the )?parent( entity)?$/,/^jumlah ekuitas yang (dapat )?diatribusikan kepada pemilik entitas induk$/],
+  ekuitas_induk:[/^(total )?equity attributable to (equity )?owners of (the )?parent( entity)?$/,/^(jumlah )?ekuitas yang (dapat )?diatribusikan kepada pemilik entitas induk$/],
   total_ekuitas:[/^total equity$/,/^jumlah ekuitas$/],
   pendapatan:[/^(total )?(sales and revenues?|revenues?|net revenues?|net sales|sales)$/,/^(jumlah )?(penjualan dan pendapatan usaha|pendapatan( usaha)?|penjualan( bersih)?|pendapatan bersih)$/,/^(total )?interest income$/,/^(jumlah )?pendapatan bunga$/],
   laba_kotor:[/^(total )?gross profit( \(loss\))?$/,/^(jumlah )?laba( \(rugi\))? bruto$/],
-  laba_induk:[/^profit \(loss\) attributable to (equity owners of )?(the )?parent( entity)?$/,/^laba \(rugi\) yang dapat diatribusikan ke(pada)? (pemilik )?entitas induk$/],
-  laba:[/^(total )?profit \(loss\)( for the period)?$/,/^(jumlah )?laba \(rugi\)( periode berjalan)?$/],
-  cfo:[/^(total )?net cash flows? received from \(used in\) operating activities$/,/^(jumlah )?arus kas bersih yang diperoleh dari \(digunakan untuk\) aktivitas operasi$/],
+  laba_induk:[/^profit \(loss\) attributable to (equity owners of )?(the )?parent( entity)?$/,/^laba \(rugi\) yang dapat diatribusikan ke(pada)? (pemilik )?entitas induk$/,/^pemilik entitas induk$/,/^(equity holders|owners) of the (parent|company)( entity)?$/],
+  laba:[/^(total )?profit( \(loss\))?( for the (year|period))?$/,/^(jumlah )?laba( \(rugi\))?( (tahun|periode) berjalan)?$/],
+  cfo:[/^(total )?net cash flows? received from \(used in\) operating activities$/,/^(jumlah )?arus kas bersih yang diperoleh dari \(digunakan untuk\) aktivitas operasi$/,
+    /^(jumlah )?(arus )?kas bersih\b.{0,60}aktivitas operasi$/,/^(total )?net cash\b.{0,60}operating activities$/],
 };
 const LK_INFO={kode:/^(entity code|kode entitas)$/,periode:/^(period of financial statements submissions|periode penyampaian laporan keuangan)$/,
   akhir:/^(current period end date|tanggal akhir periode berjalan)$/,nama:/^(entity name|nama entitas)$/,bulat:/^(level of rounding used in financial statements|pembulatan yang digunakan dalam penyajian jumlah dalam laporan keuangan)$/};
@@ -2096,7 +2099,63 @@ function lkBulan(teks,akhir){const t=(teks||"").toLowerCase();
   const m=+(akhir||"").slice(5,7);return m?({3:3,6:6,9:9,12:12}[m]||12):12}
 function lkTanggal(v){if(typeof v==="number"){const d=new Date(Math.round((v-25569)*864e5));return d.toISOString().slice(0,10)}
   const t=String(v||"").trim();let m=t.match(/(\d{4})-(\d{2})-(\d{2})/);if(m)return m[0];m=t.match(/(\d{1,2})[\/ -](\d{1,2})[\/ -](\d{4})/);return m?`${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`:""}
-async function lkBaca(file){
+let PDFJS_SIAP=null;
+function muatPdfjs(){return PDFJS_SIAP||(PDFJS_SIAP=new Promise((ok,gagal)=>{const el=document.createElement("script");el.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+  el.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";ok(window.pdfjsLib)};
+  el.onerror=()=>{PDFJS_SIAP=null;gagal(new Error("Pustaka pembaca PDF gagal dimuat. Periksa internet lalu coba lagi."))};document.head.appendChild(el)}))}
+const LK_BAGIAN={total_aset:"neraca",aset_lancar:"neraca",liab_lancar:"neraca",total_liab:"neraca",ekuitas_induk:"neraca",total_ekuitas:"neraca",pendapatan:"labarugi",laba_kotor:"labarugi",laba_induk:"labarugi",laba:"labarugi",cfo:"aruskas"};
+const BULAN_ID={januari:1,februari:2,maret:3,april:4,mei:5,juni:6,juli:7,agustus:8,september:9,oktober:10,november:11,desember:12,january:1,february:2,march:3,may:5,june:6,july:7,august:8,october:10,december:12};
+function lkAngka(w){const neg=/^\(|\)$|^-/.test(w),t=w.replace(/[()\s-]/g,"");if(!/^\d{1,3}([.,]\d{3})+$|^\d{5,}$/.test(t))return null;return(neg?-1:1)*+t.replace(/[.,]/g,"")}
+async function lkBacaPdf(file,lapor=()=>{}){
+  const pdfjs=await muatPdfjs();
+  const doc=await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+  const nilai={},info={};let bagian=null,teksAwal="",tglHal=false;
+  for(let p=1;p<=doc.numPages;p++){
+    if(p%10===1)lapor(`Membaca halaman ${p} dari ${doc.numPages}…`);
+    const tc=await (await doc.getPage(p)).getTextContent(),m=new Map();
+    tc.items.forEach(it=>{if(!it.str.trim())return;const y=Math.round(it.transform[5]/3);(m.get(y)||m.set(y,[]).get(y)).push({x:it.transform[4],s:it.str})});
+    const baris=[...m.entries()].sort((a,b)=>b[0]-a[0]).map(([,v])=>{const w=[];v.sort((a,b)=>a.x-b.x).forEach(it=>it.s.split(/\s+/).filter(Boolean).forEach(x=>w.push({x:it.x,w:x})));
+      for(let i=w.length-1;i>0;i--){if(w[i].w===")"){w[i-1].w+=")";w.splice(i,1)}else if(w[i-1].w==="("){w[i].w="("+w[i].w;w.splice(i-1,1)}}return w});
+    const teksHal=baris.map(b=>b.map(x=>x.w).join(" ")).join("\n");
+    if(p<=6||bagian===null)teksAwal+=teksHal+"\n";
+    if(!info.bulat&&/(dinyatakan|disajikan|expressed|presented|pembulatan|rounding)[^\n]{0,60}(jutaan|millions?|ribuan|thousands?|miliar|billions?)/i.test(teksHal))
+      info.bulat=(teksHal.match(/jutaan|millions?|ribuan|thousands?|miliar|billions?/i)||[""])[0];
+    for(let i=0;i<baris.length;i++){
+      const w=baris[i],big=w.map((x,j)=>lkAngka(x.w)!=null?j:-1).filter(j=>j>=0);
+      if(!big.length){const t=lkTeks(w.map(x=>x.w).join(" ")).replace(/^\[\d+\]\s*/,"");
+        if(/^((laporan|statements?|consolidated|interim|neraca)\b.{0,40})?(posisi keuangan|financial position|neraca\b)/.test(t)&&/^(laporan|statements?|consolidated|interim|neraca)/.test(t))bagian="neraca";
+        else if(/^(laporan|statements?|consolidated|interim)\b.{0,50}(laba rugi|profit or loss|income)/.test(t))bagian="labarugi";
+        else if(/^(laporan|statements?|consolidated|interim)\b.{0,30}(arus kas|cash flows?)/.test(t))bagian="aruskas";
+        else if(/^(laporan|statements?|consolidated|interim)\b.{0,30}(perubahan ekuitas|changes in equity)/.test(t))bagian="ekuitas";
+        continue}
+      if(!bagian||big.length>2)continue;
+      const x0=w[big[0]].x,x1=w[big.at(-1)].x;
+      const bersih=a=>a.filter(x=>!/^\d{1,2}[a-z]?(,\d{1,2}[a-z]?)*$|^-$|^[a-z]$/.test(x.w)).map(x=>x.w).join(" ");
+      let id=bersih(w.slice(0,big[0])),en=bersih(w.slice(big.at(-1)+1));
+      for(let k=1;k<=4;k++){const n=baris[i+k];if(!n||n.some(x=>lkAngka(x.w)!=null))break;const kiri=n.filter(x=>x.x<x0).map(x=>x.w).join(" "),kanan=n.filter(x=>x.x>x1).map(x=>x.w).join(" ");
+        if(!/^[a-z(]/.test(kiri||kanan))break;id+=" "+kiri;en+=" "+kanan}
+      if(/^[a-z]/.test(id))for(let k=1;k<=2;k++){const n=baris[i-k];if(!n||n.some(x=>lkAngka(x.w)!=null))break;id=n.filter(x=>x.x<x0).map(x=>x.w).join(" ")+" "+id;en=n.filter(x=>x.x>x1).map(x=>x.w).join(" ")+" "+en}
+      const calon=[id,en,...id.split("/"),...en.split("/")].map(t=>lkTeks(t).replace(/[:\/]+$/,"").trim()).filter(Boolean);
+      for(const[kunci,pola] of Object.entries(LK_POLA)){if(nilai[kunci]||LK_BAGIAN[kunci]!==bagian)continue;
+        if(calon.some(t=>pola.some(r=>r.test(t))))nilai[kunci]={kini:lkAngka(w[big[0]].w),lalu:big.length>1?lkAngka(w[big[1]].w):null,lembar:"hal. "+p}}
+    }
+    if(!tglHal&&Object.values(nilai).some(v=>v.lembar==="hal. "+p)){teksAwal+=teksHal.slice(0,1500)+"\n";tglHal=true}
+  }
+  const awal=teksAwal.replace(/\s+/g," ");
+  const kd=awal.match(/kode entitas\s+([A-Z]{4})\b/i)||file.name.match(/([A-Z]{4})(?=[^A-Za-z]*\.pdf$)/);
+  const per=awal.match(/periode penyampaian(?: laporan keuangan)?\s+((kuartal|tahunan)[^/]*)/i);
+  const tgl=[...awal.matchAll(/(\d{1,2})\s+(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)\s+(20\d\d)|(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2}),?\s+(20\d\d)/gi)]
+    .map(x=>x[1]?`${x[3]}-${String(BULAN_ID[x[2].toLowerCase()]).padStart(2,"0")}-${x[1].padStart(2,"0")}`:`${x[6]}-${String(BULAN_ID[x[4].toLowerCase()]).padStart(2,"0")}-${x[5].padStart(2,"0")}`)
+    .filter(t=>/(03-31|06-30|09-30|12-31)$/.test(t)).sort();
+  let akhir=tgl.at(-1)||"";
+  if(!akhir){const f=file.name.match(/(03|06|09|12)[ _-]?(\d{2})(?=\D*\.pdf$)/i);if(f)akhir=`20${f[2]}-${f[1]}-${{"03":"31","06":"30","09":"30","12":"31"}[f[1]]}`}
+  const bulan=lkBulan(per?per[1]:"",akhir);
+  const bt=String(info.bulat||"").toLowerCase(),kali=/miliar|billion/.test(bt)?1e9:/juta|million/.test(bt)?1e6:/ribu|thousand/.test(bt)?1e3:1;
+  const mentah={kode:kd?kd[1].toUpperCase():"",nama:"",periode_teks:per?per[1]:"",akhir,bulan,nilai,kali,berkas:file.name};
+  return{...lkHitung(mentah),mentah};
+}
+async function lkBaca(file,lapor){
+  if(/\.pdf$/i.test(file.name))return lkBacaPdf(file,lapor);
   const XLSX=await muatXLSX();
   const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});
   const nilai={},info={};
@@ -2142,7 +2201,8 @@ function lkHitung(x){
   const periode=`${(x.akhir||"").slice(0,4)}-${x.bulan===12?"TAHUNAN":"Q"+x.bulan/3}`;
   return{kode:x.kode,nama:x.nama,periode,periode_teks:x.periode_teks,akhir:x.akhir,bulan:x.bulan,bank,putusan,syarat,skor,terdata,
     rasio:Object.fromEntries(Object.entries(r).map(([a,b])=>[a,b==null||!isFinite(b)?null:Math.round(b*100)/100])),
-    terbaca:Object.keys(v).length,berkas:x.berkas,diunggah:new Date().toISOString().slice(0,16)};
+    terbaca:Object.keys(v).length,berkas:x.berkas,diunggah:new Date().toISOString().slice(0,16),
+    sumber:Object.fromEntries(Object.entries(v).map(([a,b])=>[a,[b.kini==null?null:b.kini*(x.kali||1),b.lalu==null?null:b.lalu*(x.kali||1),b.lembar]]))};
 }
 const LK_WARNA={kuat:"var(--hijau)",sedang:"var(--kuning)",waspada:"var(--kuning)",lemah:"var(--merah)","tidak terbaca":"var(--redup)"};
 function kartuLK(x,baru=false){const r=x.rasio||{};
@@ -2154,7 +2214,9 @@ function kartuLK(x,baru=false){const r=x.rasio||{};
       <div><span class="label">Utang/ekuitas</span><b>${r.der==null?"–":fmt(r.der,2)+"×"}</b><span class="redup">${r.cr==null?"":"rasio lancar "+fmt(r.cr,2)}</span></div></div>
     <div class="redup" style="font-size:12px;margin-top:6px">Skor sehat <b style="color:var(--teks)">${x.skor??r.skor??"–"}/${x.terdata??"–"}</b>: ${(x.syarat||[]).filter(s=>s[1]!=null).map(s=>`${s[1]?"✓":"✗"} ${s[0]}`).join(" · ")}</div>
     ${x.terbaca<6?`<div style="color:var(--kuning);font-size:12px;margin-top:4px">Hanya ${x.terbaca} pos terbaca dari file ini; hasil mungkin kurang lengkap.</div>`:""}
+    ${baru&&x.sumber?`<details style="margin-top:6px"><summary class="redup" style="cursor:pointer;font-size:12px">Periksa angka yang terbaca (${Object.keys(x.sumber).length} pos)</summary><table class="keranjang" style="font-size:12px;margin-top:4px"><thead><tr><th>Pos</th><th>Periode ini</th><th>Pembanding</th><th>Sumber</th></tr></thead><tbody>${Object.entries(x.sumber).map(([k,[a,b,l]])=>`<tr><td style="text-align:left">${LK_NAMA[k]||k}</td><td>${a==null?"–":"Rp"+rp(a)}</td><td>${b==null?"–":"Rp"+rp(b)}</td><td>${esc(l||"")}</td></tr>`).join("")}</tbody></table><div class="redup" style="font-size:11px">Pembanding neraca = akhir tahun lalu; laba rugi & arus kas = periode yang sama tahun lalu. Bila ada angka keliru, jangan simpan laporan ini.</div></details>`:""}
     ${baru?"":`<div class="ml-aksi"><button class="tombol kedua chip" data-lk-hapus="${x.kode}|${esc(x.periode)}">Hapus</button></div>`}</div>`}
+const LK_NAMA={total_aset:"Jumlah aset",aset_lancar:"Aset lancar",liab_lancar:"Liabilitas jangka pendek",total_liab:"Jumlah liabilitas",ekuitas_induk:"Ekuitas milik induk",total_ekuitas:"Jumlah ekuitas",pendapatan:"Pendapatan",laba_kotor:"Laba bruto",laba_induk:"Laba milik induk",laba:"Laba periode",cfo:"Arus kas operasi"};
 async function tampilLapkeu(){
   await muatLK();
   const semua=lkSemua(),daftar=Object.entries(semua).sort(([a],[b])=>a.localeCompare(b));
@@ -2162,12 +2224,15 @@ async function tampilLapkeu(){
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin:0">Laporan Keuangan Saya</h3>
      <p class="redup" style="margin:6px 0 10px">Untuk saham yang Anda anggap potensial: unduh laporan keuangan terbaru dari IDX, lalu unggah di sini. Web membaca file Excel di perangkat Anda, menghitung rasio dan skor sehat, lalu menyimpannya (terenkripsi) agar terlihat di semua perangkat dan dipakai di Rencana swing.</p>
      <div class="baris" style="margin-bottom:10px;align-items:flex-end"><label>Kode saham<input id="lk-kode-unduh" maxlength="4" size="6" placeholder="mis. ASGR" style="text-transform:uppercase" list="daftar-kode"></label>
-       <a class="tombol" id="lk-unduh" href="#" target="_blank" rel="noopener" style="pointer-events:none;opacity:.5">Unduh Excel ${periodeLapkeuTerbaru().teks} dari IDX ↗</a>
+       <a class="tombol" id="lk-unduh" href="#" target="_blank" rel="noopener" style="pointer-events:none;opacity:.5">PDF ${periodeLapkeuTerbaru().teks} ↗</a>
+       <a class="tombol" id="lk-unduh-th" href="#" target="_blank" rel="noopener" style="pointer-events:none;opacity:.5">PDF ${periodeTahunan().teks} ↗</a>
+       <a class="tombol kedua" id="lk-unduh-x" href="#" target="_blank" rel="noopener" style="pointer-events:none;opacity:.5">Excel ${periodeLapkeuTerbaru().teks} ↗</a>
        <a class="tombol kedua" id="lk-profil" href="#" target="_blank" rel="noopener" style="pointer-events:none;opacity:.5">Profil emiten di IDX ↗</a></div>
-     <ol style="margin:0 0 10px 18px;padding:0;font-size:14px"><li>Isi kode saham, lalu klik <b>Unduh Excel</b>. File laporan terbaru (<i>FinancialStatement-…-KODE.xlsx</i>) terunduh langsung dari IDX.</li>
-       <li>Bila laporan periode itu belum terbit, buka <b>Profil emiten</b> → tab <b>Laporan Keuangan</b>, lalu unduh file <b>.xlsx</b> (bukan PDF) periode terbaru.</li>
-       <li>Pilih file itu di bawah ini. Boleh beberapa file sekaligus.</li></ol>
-     <button class="tombol" id="lk-pilih" type="button">Pilih file Excel IDX</button><input type="file" id="lk-file" accept=".xlsx,.xls" multiple hidden>
+     <ol style="margin:0 0 10px 18px;padding:0;font-size:14px"><li>Isi kode saham, lalu klik tombol <b>PDF</b> laporan triwulan terbaru atau tahunan. File terunduh langsung dari IDX.</li>
+       <li>Boleh juga memakai PDF laporan keuangan audit perusahaan atau <b>laporan tahunan</b> (annual report) dari tab <b>Laporan Keuangan</b> di profil emiten. Web mencari halaman laporan posisi keuangan, laba rugi, dan arus kas di dalamnya.</li>
+       <li>Pilih file di bawah ini (PDF atau Excel, boleh beberapa sekaligus), lalu <b>periksa angka yang terbaca</b> sebelum menyimpan.</li></ol>
+     <p class="redup" style="font-size:12px;margin:0 0 10px">Excel paling akurat; PDF laporan buatan IDX (<i>FinancialStatement-…pdf</i>) juga rapi; PDF audit perusahaan dan laporan tahunan formatnya beragam, jadi periksa tabel angkanya. File laporan tahunan yang besar (300+ halaman) bisa butuh sekitar 1 menit.</p>
+     <button class="tombol" id="lk-pilih" type="button">Pilih file PDF / Excel</button><input type="file" id="lk-file" accept=".pdf,.xlsx,.xls" multiple hidden>
      <span class="redup" id="lk-status" style="margin-left:8px"></span>
      <div id="lk-pratinjau" style="margin-top:12px"></div></div>
    <div class="kartu"><h3 style="margin-top:0">Tersimpan (${daftar.length} saham)</h3>
@@ -2175,14 +2240,14 @@ async function tampilLapkeu(){
      <p class="redup" style="font-size:12px;margin:10px 0 0">Penilaian: <b>kuat</b> = laba positif dan tumbuh, ROE ≥ 10%, arus kas operasi tidak negatif, utang/ekuitas ≤ 2 (kecuali bank). <b>Lemah</b> = rugi. <b>Waspada</b> = laba positif tetapi arus kas operasi negatif. Laba kuartalan dibandingkan dengan periode yang sama tahun lalu; ROE disetahunkan.</p></div>`;
   $("lk-pilih").onclick=()=>$("lk-file").click();
   $("lk-kode-unduh").oninput=e=>{const k=e.target.value.trim().toUpperCase(),ok=/^[A-Z]{4}$/.test(k);
-    [["lk-unduh",ok?tautanXlsx(k):"#"],["lk-profil",ok?`https://www.idx.co.id/id/perusahaan-tercatat/profil-perusahaan-tercatat/${k}`:"#"]].forEach(([id,u])=>{const a=$(id);a.href=u;a.style.pointerEvents=ok?"":"none";a.style.opacity=ok?"":".5"})};
+    [["lk-unduh",ok?tautanXlsx(k,periodeLapkeuTerbaru(),"pdf"):"#"],["lk-unduh-th",ok?tautanXlsx(k,periodeTahunan(),"pdf"):"#"],["lk-unduh-x",ok?tautanXlsx(k):"#"],["lk-profil",ok?`https://www.idx.co.id/id/perusahaan-tercatat/profil-perusahaan-tercatat/${k}`:"#"]].forEach(([id,u])=>{const a=$(id);a.href=u;a.style.pointerEvents=ok?"":"none";a.style.opacity=ok?"":".5"})};
   $("lk-file").onchange=async e=>{
     const files=[...e.target.files];if(!files.length)return;$("lk-status").textContent="Membaca file…";LK_BARU=[];
-    for(const f of files){try{LK_BARU.push(await lkBaca(f))}catch(err){LK_BARU.push({gagal:f.name+": "+err.message})}}
+    for(const f of files){try{LK_BARU.push(await lkBaca(f,t=>$("lk-status").textContent=f.name+": "+t))}catch(err){LK_BARU.push({gagal:f.name+": "+err.message})}}
     $("lk-status").textContent="";
     const ok=LK_BARU.filter(x=>!x.gagal);
     $("lk-pratinjau").innerHTML=LK_BARU.filter(x=>x.gagal).map(x=>`<div class="turun">${esc(x.gagal)}</div>`).join("")
-      +ok.map(x=>`${!/^[A-Z]{4}$/.test(x.kode)?`<label>Kode saham untuk ${esc(x.berkas)} <input data-lk-kode="${esc(x.berkas)}" size="6" style="text-transform:uppercase"></label>`:""}${kartuLK(x,true)}`).join("")
+      +ok.map(x=>`${!/^[A-Z]{4}$/.test(x.kode)?`<label>Kode saham untuk ${esc(x.berkas)} <input data-lk-kode="${esc(x.berkas)}" size="6" style="text-transform:uppercase"></label> `:""}${!x.akhir&&x.mentah?`<label>Akhir periode laporan <select data-lk-akhir="${esc(x.berkas)}"><option value="">pilih…</option>${[0,1,2].flatMap(d=>{const y=new Date().getFullYear()-d;return["12-31","09-30","06-30","03-31"].map(t=>`${y}-${t}`)}).filter(t=>t<=new Date().toISOString().slice(0,10)).map(t=>`<option>${t}</option>`).join("")}</select></label>`:""}${kartuLK(x,true)}`).join("")
       +(ok.length?`<button class="tombol" id="lk-simpan">Simpan ${ok.length} laporan</button> <span class="redup" id="lk-kirim"></span>`:"");
     if(ok.length)$("lk-simpan").onclick=simpanLK;
   };
@@ -2193,11 +2258,13 @@ async function tampilLapkeu(){
     tampilLapkeu()});
 }
 async function simpanLK(){
+  document.querySelectorAll("[data-lk-akhir]").forEach(i=>{const ix=LK_BARU.findIndex(y=>y.berkas===i.dataset.lkAkhir);if(ix>=0&&i.value&&LK_BARU[ix].mentah){const m={...LK_BARU[ix].mentah,akhir:i.value};m.bulan=lkBulan("",i.value);LK_BARU[ix]={...lkHitung(m),mentah:m}}});
   document.querySelectorAll("[data-lk-kode]").forEach(i=>{const x=LK_BARU.find(y=>y.berkas===i.dataset.lkKode);if(x&&/^[A-Za-z]{4}$/.test(i.value.trim()))x.kode=i.value.trim().toUpperCase()});
+  if(LK_BARU.some(x=>!x.gagal&&!x.akhir)){$("lk-kirim").textContent="Pilih akhir periode laporan dulu.";return}
   const ok=LK_BARU.filter(x=>!x.gagal&&/^[A-Z]{4}$/.test(x.kode));
   if(!ok.length){$("lk-kirim").textContent="Isi kode saham dulu.";return}
   const lok=bacaLokal("lapkeu-v1",{}),hapus=new Set(bacaLokal("lapkeu-hapus-v1",[]));
-  ok.forEach(x=>{lok[x.kode]=(lok[x.kode]||[]).filter(y=>y.periode!==x.periode);lok[x.kode].push(x);hapus.delete(x.kode+"|"+x.periode)});
+  ok.forEach(x=>{delete x.mentah;delete x.sumber;lok[x.kode]=(lok[x.kode]||[]).filter(y=>y.periode!==x.periode);lok[x.kode].push(x);hapus.delete(x.kode+"|"+x.periode)});
   simpanLokal("lapkeu-v1",lok);simpanLokal("lapkeu-hapus-v1",[...hapus]);
   $("lk-kirim").textContent="Tersimpan di perangkat ini. Mengirim ke web…";
   try{await kirimTerkunci({lapkeu:ok},"lapkeu");$("lk-kirim").innerHTML='<span class="naik">Terkirim (terenkripsi).</span> Muncul di semua perangkat setelah pembaruan berikutnya selesai (±5 menit).';setTimeout(tampilLapkeu,1500)}
