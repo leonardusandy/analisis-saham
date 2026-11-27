@@ -84,6 +84,8 @@ def main():
         jalan("strategi")
     if mode == "harian" or not ada("stockpick.json"):
         jalan("stockpick")
+    if mode in ("harian", "lapkeu") or not ada("swing.json"):
+        jalan("swing")
     if mode == "harian" or not ada("model.json"):
         jalan("model")
     if mode in ("harian", "posisi") or not ada("prediksi.json"):

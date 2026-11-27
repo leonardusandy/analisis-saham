@@ -169,7 +169,7 @@ def penilaian_harian(semua: list[dict]) -> list[dict]:
     return hasil[-60:]
 
 
-def nilai_beli(c: dict, L: list) -> None:
+def nilai_beli(c: dict, L: list, stop_pct: float | None = None, ma: int = 10, maks: int | None = None) -> None:
     """Cara trading (hasil riset putaran 4): antrean beli di batas atas rentang beli (harga penutupan hari
     sinyal). Antrean hanya terisi bila harga besok turun sampai harga antrean; harga beli = min(pembukaan,
     harga antrean). Batas rugi -5% dari harga beli. Saham ditahan selama penutupan >= MA10; bila penutupan
@@ -178,7 +178,8 @@ def nilai_beli(c: dict, L: list) -> None:
     if c["tanggal"] not in tgl:
         return
     i = tgl.index(c["tanggal"])
-    ke = L[i + 1:i + 1 + HARI_BELI]
+    maks = maks or HARI_BELI
+    ke = L[i + 1:i + 1 + maks]
     if not ke:
         c["status"] = "menunggu"
         return
@@ -191,7 +192,7 @@ def nilai_beli(c: dict, L: list) -> None:
         c.pop("benar", None)
         return
     beli = min(d1["o"], antrean)
-    stop = beli * (1 - cfg.STOP_PERSEN)
+    stop = beli * (1 - (stop_pct or cfg.STOP_PERSEN))
     keluar, cara, hari_keluar = None, None, None
     for n, x in enumerate(ke):
         j = i + 1 + n
@@ -201,19 +202,19 @@ def nilai_beli(c: dict, L: list) -> None:
         if x["l"] <= stop:
             keluar, cara, hari_keluar = stop, "batas rugi", x["t"]
             break
-        if n > 0 and j >= 9:
-            ma10 = sum(y["c"] for y in L[j - 9:j + 1]) / 10
-            if x["c"] < ma10:
+        if n > 0 and j >= ma - 1:
+            rata = sum(y["c"] for y in L[j - ma + 1:j + 1]) / ma
+            if x["c"] < rata:
                 if j + 1 < len(L):
-                    keluar, cara, hari_keluar = L[j + 1]["o"], "tutup di bawah MA10", L[j + 1]["t"]
+                    keluar, cara, hari_keluar = L[j + 1]["o"], f"tutup di bawah MA{ma}", L[j + 1]["t"]
                 else:
-                    cara = "jual besok (tutup di bawah MA10)"
+                    cara = f"jual besok (tutup di bawah MA{ma})"
                 break
-    selesai = keluar is not None or (cara is None and len(ke) >= HARI_BELI)
+    selesai = keluar is not None or (cara is None and len(ke) >= maks)
     if keluar is None:
         keluar, hari_keluar = ke[-1]["c"], ke[-1]["t"]
         if cara is None:
-            cara = "batas 20 hari" if selesai else f"berjalan hari ke-{len(ke)}"
+            cara = f"batas {maks} hari" if selesai else f"berjalan hari ke-{len(ke)}"
     hasil = (keluar * (1 - cfg.BIAYA_JUAL)) / (beli * (1 + cfg.BIAYA_BELI)) - 1
     tinggi = max(x["h"] for x in ke)
     c["hasil"] = {
@@ -222,7 +223,7 @@ def nilai_beli(c: dict, L: list) -> None:
         "kena_r1": bool(r.get("r1") and tinggi >= r["r1"]),
         "kena_r2": bool(r.get("r2") and tinggi >= r["r2"]),
         "kena_cl": cara.startswith("batas rugi"),
-        "sampai": hari_keluar if selesai else ke[-1]["t"], "aturan": "antrean+MA10",
+        "sampai": hari_keluar if selesai else ke[-1]["t"], "aturan": f"antrean+MA{ma}",
     }
     c["status"] = "selesai" if selesai else "berjalan"
     if selesai:
@@ -264,6 +265,17 @@ def nilai_model(c: dict, L: list) -> None:
         c["benar"] = (c["p"] >= 50) == (ubah > 0)
     else:
         c["status"] = "berjalan"
+
+
+def catat_swing(sw: dict) -> list[dict]:
+    """Pilihan swing fundamental hari ini (utama + cadangan) untuk uji kertas."""
+    if not sw or not sw.get("pilihan"):
+        return []
+    t = sw["tanggal"]
+    return [{"id": f"{t}|{x['kode']}|swing", "jenis": "swing", "tanggal": t, "kode": x["kode"], "status": "menunggu",
+             "dipilih": ["S" if x.get("utama") else "S-cadangan"], "rencana": {"entry": x["entry"], "cl": x["cl"]},
+             "tutup": x["tutup"], "fitur": {"ihsg_naik": bool(sw.get("pasar_mendukung")), "roe": x.get("roe"),
+                                            "piotroski": x.get("piotroski")}} for x in sw["pilihan"]]
 
 
 def catat_model(md: dict) -> list[dict]:
@@ -411,6 +423,8 @@ def statistik(cat: list[dict]) -> dict:
             "B_saat_pasar_naik": ringkas([c for c in beli if "B" in c.get("dipilih", []) and c["fitur"].get("ihsg_naik")]),
             "A": ringkas([c for c in beli if "A" in c.get("dipilih", [])]),
             "J": ringkas([c for c in beli if "J" in c.get("dipilih", []) or not any(x in c.get("dipilih", []) for x in ("A", "B", "A-cadangan", "B-cadangan"))]),
+            "S": ringkas([c for c in cat if c["jenis"] == "swing" and "S" in c.get("dipilih", [])]),
+            "S_saat_pasar_naik": ringkas([c for c in cat if c["jenis"] == "swing" and "S" in c.get("dipilih", []) and c["fitur"].get("ihsg_naik")]),
         },
         "beli_analisa": ringkas([c for c in beli if "analisa" in c.get("dipilih", [])]),
         "antrean": {"terisi": sum(c.get("status") in ("selesai", "berjalan") for c in pilih),
@@ -421,7 +435,8 @@ def statistik(cat: list[dict]) -> dict:
         "per_ciri": per_ciri, "akurasi_tren": akurasi_tren, "kurva": kurva, "model": model, "posisi": posisi,
         "jumlah": {"beli": len(beli), "tren": len(tren), "model": sum(c["jenis"] == "model" for c in cat),
                    "hari": len({c["tanggal"] for c in cat}),
-                   "menunggu": sum(c["status"] in ("menunggu", "berjalan") for c in cat if c["jenis"] != "model")},
+                   "menunggu": sum(c["status"] in ("menunggu", "berjalan") for c in cat if c["jenis"] != "model"),
+                   "swing": sum(c["jenis"] == "swing" for c in cat)},
     }
 
 
@@ -449,7 +464,7 @@ def main():
             c["status"] = "menunggu"
     # 0b) proses ulang untuk tanggal data yang sama: catatan yang belum dinilai diganti yang terbaru
     for cid in [cid for cid, c in cat.items()
-                if c["tanggal"] == t_data and c["jenis"] in ("beli", "tren", "model") and "h1" not in c]:
+                if c["tanggal"] == t_data and c["jenis"] in ("beli", "tren", "model", "swing") and "h1" not in c]:
         del cat[cid]
     # 1) nilai catatan yang belum selesai
     simpan = {}
@@ -461,11 +476,13 @@ def main():
             continue
         nilai_h1(c, L)
         if c["status"] != "selesai":
-            {"beli": nilai_beli, "tren": nilai_tren, "model": nilai_model, "posisi": nilai_posisi}[c["jenis"]](c, L)
+            {"beli": nilai_beli, "tren": nilai_tren, "model": nilai_model, "posisi": nilai_posisi,
+             "swing": lambda c, L: nilai_beli(c, L, 0.08, 50, 40)}[c["jenis"]](c, L)
 
     # 2) tambah catatan hari ini (id unik: data tanggal yang sama tidak terhitung dua kali)
     n_baru = 0
-    for c in catat_hari_ini(rk, sp, fund, baca(k / "strategi.json", {})) + catat_model(baca(k / "model.json")):
+    for c in (catat_hari_ini(rk, sp, fund, baca(k / "strategi.json", {})) + catat_model(baca(k / "model.json"))
+              + catat_swing(baca(k / "swing.json", {}))):
         if c["id"] not in cat:
             cat[c["id"]] = c
             n_baru += 1
