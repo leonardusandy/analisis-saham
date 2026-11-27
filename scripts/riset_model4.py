@@ -129,7 +129,8 @@ class Harga:
         self.arr = {}
         for k, g in d.groupby("kode", sort=False):
             self.arr[k] = {c: g[c].to_numpy(dtype=float) for c in
-                           ("buka", "tinggi", "rendah", "tutup", "atr_rp", "_lo5", "_hi60p", "_hi20p", "ma5_rp", "ma10_rp", "ma20_rp")}
+                           ("buka", "tinggi", "rendah", "tutup", "atr_rp", "_lo5", "_hi60p", "_hi20p", "ma5_rp", "ma10_rp",
+                            "ma20_rp", "ma50_rp") if c in g}
             self.arr[k]["t"] = g["t"].to_numpy()
 
 
@@ -151,8 +152,8 @@ def simulasi(a, i, masuk="buka", stop="5%", r_target=None, maks=3, kelola="tidak
             return (np.nan, 0, False, None)  # antrean tidak terisi
         e = min(o[i + 1], lim)
     # --- batas rugi
-    if stop == "5%":
-        s = e * 0.95
+    if stop.endswith("%"):
+        s = e * (1 - float(stop[:-1]) / 100)
     elif stop == "1atr":
         s = e - atr[i]
     else:  # struktur: di bawah harga terendah 5 hari, risiko dibatasi 1,5%..5%
@@ -271,7 +272,7 @@ def siapkan(cetak_pola=True):
     d = d.sort_values(["kode", "t"]).reset_index(drop=True)
     d["pos"] = d.groupby("kode").cumcount()
     d["atr_rp"] = d["atr"] * d["tutup"]
-    for m in (5, 10, 20):
+    for m in (5, 10, 20, 50):
         d[f"ma{m}_rp"] = d["tutup"] / (1 + d[f"ma{m}"])
     nama_pola = tambah_pola(d)
     d["besok"] = d.groupby("kode")["tutup"].shift(-1) / d["tutup"] - 1
