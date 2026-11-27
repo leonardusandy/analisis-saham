@@ -241,13 +241,15 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
 @media (min-width:1051px){
   #tombol-menu{display:grid}
   body.sisi-ringkas{--sisi:66px}
-  body.sisi-ringkas .sisi{overflow-x:hidden}
-  body.sisi-ringkas .sisi .logo{padding:14px 13px;justify-content:center}
-  body.sisi-ringkas .sisi .logo .nama,body.sisi-ringkas .papan{display:none}
-  body.sisi-ringkas nav.menu.utama{padding:0 8px 20px}
-  body.sisi-ringkas nav.menu.utama .grup{font-size:0;height:1px;background:rgba(255,255,255,.12);margin:10px 6px}
-  body.sisi-ringkas nav.menu.utama a{font-size:0;gap:0;justify-content:center;padding:10px 0}
-  body.sisi-ringkas nav.menu.utama a.aktif::before{left:-8px}
+  body.sisi-ringkas .sisi{overflow-x:hidden;width:66px;transition:width .18s ease,box-shadow .18s ease}
+  body.sisi-ringkas.sisi-intip .sisi{width:232px;box-shadow:12px 0 30px rgba(10,19,34,.28)}
+  body.sisi-ringkas:not(.sisi-intip) .sisi .logo{padding:14px 13px;justify-content:center}
+  body.sisi-ringkas:not(.sisi-intip) .sisi .logo .nama,body.sisi-ringkas:not(.sisi-intip) .papan{display:none}
+  body.sisi-ringkas:not(.sisi-intip) nav.menu.utama{padding:0 8px 20px}
+  body.sisi-ringkas:not(.sisi-intip) nav.menu.utama .grup{font-size:0;height:1px;background:rgba(255,255,255,.12);margin:10px 6px}
+  body.sisi-ringkas:not(.sisi-intip) nav.menu.utama a{font-size:0;gap:0;justify-content:center;padding:10px 0}
+  body.sisi-ringkas:not(.sisi-intip) nav.menu.utama a.aktif::before{left:-8px}
+  body.sisi-ringkas.sisi-intip nav.menu.utama a{white-space:nowrap}
 }
 @media (min-width:1351px){
   #tombol-pantau{display:grid}
@@ -335,7 +337,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
     <a href="#panduan" data-h="panduan"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg>Panduan</a>
 </nav>
 <header class="atas">
-  <button class="tombol-ikon" id="tombol-menu" aria-label="Buka menu" title="Lebarkan atau ringkas menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <button class="tombol-ikon" id="tombol-menu" aria-label="Buka menu" title="Lebarkan atau ringkas menu (menyembunyikan diri setelah 4 detik tidak dipakai)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   <div class="cari"><input id="cari" placeholder="Cari kode atau nama saham" autocomplete="off" aria-label="Cari saham"><div class="saran" id="saran"></div></div>
   <div class="perbarui" id="perbarui">
     <button class="tombol-perbarui" id="tombol-perbarui" aria-haspopup="dialog" aria-expanded="false" aria-controls="panel-perbarui"><span class="titik" id="perbarui-titik"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg><span id="perbarui-ringkas">Memuat…</span></button>
@@ -348,7 +350,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
     </div>
   </div>
   <div class="jam-kecil" id="jam-kecil"></div>
-  <button class="tombol-ikon" id="tombol-pantau" aria-label="Buka daftar pantau" title="Tampilkan atau sembunyikan daftar pantau"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l2.4 5 5.6.6-4.2 3.8 1.2 5.6L12 16.3 7 19l1.2-5.6L4 9.6l5.6-.6z"/></svg></button>
+  <button class="tombol-ikon" id="tombol-pantau" aria-label="Buka daftar pantau" title="Tampilkan atau sembunyikan daftar pantau (menyembunyikan diri setelah 6 detik tidak dipakai)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l2.4 5 5.6.6-4.2 3.8 1.2 5.6L12 16.3 7 19l1.2-5.6L4 9.6l5.6-.6z"/></svg></button>
 </header>
 <aside class="samping" id="samping" aria-label="Daftar pantau"><div>
     <div class="pantau-judul"><span>Daftar pantau <span class="redup" id="jml-pantau"></span></span><button class="tutup-laci" data-tutup aria-label="Tutup daftar pantau">×</button></div>
@@ -942,11 +944,17 @@ async function jalankanPerbarui(){
 
 function tutupLaci(){document.body.classList.remove("laci-sisi","laci-pantau")}
 function bukaLaci(n){tutupLaci();document.body.classList.add("laci-"+n)}
-const simpanTata=()=>{try{localStorage.setItem("tata-v1",JSON.stringify({r:document.body.classList.contains("sisi-ringkas"),p:document.body.classList.contains("tanpa-pantau")}))}catch(e){}};
-try{const t=JSON.parse(localStorage.getItem("tata-v1")||"{}");if(t.r)document.body.classList.add("sisi-ringkas");if(t.p)document.body.classList.add("tanpa-pantau")}catch(e){}
+// Menu kiri & daftar pantau menyembunyikan diri bila tidak dipakai beberapa detik (layar lebar).
+const TUNDA_SISI=4000,TUNDA_PANTAU=6000,lebar=n=>innerWidth>n,bd=document.body;let tSisi,tPantau,tIntip;
 document.querySelectorAll("nav.menu.utama a[data-h]").forEach(a=>a.title=a.textContent.trim());
-$("tombol-menu").onclick=()=>{if(innerWidth>1050){document.body.classList.toggle("sisi-ringkas");simpanTata()}else bukaLaci("sisi")};
-$("tombol-pantau").onclick=()=>{if(innerWidth>1350){document.body.classList.toggle("tanpa-pantau");simpanTata()}else bukaLaci("pantau")};
+const ringkasNanti=()=>{clearTimeout(tSisi);tSisi=setTimeout(()=>{if(lebar(1050)&&!$("menu").matches(":hover")){bd.classList.add("sisi-ringkas");bd.classList.remove("sisi-intip")}},TUNDA_SISI)};
+const pantauNanti=()=>{clearTimeout(tPantau);tPantau=setTimeout(()=>{const sp=document.querySelector(".samping");if(lebar(1350)&&!(sp&&sp.matches(":hover")))bd.classList.add("tanpa-pantau")},TUNDA_PANTAU)};
+$("menu").addEventListener("mouseenter",()=>{clearTimeout(tSisi);clearTimeout(tIntip);if(lebar(1050)&&bd.classList.contains("sisi-ringkas"))tIntip=setTimeout(()=>bd.classList.add("sisi-intip"),250)});
+$("menu").addEventListener("mouseleave",()=>{clearTimeout(tIntip);if(!lebar(1050))return;if(bd.classList.contains("sisi-intip"))tIntip=setTimeout(()=>bd.classList.remove("sisi-intip"),500);else ringkasNanti()});
+{const sp=document.querySelector(".samping");if(sp){sp.addEventListener("mouseenter",()=>clearTimeout(tPantau));sp.addEventListener("mouseleave",()=>{if(lebar(1350)&&!bd.classList.contains("tanpa-pantau"))pantauNanti()})}}
+if(lebar(1050))ringkasNanti();if(lebar(1350))pantauNanti();
+$("tombol-menu").onclick=()=>{if(lebar(1050)){bd.classList.remove("sisi-intip");if(bd.classList.toggle("sisi-ringkas"))clearTimeout(tSisi);else ringkasNanti()}else bukaLaci("sisi")};
+$("tombol-pantau").onclick=()=>{if(lebar(1350)){if(bd.classList.toggle("tanpa-pantau"))clearTimeout(tPantau);else pantauNanti()}else bukaLaci("pantau")};
 document.addEventListener("click",e=>{const b=e.target.closest("[data-laci]");if(b){bukaLaci(b.dataset.laci);return}
   if(e.target.closest("[data-tutup]")||e.target.closest(".sisi a[href^='#']")||e.target.closest(".samping a[href^='#']"))tutupLaci()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")tutupLaci()});
