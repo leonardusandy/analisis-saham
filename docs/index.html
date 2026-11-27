@@ -1387,7 +1387,7 @@ async function tampilMalam(){
        <div class="ml-atas"><div><a href="#saham/${x.p.kode}" class="ml-kode">${x.p.kode}</a> <span class="redup">${x.p.lot} lot · beli ${fmt(x.p.beli)} · ${tglPendek(x.p.tgl)} · hari ke-${x.hari}</span></div>
          <span class="ml-putusan" style="background:${WARNA[x.keputusan]}">${esc(x.judul)}</span></div>
        ${s?`<div class="ml-angka"><div><span class="label">Penutupan</span><b>${fmt(x.c)}</b><span class="${kelas(s.perubahan_pct)}">${pct(s.perubahan_pct)} hari ini</span></div>
-         <div><span class="label">Untung/rugi bersih</span><b class="${kelas(x.bersih)}">${pct(x.bersih)}</b><span class="${kelas(x.bersih)}">Rp${fmt(Math.round(x.p.lot*100*(x.c*(1-0.0025)-x.p.beli*(1+0.0015))))}</span></div>
+         <div><span class="label">Untung/rugi</span><b class="${kelas(x.untung)}">${pct(x.untung)}</b><span class="${kelas(x.untung)}">Rp${fmt(Math.round(x.p.lot*100*(x.c-x.p.beli)))}</span><span class="redup" title="Setelah biaya beli 0,15% dan jual 0,25%">bersih ${pct(x.bersih)} · Rp${fmt(Math.round(x.p.lot*100*(x.c*(1-0.0025)-x.p.beli*(1+0.0015))))}</span></div>
          <div><span class="label">Batas rugi besok</span><b class="turun">${fmt(x.stop)}</b><span class="redup">${x.stop>x.stopAwal?"dinaikkan dari "+fmt(x.stopAwal):"−5% dari harga beli"}</span></div>
          <div><span class="label">Target ambil untung</span><b class="naik">${fmt(x.target)}</b><span class="redup">${pct((x.target/x.c-1)*100)} dari penutupan</span></div></div>`:""}
        <ul class="ml-alasan">${x.alasan.map(a=>`<li>${esc(a)}</li>`).join("")}${x.tanda.map(a=>`<li class="redup">Perhatikan: ${esc(a)}</li>`).join("")}</ul>
