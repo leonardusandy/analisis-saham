@@ -129,7 +129,7 @@ class Harga:
         self.arr = {}
         for k, g in d.groupby("kode", sort=False):
             self.arr[k] = {c: g[c].to_numpy(dtype=float) for c in
-                           ("buka", "tinggi", "rendah", "tutup", "atr_rp", "_lo5", "_hi60p", "_hi20p", "ma10_rp")}
+                           ("buka", "tinggi", "rendah", "tutup", "atr_rp", "_lo5", "_hi60p", "_hi20p", "ma5_rp", "ma10_rp", "ma20_rp")}
             self.arr[k]["t"] = g["t"].to_numpy()
 
 
@@ -198,8 +198,11 @@ def simulasi(a, i, masuk="buka", stop="5%", r_target=None, maks=3, kelola="tidak
                 s = max(s, e + risiko)         # kunci 1R setelah untung 2R
             if c[j] >= e + 2 * risiko:
                 s = max(s, tertinggi - 2 * atr[i])
-        elif kelola == "ma10":
-            if c[j] < a["ma10_rp"][j] and j > j0:
+        elif kelola.startswith("ma"):
+            mak = a[kelola.split("x")[0] + "_rp"]
+            dua = kelola.endswith("x2")
+            bawah = c[j] < mak[j] and (not dua or (j - 1 >= j0 and c[j - 1] < mak[j - 1]))
+            if bawah and j > j0:
                 keluar, hari_keluar = (o[j + 1] if j + 1 < n else c[j]), min(j + 1, n - 1)
                 break
     if keluar is None:
@@ -263,12 +266,13 @@ def baris_hasil(nama, tr):
 
 
 # ---------------------------------------------------------------- utama
-def main():
+def siapkan(cetak_pola=True):
     d, CIRI, _, t0 = rm.bangun_data(pakai_global=False)
     d = d.sort_values(["kode", "t"]).reset_index(drop=True)
     d["pos"] = d.groupby("kode").cumcount()
     d["atr_rp"] = d["atr"] * d["tutup"]
-    d["ma10_rp"] = d["tutup"] / (1 + d["ma10"])
+    for m in (5, 10, 20):
+        d[f"ma{m}_rp"] = d["tutup"] / (1 + d[f"ma{m}"])
     nama_pola = tambah_pola(d)
     d["besok"] = d.groupby("kode")["tutup"].shift(-1) / d["tutup"] - 1
     d["tahun"] = d["t"].dt.year
@@ -284,9 +288,10 @@ def main():
     # ---- 1. pola (seluruh 5 tahun & periode uji)
     v = d[d["layak"] & d["besok"].notna() & d["hasil"].notna() & d["di_semesta"]].copy()
     v["selisih"] = v["besok"] - v.groupby("t")["besok"].transform("mean")
-    statistik_pola(v, nama_pola)
-    print("\n-- Sama, hanya periode uji 2024 s.d. sekarang --")
-    statistik_pola(v[v["t"] >= rm.MULAI_UJI], nama_pola)
+    if cetak_pola:
+        statistik_pola(v, nama_pola)
+        print("\n-- Sama, hanya periode uji 2024 s.d. sekarang --")
+        statistik_pola(v[v["t"] >= rm.MULAI_UJI], nama_pola)
 
     # ---- model peringkat walk-forward: tanpa dan dengan ciri pola
     from sklearn.ensemble import HistGradientBoostingRegressor
@@ -335,6 +340,11 @@ def main():
     H = Harga(d)
     acak = u[u["ihsg_ma20"] > 0].sample(n=min(6000, len(u)), random_state=0).copy()
     acak["urutan"] = 1
+    return d, u, SET, H, acak, t0
+
+
+def main():
+    d, u, SET, H, acak, t0 = siapkan()
 
     print("\n=== 2. MODEL + POLA CANDLESTICK (cara lama: beli pembukaan, CL5%, jual hari-3) ===")
     rows = [baris_hasil(nm, jalankan_set(H, p)) for nm, p in SET.items()]
