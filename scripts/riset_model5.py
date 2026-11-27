@@ -106,11 +106,14 @@ def main():
     print(f"Mengambil laporan tahunan {len(kode)} saham...")
     with ThreadPoolExecutor(6) as ex:
         baris = [x for lst in ex.map(fund_satu, kode) for x in lst]
-    F = pd.DataFrame(baris).sort_values("tersedia")
+    F = pd.DataFrame(baris)
+    F["tersedia"] = pd.to_datetime(F["tersedia"]).dt.tz_localize(None)
+    F = F.sort_values("tersedia")
     print(f"Fundamental: {len(F)} tahun buku dari {F['kode'].nunique()} saham ({time.time() - t0:.0f} dtk)")
     print("Sebaran tersedia:", F["tersedia"].dt.year.value_counts().sort_index().to_dict())
 
     x = d[d["layak"] & d["di_semesta"] & (d["t"] >= MULAI)].copy().sort_values("t")
+    F["tersedia"] = F["tersedia"].astype(x["t"].dtype)
     x = pd.merge_asof(x, F.drop(columns=["tutup_buku"]), left_on="t", right_on="tersedia", by="kode", direction="backward")
     x["tren"] = (x["ma50"] > 0) & (x["ma20"] < x["ma50"]) & (x["kem50"] > 0)
     x["naik_ihsg"] = x["ihsg_ma20"] > 0
