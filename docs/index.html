@@ -220,7 +220,7 @@ button.chip.aktif{background:var(--latar-aksen);color:var(--aksen);border-color:
 @media (max-width:760px){.ml-angka{grid-template-columns:1fr 1fr}.ml-kepala h2{font-size:20px}.ml-pasar{text-align:left}}
 .pk-baru{background:#fff4b3}.pk-beli{background:#d7e9fb}.pk-naik{background:#dcf2dc}.pk-turun{background:#fde2cf}
 @media (prefers-color-scheme:dark){.pk-baru{background:#4a4210}.pk-beli{background:#16324d}.pk-naik{background:#173a22}.pk-turun{background:#4a2a14}}
-.pk-tabel td,.pk-tabel th{padding:5px 8px}.bungkus td{white-space:normal;overflow-wrap:anywhere}.bungkus td:first-child{white-space:nowrap}.pk-tabel tr.klik:hover{filter:brightness(.96)}
+.pk-tabel td,.pk-tabel th{padding:5px 8px}.tabel-rencana td,.tabel-rencana th{vertical-align:middle}.tabel-rencana tbody tr:hover{background:var(--hover)}.bungkus td{white-space:normal;overflow-wrap:anywhere}.bungkus td:first-child{white-space:nowrap}.pk-tabel tr.klik:hover{filter:brightness(.96)}
 .legenda span.kotak{display:inline-block;width:28px;height:14px;border-radius:3px;vertical-align:middle;margin-right:6px;border:1px solid var(--garis)}
 .saham-kepala{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
 .bintang{cursor:pointer;font-size:22px;background:none;border:1px solid var(--garis);border-radius:8px;padding:2px 10px;color:var(--kuning)}
@@ -1512,12 +1512,19 @@ async function tampilMalam(){
    </div>
 
    <div class="kartu ml-rencana" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><h3 style="margin:0">Yang dilakukan ${sebut}</h3><button class="tombol kedua chip" id="ml-salin">Salin rencana</button></div>
-     <ol id="ml-daftar-rencana">${[
-       ...nilai.filter(x=>x.keputusan==="jual").map(x=>`<li><b class="turun">JUAL ${x.p.kode}</b> ${x.p.lot} lot saat pembukaan <span class="redup">(${x.swing?"swing, ":""}${esc(x.sebab)})</span></li>`),
-       ...nilai.filter(x=>x.keputusan==="waspada"||x.keputusan==="tahan").map(x=>`<li><b class="${x.keputusan==="tahan"?"naik":""}" ${x.keputusan==="waspada"?'style="color:var(--kuning)"':""}>TAHAN ${x.p.kode}</b>: order jual otomatis di ${fmt(x.stop)}; jual bila penutupan di bawah MA${x.nMA} ${fmt(x.ma10)}${x.swing?" (swing)":""}${x.keputusan==="waspada"?' <span class="redup">(waspada)</span>':""}</li>`),
-       ...(R.pasar_mendukung?beli.slice(0,3).map(b=>`<li><b style="color:var(--aksen)">ANTRE BELI ${b.kode}</b> <span class="redup">(trading cepat)</span> di ${fmt(b.entry[0])}${b.entry[1]!==b.entry[0]?"–"+fmt(b.entry[1]):""}, ${fmt(hitungLot(b.entry[1],b.cl).lot)} lot; batas rugi ${fmt(b.cl)}, sasaran 1:3 ${fmt(b.t3)}, tahan selama di atas MA10</li>`):[]),
-       ...(R.pasar_mendukung?swingBeli.map(b=>`<li><b style="color:var(--aksen)">ANTRE BELI ${b.kode}</b> <span class="redup">(swing fundamental)</span> di ${fmt(b.entry[0])}${b.entry[1]!==b.entry[0]?"–"+fmt(b.entry[1]):""}, ${fmt(hitungLot(b.entry[1],b.cl).lot)} lot; batas rugi ${fmt(b.cl)}, tahan selama di atas MA50</li>`):[]),
-     ].join("")||'<li class="redup">Tidak ada tindakan: belum ada posisi dan tidak ada saham yang memenuhi syarat beli.</li>'}</ol>
+     ${(()=>{const rng=e=>fmt(e[0])+(e[1]!==e[0]?"–"+fmt(e[1]):"");
+       const B=[
+       ...nilai.filter(x=>x.keputusan==="jual").map(x=>({a:"JUAL",w:"var(--merah)",k:x.p.kode,j:x.swing?"Swing":"Trading cepat",h:"saat pembukaan",l:x.p.lot,cl:"–",t:"–",ket:esc(x.sebab),
+         teks:`JUAL ${x.p.kode} ${x.p.lot} lot saat pembukaan (${x.sebab})`})),
+       ...nilai.filter(x=>x.keputusan==="waspada"||x.keputusan==="tahan").map(x=>({a:x.keputusan==="waspada"?"TAHAN (waspada)":"TAHAN",w:x.keputusan==="waspada"?"var(--kuning)":"var(--hijau)",k:x.p.kode,j:x.swing?"Swing":"Trading cepat",h:"–",l:x.p.lot,cl:fmt(x.stop),t:fmt(x.target),
+         ket:`Order jual otomatis di ${fmt(x.stop)}; jual bila tutup di bawah MA${x.nMA} ${fmt(x.ma10)}`,teks:`TAHAN ${x.p.kode}: order jual otomatis di ${fmt(x.stop)}; jual bila penutupan di bawah MA${x.nMA} ${fmt(x.ma10)}`})),
+       ...(R.pasar_mendukung?beli.slice(0,3).map(b=>{const l=hitungLot(b.entry[1],b.cl).lot;return{a:"ANTRE BELI",w:"var(--aksen)",k:b.kode,j:"Trading cepat",h:rng(b.entry),l,cl:fmt(b.cl),t:fmt(b.t3),ket:"Tahan selama di atas MA10, maks 20 hari",
+         teks:`ANTRE BELI ${b.kode} (trading cepat) di ${rng(b.entry)}, ${fmt(l)} lot; batas rugi ${fmt(b.cl)}, sasaran 1:3 ${fmt(b.t3)}, tahan selama di atas MA10`}}):[]),
+       ...(R.pasar_mendukung?swingBeli.map(b=>{const l=hitungLot(b.entry[1],b.cl).lot;return{a:"ANTRE BELI",w:"var(--aksen)",k:b.kode,j:"Swing",h:rng(b.entry),l,cl:fmt(b.cl),t:"–",ket:"Tahan selama di atas MA50, maks 40 hari",
+         teks:`ANTRE BELI ${b.kode} (swing fundamental) di ${rng(b.entry)}, ${fmt(l)} lot; batas rugi ${fmt(b.cl)}, tahan selama di atas MA50`}}):[])];
+       if(!B.length)return'<p class="redup" id="ml-daftar-rencana">Tidak ada tindakan: belum ada posisi dan tidak ada saham yang memenuhi syarat beli.</p>';
+       return`<div class="gulir" style="margin-top:10px"><table class="pk-tabel tabel-rencana" id="ml-daftar-rencana"><thead><tr><th>#</th><th style="text-align:left">Tindakan</th><th style="text-align:left">Saham</th><th style="text-align:left">Jenis</th><th>Harga antre</th><th>Lot</th><th>Batas rugi</th><th>Sasaran 1:3</th><th style="text-align:left">Aturan keluar</th></tr></thead><tbody>${
+         B.map((r,n)=>`<tr data-teks="${esc(r.teks)}"><td class="redup">${n+1}</td><td style="text-align:left"><span class="ml-putusan" style="background:${r.w};font-size:12px">${r.a}</span></td><td style="text-align:left"><a href="#analisa/${r.k}"><b>${r.k}</b></a></td><td style="text-align:left" class="redup">${r.j}</td><td><b>${r.h}</b></td><td>${typeof r.l==="number"?fmt(r.l):r.l}</td><td class="turun">${r.cl}</td><td class="naik">${r.t}</td><td style="text-align:left;white-space:normal;min-width:200px" class="redup">${r.ket}</td></tr>`).join("")}</tbody></table></div>`})()}
      ${ditunda.length?`<p class="redup" style="margin:0 0 6px">Ditunda karena berita negatif dari media terpercaya: ${ditunda.map(b=>`<a href="#saham/${b.kode}">${b.kode}</a>`).join(", ")} (diganti cadangan).</p>`:""}
      ${!R.pasar_mendukung&&beli.length?'<p class="redup" style="margin:0">Ada saham yang memenuhi aturan, tetapi pasar sedang lemah. Menurut aturan, pembelian baru ditunda.</p>':""}</div>
 
@@ -1669,7 +1676,7 @@ function pasangMalam(){
       const j=bacaJurnal();j.push({tgl:$("ml-tjual-"+ix).value||p.tgl,kode:p.kode,beli:p.beli,jual:hj,lot:p.lot,catatan:`beli ${p.tgl}, dicatat dari Malam Ini`});tulisJurnal(j);
       POSISI.splice(ix,1);simpanPosisi();tampilMalam()}
     else if(t.dataset.beli){bukaForm({kode:t.dataset.beli,beli:+t.dataset.harga,lot:+t.dataset.lot,stop:+t.dataset.cl,jenis:t.dataset.jenis||"cepat"})}
-    else if(t.id==="ml-salin"){const teks="Rencana trading "+namaHari(tambahHariBursa(R.tanggal_data,1)).panjang+":\n"+[...document.querySelectorAll("#ml-daftar-rencana li")].map((li,i)=>`${i+1}. ${li.textContent.trim()}`).join("\n");
+    else if(t.id==="ml-salin"){const teks="Rencana trading "+namaHari(tambahHariBursa(R.tanggal_data,1)).panjang+":\n"+[...document.querySelectorAll("#ml-daftar-rencana tr[data-teks]")].map((tr,i)=>`${i+1}. ${tr.dataset.teks}`).join("\n");
       navigator.clipboard?.writeText(teks).then(()=>{t.textContent="Tersalin";setTimeout(()=>t.textContent="Salin rencana",1500)})}
   };
 }
