@@ -97,6 +97,16 @@ def main():
     if mode in ("harian", "berita") or not ada("berita.json"):
         jalan("berita")
     jalan("olah_broker")
+    # data laptop (antrean penutupan) biasanya tiba setelah pembaruan harian: catat ulang pilihan hari ini
+    # agar ciri antrean ikut tersimpan untuk uji kertas (catatan yang belum dinilai diganti yang terbaru)
+    if mode == "broker" and ada("prediksi.json"):
+        try:
+            psi = json.loads((k / "psikologi.json").read_text())
+            rk = json.loads((k / "ringkasan.json").read_text())
+            if psi.get("tanggal") == rk.get("tanggal_data"):
+                jalan("prediksi")
+        except Exception:  # noqa: BLE001
+            pass
 
 
 if __name__ == "__main__":
