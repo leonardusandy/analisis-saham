@@ -178,6 +178,7 @@ button.chip.aktif{background:var(--latar-aksen);color:var(--aksen);border-color:
 .am-indikator{display:grid;grid-template-columns:1fr 1fr;gap:6px}.am-indikator .ind{margin:0}
 .am-indikator .ind>label{font-size:13px;line-height:1.3}
 @media (max-width:1100px){.mandiri{grid-template-columns:1fr}.am-tv{height:62vh}.mandiri-atur{order:2}.am-indikator{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}}
+.ml-nilai{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}.ml-nilai>div{display:flex;flex-direction:column}
 .ml-kepala{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-end;margin:4px 0 16px}
 .ml-kepala h2{margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em}
 .ml-pasar{text-align:right}.ml-pasar b{font-size:20px;font-weight:800}
@@ -1366,6 +1367,8 @@ function nilaiPosisi(p){
 async function tampilMalam(){
   if(!SP){try{SP=await ambil("data/stockpick.json")}catch(e){SP={uptrend:[],sideways:[],analisa:[],sektor:[]}}}
   if(!MD){try{MD=await ambil("data/model.json")}catch(e){}}
+  await muatPrediksi();
+  const hKemarin=(PRD?.harian||[]).filter(h=>h.dinilai===R.tanggal_data).pop();
   const el=$("ml-isi"),i=R.ihsg||{},segar=R.tanggal_data>=hariBursaTerakhirJS(),tglTindak=tambahHariBursa(R.tanggal_data,1),hariTindak=namaHari(tglTindak),lbl=labelTindak(tglTindak);
   const lewat=!segar&&(lbl==="hari ini"||lbl==="lewat");
   const sebut=lewat?hariTindak.pendek:lbl==="hari ini"||lbl==="besok"?`${lbl} (${hariTindak.pendek})`:hariTindak.pendek;
@@ -1389,6 +1392,9 @@ async function tampilMalam(){
        ...(R.pasar_mendukung?beli.slice(0,3).map(b=>`<li><b style="color:var(--aksen)">BELI ${b.kode}</b> di ${fmt(b.entry[0])}${b.entry[1]!==b.entry[0]?"–"+fmt(b.entry[1]):""}, ${fmt(hitungLot(b.entry[1],b.cl).lot)} lot; batas rugi ${fmt(b.cl)}, target ${fmt(b.r1)}</li>`):[]),
      ].join("")||'<li class="redup">Tidak ada tindakan: belum ada posisi dan tidak ada saham yang memenuhi syarat beli.</li>'}</ol>
      ${!R.pasar_mendukung&&beli.length?'<p class="redup" style="margin:0">Ada saham yang memenuhi aturan, tetapi pasar sedang lemah. Menurut aturan, pembelian baru ditunda.</p>':""}</div>
+
+   ${hKemarin?`<div class="kartu" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline"><h3 style="margin:0">Benar atau salah? Prediksi untuk ${namaHari(hKemarin.dinilai).pendek}</h3><a href="#evaluasi" class="redup">Lihat semua hari →</a></div>
+     <p class="redup" style="margin:4px 0 10px">Prediksi dibuat dari data ${namaHari(hKemarin.tanggal).pendek}, dinilai dengan harga penutupan ${namaHari(hKemarin.dinilai).pendek}. ✓ = harga naik.</p>${kartuPenilaian(hKemarin)}</div>`:""}
 
    <div class="kartu" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><h3 style="margin:0">Saham yang saya pegang <span class="redup">(${POSISI.length})</span></h3><button class="tombol" id="ml-tambah-buka">Tambah posisi</button></div>
      <form id="ml-form" class="ml-form" hidden autocomplete="off">
@@ -1572,6 +1578,19 @@ function isiTabelModel(){
   tabelUrut($("t-model"),kol,baris,urutMD);
 }
 
+// ================= Penilaian penutupan berikutnya =================
+function kartuPenilaian(h){
+  if(!h)return"";
+  const m=h.model,t=h.tren,b=h.beli||[];
+  const ok=v=>v?'<span class="naik">✓</span>':'<span class="turun">✗</span>';
+  const bar=[];
+  if(b.length)bar.push(`<div><span class="label">Rekomendasi beli</span>${b.map(x=>`<div style="font-size:13px;margin-top:2px">${ok(x.benar)} <a href="#saham/${x.kode}"><b>${x.kode}</b></a> <span class="${kelas(x.pct)}">${pct(x.pct)}</span>${x.dipilih?.length?"":' <span class="redup">(sinyal J)</span>'}${x.entry?` <span class="redup">· ${x.bisa_beli?"harga sempat masuk rentang entry":"tidak sempat masuk rentang entry"}</span>`:""}</div>`).join("")}</div>`);
+  if(m)bar.push(`<div><span class="label">Model: arah naik/turun</span><b>${fmt(m.arah_benar,1)}% tepat</b><span class="redup" style="font-size:12px;display:block">diperkirakan naik ${m.naik_diperkirakan}, yang benar naik ${m.naik_nyata} dari ${m.n}</span></div>`);
+  if(m&&m.rel_benar!=null)bar.push(`<div><span class="label">Model: unggul/tertinggal</span><b>${fmt(m.rel_benar,1)}% tepat</b><span class="redup" style="font-size:12px;display:block">20% teratas <span class="${kelas(m.atas20)}">${pct(m.atas20)}</span> vs terbawah <span class="${kelas(m.bawah20)}">${pct(m.bawah20)}</span> ${m.atas20>m.bawah20?"✓":"✗"}</span></div>`);
+  if(t)bar.push(`<div><span class="label">Tren</span><span style="font-size:13px;display:block">Uptrend naik: <b>${t.uptrend.benar==null?"–":fmt(t.uptrend.benar,1)+"%"}</b> (${t.uptrend.n})</span><span style="font-size:13px;display:block">Sideways tenang (≤2%): <b>${t.sideways.benar==null?"–":fmt(t.sideways.benar,1)+"%"}</b> (${t.sideways.n})</span><span style="font-size:13px;display:block">Keluar tabel turun: <b>${t.keluar.benar==null?"–":fmt(t.keluar.benar,1)+"%"}</b> (${t.keluar.n})</span></div>`);
+  return`<div class="statistik ml-nilai">${bar.join("")}</div>`;
+}
+
 // ================= Evaluasi prediksi =================
 let gEval=null;
 async function tampilEvaluasi(){
@@ -1585,6 +1604,16 @@ async function tampilEvaluasi(){
   el.innerHTML=`
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin:0">Evaluasi analisis & rekomendasi</h3>
      <p class="redup" style="margin:6px 0 0">Setiap hari bursa pukul 17.30 (setelah bursa tutup), web mencatat semua rekomendasi dan perkiraan hari itu, lalu menilai catatan hari-hari sebelumnya dengan harga sebenarnya. Data ini menjadi bahan untuk memperbaiki aturan dan model. Tercatat ${fmt(n.hari)} hari, ${fmt(n.beli)} sinyal beli, ${fmt(n.tren)} perkiraan tren, ${fmt(n.model||0)} perkiraan model; ${fmt(n.menunggu)} masih menunggu hasil. Diperbarui ${PRD.dibuat}.</p></div>
+   <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Penilaian di penutupan berikutnya</h3>
+     <p class="redup" style="margin:0 0 10px">Setiap prediksi langsung dinilai dengan harga penutupan hari bursa berikutnya.</p>
+     ${(PRD.harian||[]).length?`<div class="gulir" style="max-height:420px"><table class="keranjang"><thead><tr><th>Prediksi dari data</th><th>Dinilai</th><th>Rekomendasi beli</th><th>Model arah tepat</th><th>Model unggul tepat</th><th>20% teratas vs terbawah</th><th>Uptrend naik</th></tr></thead><tbody>${[...PRD.harian].reverse().map(h=>`<tr><td>${tglPendek(h.tanggal)}</td><td>${tglPendek(h.dinilai)}</td>
+       <td style="text-align:left">${(h.beli||[]).map(x=>`<span class="${kelas(x.pct)}">${x.benar?"✓":"✗"} ${x.kode} ${pct(x.pct)}</span>`).join(", ")||'<span class="redup">–</span>'}</td>
+       <td>${h.model?fmt(h.model.arah_benar,1)+"%":"–"}</td><td>${h.model?.rel_benar!=null?fmt(h.model.rel_benar,1)+"%":"–"}</td>
+       <td>${h.model?.atas20!=null?`<span class="${kelas(h.model.atas20-h.model.bawah20)}">${pct(h.model.atas20)} vs ${pct(h.model.bawah20)}</span>`:"–"}</td>
+       <td>${h.tren?.uptrend?.benar!=null?fmt(h.tren.uptrend.benar,1)+"%":"–"}</td></tr>`).join("")}</tbody></table></div>
+       <h4 style="margin:14px 0 6px">Rincian penilaian terakhir (${tglPendek(PRD.harian.at(-1).tanggal)} → ${tglPendek(PRD.harian.at(-1).dinilai)})</h4>${kartuPenilaian(PRD.harian.at(-1))}`
+       :'<div class="kosong">Penilaian pertama muncul setelah penutupan hari bursa berikutnya.</div>'}</div>
+
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Hasil rekomendasi beli (beli di pembukaan, batas rugi −5%, jual hari ke-3)</h3>
      <div class="statistik">${r(st.beli_analisa,"Analisa harian")}${r(st.beli_dipilih,"Analisa + Kandidat Besok")}${r(st.beli_semua,"Semua sinyal aturan J")}
        <div><span class="label">Tersentuh dalam 3 hari</span><b>R1 ${st.kena.r1==null?"–":fmt(st.kena.r1,0)+"%"}</b><span class="redup" style="font-size:12px;display:block">R2 ${st.kena.r2==null?"–":fmt(st.kena.r2,0)+"%"} · CL ${st.kena.cl==null?"–":fmt(st.kena.cl,0)+"%"}</span></div></div>

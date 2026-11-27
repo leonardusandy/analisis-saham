@@ -67,6 +67,68 @@ def lilin(kode: str, simpan: dict):
     return simpan[kode]
 
 
+def nilai_h1(c: dict, L: list) -> None:
+    """Penilaian di penutupan berikutnya (1 hari bursa setelah prediksi)."""
+    if "h1" in c:
+        return
+    tgl = [x["t"] for x in L]
+    if c["tanggal"] not in tgl:
+        return
+    i = tgl.index(c["tanggal"])
+    if i + 1 >= len(L):
+        return
+    n = L[i + 1]
+    c["h1"] = {"t": n["t"], "o": n["o"], "h": n["h"], "l": n["l"], "c": n["c"],
+               "pct": round((n["c"] / L[i]["c"] - 1) * 100, 2)}
+
+
+def penilaian_harian(semua: list[dict]) -> list[dict]:
+    """Ringkasan penilaian penutupan berikutnya untuk setiap tanggal prediksi."""
+    per = defaultdict(list)
+    for c in semua:
+        if c.get("h1"):
+            per[c["tanggal"]].append(c)
+    hasil = []
+    for t in sorted(per):
+        v = per[t]
+        mdl = [c for c in v if c["jenis"] == "model"]
+        beli = [c for c in v if c["jenis"] == "beli"]
+        tren = [c for c in v if c["jenis"] == "tren"]
+        d = {"tanggal": t, "dinilai": v[0]["h1"]["t"]}
+        if mdl:
+            med = float(np.median([c["h1"]["pct"] for c in mdl]))
+            rel = [c for c in mdl if c.get("p_rel") is not None]
+            urut = sorted(rel, key=lambda c: -c["p_rel"])
+            n5 = max(1, len(urut) // 5)
+            d["model"] = {
+                "n": len(mdl),
+                "arah_benar": round(sum((c["p"] >= 50) == (c["h1"]["pct"] > 0) for c in mdl) / len(mdl) * 100, 1),
+                "naik_diperkirakan": sum(c["p"] >= 50 for c in mdl),
+                "naik_nyata": sum(c["h1"]["pct"] > 0 for c in mdl),
+                "rel_benar": round(sum((c["p_rel"] >= 50) == (c["h1"]["pct"] > med) for c in rel) / len(rel) * 100, 1) if rel else None,
+                "atas20": round(sum(c["h1"]["pct"] for c in urut[:n5]) / n5, 2) if rel else None,
+                "bawah20": round(sum(c["h1"]["pct"] for c in urut[-n5:]) / n5, 2) if rel else None,
+                "median": round(med, 2),
+            }
+        if beli:
+            d["beli"] = [{
+                "kode": c["kode"], "dipilih": c.get("dipilih", []), "pct": c["h1"]["pct"],
+                "buka": c["h1"]["o"], "tutup": c["h1"]["c"], "entry": (c.get("rencana") or {}).get("entry"),
+                "bisa_beli": bool((c.get("rencana") or {}).get("entry") and c["h1"]["l"] <= c["rencana"]["entry"][1]),
+                "benar": c["h1"]["pct"] > 0,
+            } for c in sorted(beli, key=lambda c: (not c.get("dipilih"), c["kode"]))]
+        if tren:
+            def akr(arr, uji):
+                return {"n": len(arr), "benar": round(sum(uji(c["h1"]["pct"]) for c in arr) / len(arr) * 100, 1) if arr else None}
+            d["tren"] = {
+                "uptrend": akr([c for c in tren if c["prediksi"] == "up"], lambda x: x > 0),
+                "sideways": akr([c for c in tren if c["prediksi"] == "side"], lambda x: abs(x) <= 2),
+                "keluar": akr([c for c in tren if c["prediksi"] == "keluar"], lambda x: x < 0),
+            }
+        hasil.append(d)
+    return hasil[-60:]
+
+
 def nilai_beli(c: dict, L: list) -> None:
     tgl = [x["t"] for x in L]
     if c["tanggal"] not in tgl:
@@ -300,10 +362,13 @@ def main():
     # 1) nilai catatan yang belum selesai
     simpan = {}
     for c in cat.values():
-        if c["status"] == "selesai":
+        if c["status"] == "selesai" and "h1" in c:
             continue
         L = lilin(c["kode"], simpan)
-        if L:
+        if not L:
+            continue
+        nilai_h1(c, L)
+        if c["status"] != "selesai":
             {"beli": nilai_beli, "tren": nilai_tren, "model": nilai_model}[c["jenis"]](c, L)
 
     # 2) tambah catatan hari ini (id unik: data tanggal yang sama tidak terhitung dua kali)
@@ -321,7 +386,7 @@ def main():
     beli_akhir = [c for c in semua if c["jenis"] == "beli"][-300:]
     (k / "prediksi.json").write_text(json.dumps({
         "dibuat": datetime.now(WIB).strftime("%Y-%m-%d %H:%M WIB"), "tanggal_data": rk["tanggal_data"],
-        "statistik": st, "beli": beli_akhir,
+        "statistik": st, "beli": beli_akhir, "harian": penilaian_harian(semua),
         "tren_terbaru": [c for c in semua if c["jenis"] == "tren"][-400:],
     }, ensure_ascii=False, separators=(",", ":")))
     print(f"Prediksi: {n_baru} catatan baru, total {len(semua)} ({st['jumlah']['hari']} hari), "
