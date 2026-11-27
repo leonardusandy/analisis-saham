@@ -23,6 +23,8 @@ import json
 import os
 import sys
 from collections import defaultdict
+
+import numpy as np
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -148,7 +150,7 @@ def catat_model(md: dict) -> list[dict]:
         return []
     t = md["tanggal"]
     return [{"id": f"{t}|{x['kode']}|model", "jenis": "model", "tanggal": t, "kode": x["kode"], "status": "menunggu",
-             "p": x["p"], "keyakinan": x["keyakinan"]} for x in md["prediksi"]]
+             "p": x["p"], "keyakinan": x["keyakinan"], "p_rel": x.get("p_rel")} for x in md["prediksi"]]
 
 
 def catat_hari_ini(rk: dict, sp: dict, fund: dict) -> list[dict]:
@@ -245,7 +247,25 @@ def statistik(cat: list[dict]) -> dict:
     per_hari = defaultdict(list)
     for c in mdl:
         per_hari[c["tanggal"]].append(c)
+    # penilaian relatif: dibanding median perubahan semua saham pada tanggal yang sama
+    rel, selisih = [], []
+    for t, v in per_hari.items():
+        v = [c for c in v if c.get("p_rel") is not None]
+        if len(v) < 20:
+            continue
+        med = float(np.median([c["hasil"]["pct"] for c in v]))
+        for c in v:
+            c["benar_rel"] = (c["p_rel"] >= 50) == (c["hasil"]["pct"] > med)
+            rel.append(c)
+        urut = sorted(v, key=lambda c: -c["p_rel"])
+        n5 = max(1, len(urut) // 5)
+        selisih.append({"t": t, "atas": sum(c["hasil"]["pct"] for c in urut[:n5]) / n5,
+                        "bawah": sum(c["hasil"]["pct"] for c in urut[-n5:]) / n5})
     model = {
+        "relatif": {"n": len(rel), "benar": round(sum(c["benar_rel"] for c in rel) / len(rel) * 100, 1) if rel else None,
+                    "hari": len(selisih),
+                    "atas20": round(sum(x["atas"] for x in selisih) / len(selisih), 2) if selisih else None,
+                    "bawah20": round(sum(x["bawah"] for x in selisih) / len(selisih), 2) if selisih else None},
         "semua": akurasi(mdl),
         "per_keyakinan": {y: akurasi([c for c in mdl if c["keyakinan"] == y]) for y in ("tinggi", "sedang", "rendah")},
         "per_arah": {"naik": akurasi([c for c in mdl if c["p"] >= 50]), "turun": akurasi([c for c in mdl if c["p"] < 50])},

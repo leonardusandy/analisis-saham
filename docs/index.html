@@ -1328,42 +1328,53 @@ async function tampilModel(){
   const el=$("md-isi");
   try{MD??=await ambil("data/model.json")}catch(e){el.innerHTML='<div class="kartu kosong">Prediksi model belum tersedia. Dibuat setiap hari bursa pukul 17.30.</div>';return}
   await muatPrediksi();
-  const v=MD.validasi,live=PRD?.statistik?.model;
+  const rel=!!MD.validasi_rel,v=MD.validasi_rel||MD.validasi,va=MD.validasi,live=PRD?.statistik?.model;
   const kotak=(j,isi,ket="")=>`<div><span class="label">${j}</span><b>${isi}</b>${ket?`<span class="redup" style="font-size:12px;display:block">${ket}</span>`:""}</div>`;
+  const unggul=MD.prediksi.filter(x=>x.arah_rel==="unggul").length,naik=MD.prediksi.filter(x=>x.arah==="naik").length;
   el.innerHTML=`
-   <div class="kartu" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="margin:0">Perkiraan arah ${MD.horizon} hari bursa ke depan · semua saham</h3><span class="redup">data ${tglPendek(MD.tanggal)} · dibuat ${MD.dibuat}</span></div>
-     <p class="redup" style="margin:6px 0 0">Peluang naik = perkiraan model bahwa harga penutupan ${MD.horizon} hari lagi lebih tinggi dari penutupan terakhir. Model belajar dari pola harga, volume, tren, dan kondisi pasar ±1 tahun terakhir. <b>Peluang 50% berarti tidak tahu.</b> Ini bukan kepastian dan bukan perintah transaksi.</p></div>
+   <div class="kartu" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="margin:0">Perkiraan ${MD.horizon} hari bursa ke depan · semua saham</h3><span class="redup">data ${tglPendek(MD.tanggal)} · dibuat ${MD.dibuat}</span></div>
+     <p style="margin:8px 0 0">Model menjawab dua pertanyaan untuk setiap saham:</p>
+     <ul style="margin:4px 0 0;padding-left:20px">
+       <li><b>Unggul atau tertinggal dari pasar?</b> Peluang perubahan harga ${MD.horizon} hari saham ini lebih baik dari rata-rata semua saham. Selalu ada saham yang unggul dan tertinggal, jadi ini dipakai untuk <b>memilih saham terkuat</b>. Hari ini: ${unggul} unggul, ${MD.prediksi.length-unggul} tertinggal.</li>
+       <li><b>Naik atau turun?</b> Peluang harga ${MD.horizon} hari lagi lebih tinggi dari harga terakhir. Jawaban ini sangat dipengaruhi kondisi pasar: saat pasar lemah, hampir semua saham diperkirakan turun. Hari ini: ${naik} naik, ${MD.prediksi.length-naik} turun.</li></ul>
+     <p class="redup" style="margin:8px 0 0">Peluang 50% berarti model tidak tahu. Ini bukan kepastian dan bukan perintah transaksi.</p></div>
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Seberapa bisa dipercaya?</h3>
+     <p class="redup" style="margin:0 0 10px">Diuji pada ${esc(v.periode)} (${fmt(v.n)} perkiraan) dengan data yang tidak dipakai saat melatih model.</p>
      <div class="statistik">
-       ${kotak("Akurasi saat diuji",fmt(v.akurasi,1)+"%",`${fmt(v.n)} perkiraan pada ${esc(v.periode)}, data yang tidak dipakai melatih`)}
-       ${kotak("Pembanding: tebak arah terbanyak",fmt(v.dasar,1)+"%",`saham yang benar-benar naik: ${fmt(v.persen_naik_nyata,1)}%`)}
-       ${kotak("Akurasi saat yakin (≥60% / ≤40%)",v.akurasi_yakin==null?"–":fmt(v.akurasi_yakin,1)+"%",`${fmt(v.n_yakin)} perkiraan`)}
+       ${rel?kotak("20% saham teratas menurut model",`<span class="${kelas(v.atas20_hasil)}">${pct(v.atas20_hasil)}</span>`,"rata-rata selisih dengan pasar dalam 3 hari"):""}
+       ${rel?kotak("20% saham terbawah menurut model",`<span class="${kelas(v.bawah20_hasil)}">${pct(v.bawah20_hasil)}</span>`,"model berguna bila teratas jelas lebih baik dari terbawah"):""}
+       ${kotak(rel?"Tebakan unggul/tertinggal tepat":"Akurasi arah",fmt(v.akurasi,1)+"%",`pembanding tebak asal: ${fmt(v.dasar,1)}%`)}
        ${kotak("Daya pembeda (AUC)",fmt(v.auc,3),"0,5 = menebak; 0,55+ mulai berguna")}
-       ${kotak("Akurasi nyata sejak dicatat",live?.semua?.benar==null?"belum ada":fmt(live.semua.benar,1)+"%",live?.semua?.n?`${fmt(live.semua.n)} perkiraan selesai dinilai`:"dinilai otomatis 3 hari bursa setelah perkiraan")}
+       ${rel?kotak("Model naik/turun: akurasi",fmt(va.akurasi,1)+"%",`pembanding "selalu tebak ${va.persen_naik_nyata>=50?"naik":"turun"}": ${fmt(va.dasar,1)}%`):""}
+       ${kotak("Ketepatan nyata sejak dicatat",live?.relatif?.benar!=null?fmt(live.relatif.benar,1)+"% (unggul/tertinggal)":live?.semua?.benar!=null?fmt(live.semua.benar,1)+"% (naik/turun)":"belum ada",live?.relatif?.hari?`${live.relatif.hari} hari dinilai · teratas ${pct(live.relatif.atas20)} vs terbawah ${pct(live.relatif.bawah20)}`:"dinilai otomatis 3 hari bursa setelah perkiraan")}
      </div>
      <div class="kisi2" style="margin-top:12px">
-       <div><h4 style="margin:6px 0">Perkiraan vs kenyataan (periode uji)</h4><div class="gulir"><table class="keranjang"><thead><tr><th>Peluang naik</th><th>Jumlah</th><th>Rata perkiraan</th><th>Yang benar naik</th><th>Rata perubahan</th></tr></thead><tbody>${v.keranjang.map(x=>`<tr><td>${x.rentang}</td><td>${fmt(x.n)}</td><td>${fmt(x.perkiraan,1)}%</td><td><b>${fmt(x.kenyataan,1)}%</b></td><td class="${kelas(x.rata_hasil)}">${pct(x.rata_hasil)}</td></tr>`).join("")}</tbody></table></div>
-         <p class="redup" style="font-size:12px">Model yang baik: kolom "yang benar naik" mendekati "rata perkiraan", dan makin tinggi peluang makin tinggi kenyataannya.</p></div>
+       <div><h4 style="margin:6px 0">Perkiraan vs kenyataan (periode uji)</h4><div class="gulir"><table class="keranjang"><thead><tr><th>Peluang ${rel?"unggul":"naik"}</th><th>Jumlah</th><th>Rata perkiraan</th><th>Yang benar ${rel?"unggul":"naik"}</th><th>Rata ${rel?"selisih vs pasar":"perubahan"}</th></tr></thead><tbody>${v.keranjang.map(x=>`<tr><td>${x.rentang}</td><td>${fmt(x.n)}</td><td>${fmt(x.perkiraan,1)}%</td><td><b>${fmt(x.kenyataan,1)}%</b></td><td class="${kelas(x.rata_hasil)}">${pct(x.rata_hasil)}</td></tr>`).join("")}</tbody></table></div>
+         <p class="redup" style="font-size:12px">Model yang baik: makin tinggi peluang, makin tinggi kolom "yang benar".</p></div>
        <div><h4 style="margin:6px 0">Ciri yang paling berpengaruh</h4>${MD.penting.slice(0,8).map(x=>{const w=Math.max(0,x.turun_auc)/Math.max(1e-6,MD.penting[0].turun_auc)*100;return`<div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-size:13px"><span style="width:190px">${esc(x.fitur)}</span><span class="batang-p" style="width:${w*1.4}px;background:var(--aksen)"></span></div>`}).join("")}</div>
      </div></div>
    <div class="kartu"><div class="baris" style="justify-content:space-between;align-items:end;margin-bottom:8px">
        <div class="baris" id="md-saring"></div>
-       <div class="rentang" id="md-arah"><button class="tombol kedua chip aktif" data-a="semua">Semua</button><button class="tombol kedua chip" data-a="naik">Perkiraan naik</button><button class="tombol kedua chip" data-a="turun">Perkiraan turun</button><button class="tombol kedua chip" data-a="yakin">Keyakinan tinggi</button></div></div>
+       <div class="rentang" id="md-arah"><button class="tombol kedua chip aktif" data-a="semua">Semua</button><button class="tombol kedua chip" data-a="unggul">Unggul dari pasar</button><button class="tombol kedua chip" data-a="tertinggal">Tertinggal</button><button class="tombol kedua chip" data-a="naik">Perkiraan naik</button><button class="tombol kedua chip" data-a="yakin">Keyakinan tinggi</button></div></div>
      <div class="redup" id="md-info" style="margin-bottom:6px"></div>
      <div class="gulir" style="max-height:70vh"><table id="t-model"></table></div>
-     <p class="redup" style="font-size:12px">*Rata-rata perubahan 3 hari yang benar-benar terjadi pada periode uji untuk saham dengan peluang serupa.</p></div>`;
+     <p class="redup" style="font-size:12px">*Rata-rata yang benar-benar terjadi pada periode uji untuk saham dengan peluang serupa. "Vs pasar" = selisih perubahan 3 hari saham dengan rata-rata semua saham.</p></div>`;
   pasangSaringLapis($("md-saring"),SARING_MD,isiTabelModel);
   $("md-arah").onclick=e=>{const b=e.target.closest("button");if(!b)return;arahMD=b.dataset.a;document.querySelectorAll("#md-arah button").forEach(x=>x.classList.toggle("aktif",x===b));isiTabelModel()};
+  if(!urutMD.k||urutMD.k==="p")urutMD={k:MD.validasi_rel?"p_rel":"p",turun:true};
   isiTabelModel();
 }
 function isiTabelModel(){
+  const rel=!!MD.validasi_rel;
   const baris=MD.prediksi.filter(x=>PETA[x.kode]).map(x=>({...G(x.kode),...x})).filter(s=>lolosLapis(s,SARING_MD))
-    .filter(s=>arahMD==="semua"||(arahMD==="yakin"?s.keyakinan==="tinggi":s.arah===arahMD));
-  const naik=baris.filter(x=>x.arah==="naik").length;
-  $("md-info").textContent=`${baris.length} saham · perkiraan naik ${naik}, turun ${baris.length-naik}`;
-  const batang=p=>{const w=Math.abs(p-50)*2;return`<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:60px;height:8px;background:var(--hover);border-radius:4px;position:relative;display:inline-block"><span style="position:absolute;top:0;height:8px;border-radius:4px;${p>=50?`left:30px;width:${w*.3}px;background:var(--hijau)`:`right:30px;width:${w*.3}px;background:var(--merah)`}"></span></span><b class="${p>=50?"naik":"turun"}">${fmt(p,1)}%</b></span>`};
-  tabelUrut($("t-model"),[["kode","Kode",(v,s)=>`<b>${v}</b>${s.j?' <span class="lencana" title="Sinyal aturan J hari ini">J</span>':""}`],["sektor","Sektor",v=>`<span class="redup">${esc(v)}</span>`],["tutup","Harga",v=>fmt(v)],["perubahan_pct","Hari ini",v=>`<span class="${kelas(v)}">${pct(v)}</span>`],
-    ["p","Peluang naik",v=>batang(v)],["arah","Arah",v=>v==="naik"?'<span class="naik">▲ naik</span>':'<span class="turun">▼ turun</span>'],["keyakinan","Keyakinan",v=>v],["perkiraan_pct","Rata-rata 3 hari*",v=>`<span class="${kelas(v)}">${pct(v)}</span>`],["rsi","RSI",v=>fmt(v,0)],["lapis","Lapis",v=>v||"–"]],baris,urutMD);
+    .filter(s=>arahMD==="semua"||(arahMD==="yakin"?(rel?s.keyakinan_rel:s.keyakinan)==="tinggi":arahMD==="naik"?s.arah==="naik":s.arah_rel===arahMD));
+  const ung=baris.filter(x=>x.arah_rel==="unggul").length,nk=baris.filter(x=>x.arah==="naik").length;
+  $("md-info").textContent=`${baris.length} saham`+(rel?` · unggul ${ung}, tertinggal ${baris.length-ung}`:"")+` · perkiraan naik ${nk}, turun ${baris.length-nk}`;
+  const batang=p=>{const w=Math.abs(p-50)*2;return`<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:60px;height:8px;background:var(--hover);border-radius:4px;position:relative;display:inline-block"><span style="position:absolute;top:0;height:8px;border-radius:4px;${p>=50?`left:30px;width:${Math.min(30,w*.3)}px;background:var(--hijau)`:`right:30px;width:${Math.min(30,w*.3)}px;background:var(--merah)`}"></span></span><b class="${p>=50?"naik":"turun"}">${fmt(p,1)}%</b></span>`};
+  const kol=[["kode","Kode",(v,s)=>`<b>${v}</b>${s.j?' <span class="lencana" title="Sinyal aturan J hari ini">J</span>':""}`],["sektor","Sektor",v=>`<span class="redup">${esc(v)}</span>`],["tutup","Harga",v=>fmt(v)],["perubahan_pct","Hari ini",v=>`<span class="${kelas(v)}">${pct(v)}</span>`]];
+  if(rel)kol.push(["p_rel","Peluang unggul",v=>batang(v)],["arah_rel","Vs pasar",v=>v==="unggul"?'<span class="naik">▲ unggul</span>':'<span class="turun">▼ tertinggal</span>'],["keyakinan_rel","Keyakinan",v=>v],["perkiraan_rel_pct","Rata vs pasar*",v=>`<span class="${kelas(v)}">${pct(v)}</span>`]);
+  kol.push(["p","Peluang naik",v=>rel?`<span class="${v>=50?"naik":"turun"}">${fmt(v,1)}%</span>`:batang(v)],["arah","Arah",v=>v==="naik"?'<span class="naik">▲ naik</span>':'<span class="turun">▼ turun</span>'],["perkiraan_pct","Rata 3 hari*",v=>`<span class="${kelas(v)}">${pct(v)}</span>`],["rsi","RSI",v=>fmt(v,0)],["lapis","Lapis",v=>v||"–"]);
+  tabelUrut($("t-model"),kol,baris,urutMD);
 }
 
 // ================= Evaluasi prediksi =================

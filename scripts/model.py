@@ -4,7 +4,9 @@ Cara kerja:
   - Ciri (fitur) dihitung dari riwayat harga harian tiap saham (tren, momentum, volume, posisi
     harga, RSI, ATR, sinyal aturan J, jejak distribusi) dan kondisi pasar (indeks rata-rata semua
     saham: naik/turun 5 hari, di atas/bawah MA20).
-  - Sasaran: harga penutupan 3 hari bursa kemudian lebih tinggi dari penutupan hari ini.
+  - Sasaran 1 (arah): harga penutupan 3 hari bursa kemudian lebih tinggi dari penutupan hari ini.
+  - Sasaran 2 (relatif): perubahan 3 hari saham lebih baik dari perubahan pasar (indeks rata-rata
+    semua saham). Selalu ada saham unggul dan tertinggal, berapa pun kondisi pasar.
   - Model: HistGradientBoostingClassifier (scikit-learn).
   - Uji jujur (walk-forward): model dilatih hanya dengan data sebelum 60 hari bursa terakhir,
     lalu diuji pada 60 hari terakhir yang tidak pernah dilihatnya. Angka akurasi di web berasal
@@ -99,6 +101,12 @@ def main():
     kolom = list(NAMA_FITUR)
     data = data.replace([np.inf, -np.inf], np.nan).dropna(subset=["ma50", "r20", "rv", "pasar5"])
 
+    # sasaran kedua: lebih kuat dari pasar (indeks rata-rata semua saham) dalam H hari
+    pasar_maju = (pasar.shift(-H) / pasar - 1).rename("pasar_maju")
+    data = data.merge(pasar_maju, left_on="t", right_index=True, how="left")
+    data["hasil_rel"] = data["hasil"] - data["pasar_maju"]
+    data["target_rel"] = (data["hasil_rel"] > 0).astype(float).where(data["hasil_rel"].notna())
+
     from sklearn.ensemble import HistGradientBoostingClassifier
     from sklearn.metrics import roc_auc_score
 
@@ -107,79 +115,102 @@ def main():
                                               l2_regularization=1.0, random_state=0)
 
     tanggal = sorted(data["t"].unique())
-    berlabel = data[data["target"].notna()]
-    tgl_label = sorted(berlabel["t"].unique())
-    batas_uji = tgl_label[-HARI_UJI]
-    # jeda H hari agar label data latih tidak menyentuh periode uji
-    tgl_latih_akhir = tgl_label[max(0, tgl_label.index(batas_uji) - H)]
-    latih = berlabel[berlabel["t"] < tgl_latih_akhir]
-    uji = berlabel[berlabel["t"] >= batas_uji]
 
-    m = model_baru().fit(latih[kolom], latih["target"])
-    p_uji = m.predict_proba(uji[kolom])[:, 1]
-    y = uji["target"].to_numpy()
-    akurasi = float(((p_uji >= 0.5) == (y == 1)).mean())
-    dasar = float(max(y.mean(), 1 - y.mean()))
-    keranjang = []
-    for a, b in [(0, .4), (.4, .45), (.45, .5), (.5, .55), (.55, .6), (.6, 1.01)]:
-        sel = (p_uji >= a) & (p_uji < b)
-        if sel.sum():
-            keranjang.append({"rentang": f"{int(a * 100)}–{min(100, int(b * 100))}%", "n": int(sel.sum()),
-                              "perkiraan": round(float(p_uji[sel].mean()) * 100, 1),
-                              "kenyataan": round(float(y[sel].mean()) * 100, 1),
-                              "rata_hasil": round(float(uji["hasil"].to_numpy()[sel].mean()) * 100, 2)})
-    yakin = (p_uji >= 0.6) | (p_uji <= 0.4)
-    validasi = {
-        "periode": f"{batas_uji} s.d. {tgl_label[-1]}", "n": int(len(uji)), "akurasi": round(akurasi * 100, 1),
-        "dasar": round(dasar * 100, 1), "persen_naik_nyata": round(float(y.mean()) * 100, 1),
-        "auc": round(float(roc_auc_score(y, p_uji)), 3),
-        "akurasi_yakin": round(float(((p_uji[yakin] >= 0.5) == (y[yakin] == 1)).mean()) * 100, 1) if yakin.sum() else None,
-        "n_yakin": int(yakin.sum()), "keranjang": keranjang, "n_latih": int(len(latih)),
-    }
+    def pusatkan(p, tgl):
+        """Untuk sasaran relatif: separuh saham pasti di atas rata-rata, jadi peluang digeser
+        per tanggal agar nilai tengahnya 50% (yang penting urutannya)."""
+        sr = pd.Series(p, index=np.asarray(tgl))
+        return np.clip((sr - sr.groupby(level=0).transform("median") + 0.5).to_numpy(), 0.01, 0.99)
 
-    # pentingnya ciri: penurunan AUC bila satu ciri diacak (pada sampel uji)
+    def latih_uji(sasaran: str, hasil: str, pusat: bool = False):
+        berlabel = data[data[sasaran].notna()]
+        tgl_label = sorted(berlabel["t"].unique())
+        batas_uji = tgl_label[-HARI_UJI]
+        # jeda H hari agar label data latih tidak menyentuh periode uji
+        tgl_latih_akhir = tgl_label[max(0, tgl_label.index(batas_uji) - H)]
+        latih = berlabel[berlabel["t"] < tgl_latih_akhir]
+        uji = berlabel[berlabel["t"] >= batas_uji]
+        m = model_baru().fit(latih[kolom], latih[sasaran])
+        p_uji = m.predict_proba(uji[kolom])[:, 1]
+        if pusat:
+            p_uji = pusatkan(p_uji, uji["t"])
+        y = uji[sasaran].to_numpy()
+        h_uji = uji[hasil].to_numpy()
+        keranjang = []
+        for a, b in [(0, .4), (.4, .45), (.45, .5), (.5, .55), (.55, .6), (.6, 1.01)]:
+            sel = (p_uji >= a) & (p_uji < b)
+            if sel.sum():
+                keranjang.append({"rentang": f"{int(a * 100)}–{min(100, int(b * 100))}%", "n": int(sel.sum()),
+                                  "perkiraan": round(float(p_uji[sel].mean()) * 100, 1),
+                                  "kenyataan": round(float(y[sel].mean()) * 100, 1),
+                                  "rata_hasil": round(float(h_uji[sel].mean()) * 100, 2)})
+        yakin = (p_uji >= 0.6) | (p_uji <= 0.4)
+        # 20% teratas vs 20% terbawah menurut model (berguna untuk memilih saham)
+        q20, q80 = np.quantile(p_uji, [0.2, 0.8])
+        validasi = {
+            "periode": f"{batas_uji} s.d. {tgl_label[-1]}", "n": int(len(uji)),
+            "akurasi": round(float(((p_uji >= 0.5) == (y == 1)).mean()) * 100, 1),
+            "dasar": round(float(max(y.mean(), 1 - y.mean())) * 100, 1), "persen_naik_nyata": round(float(y.mean()) * 100, 1),
+            "auc": round(float(roc_auc_score(y, p_uji)), 3),
+            "akurasi_yakin": round(float(((p_uji[yakin] >= 0.5) == (y[yakin] == 1)).mean()) * 100, 1) if yakin.sum() else None,
+            "n_yakin": int(yakin.sum()), "keranjang": keranjang, "n_latih": int(len(latih)),
+            "atas20_hasil": round(float(h_uji[p_uji >= q80].mean()) * 100, 2),
+            "bawah20_hasil": round(float(h_uji[p_uji <= q20].mean()) * 100, 2),
+            "atas20_benar": round(float(y[p_uji >= q80].mean()) * 100, 1),
+        }
+        tepi = np.quantile(p_uji, np.linspace(0, 1, 11))
+        rata_desil = [float(h_uji[(p_uji >= tepi[i]) & (p_uji <= tepi[i + 1])].mean()) for i in range(10)]
+        m_penuh = model_baru().fit(berlabel[kolom], berlabel[sasaran])
+        return validasi, m, m_penuh, uji, tepi, rata_desil
+
+    val_abs, _, m_abs, _, tepi_abs, desil_abs = latih_uji("target", "hasil")
+    val_rel, m_uji_rel, m_rel, uji_rel, tepi_rel, desil_rel = latih_uji("target_rel", "hasil_rel", pusat=True)
+
+    # pentingnya ciri (model relatif): penurunan AUC bila satu ciri diacak
     rng = np.random.default_rng(0)
-    contoh = uji.sample(min(len(uji), 15000), random_state=0)
-    auc0 = roc_auc_score(contoh["target"], m.predict_proba(contoh[kolom])[:, 1])
+    contoh = uji_rel.sample(min(len(uji_rel), 15000), random_state=0)
+    auc0 = roc_auc_score(contoh["target_rel"], m_uji_rel.predict_proba(contoh[kolom])[:, 1])
     penting = []
     for c in kolom:
         x = contoh[kolom].copy()
         x[c] = rng.permutation(x[c].to_numpy())
-        penting.append({"fitur": NAMA_FITUR[c], "turun_auc": round(float(auc0 - roc_auc_score(contoh["target"], m.predict_proba(x)[:, 1])), 4)})
+        penting.append({"fitur": NAMA_FITUR[c], "turun_auc": round(float(auc0 - roc_auc_score(contoh["target_rel"], m_uji_rel.predict_proba(x)[:, 1])), 4)})
     penting.sort(key=lambda x: -x["turun_auc"])
 
-    # latih ulang dengan semua data berlabel, perkirakan tanggal terakhir
-    m = model_baru().fit(berlabel[kolom], berlabel["target"])
     akhir = data[data["t"] == tanggal[-1]].copy()
-    akhir["p"] = m.predict_proba(akhir[kolom])[:, 1]
-    # perkiraan perubahan: rata-rata hasil nyata di uji untuk peluang yang mirip
-    pk = pd.Series(p_uji)
-    hasil_uji = uji["hasil"].reset_index(drop=True)
-    tepi = np.quantile(p_uji, np.linspace(0, 1, 11))
-    rata_desil = [float(hasil_uji[(pk >= tepi[i]) & (pk <= tepi[i + 1])].mean()) for i in range(10)]
+    akhir["p"] = m_abs.predict_proba(akhir[kolom])[:, 1]
+    akhir["p_rel"] = pusatkan(m_rel.predict_proba(akhir[kolom])[:, 1], akhir["t"])
 
-    def perkiraan(p):
+    def perkiraan(p, tepi, desil):
         i = int(np.clip(np.searchsorted(tepi, p, side="right") - 1, 0, 9))
-        return round(rata_desil[i] * 100, 2)
+        return round(desil[i] * 100, 2)
+
+    def yakin(p):
+        return "tinggi" if p >= 0.6 or p <= 0.4 else "sedang" if p >= 0.55 or p <= 0.45 else "rendah"
 
     prediksi = []
     for _, r in akhir.iterrows():
         s = info.get(r["kode"], {})
-        p = float(r["p"])
+        p, pr = float(r["p"]), float(r["p_rel"])
         prediksi.append({
-            "kode": r["kode"], "p": round(p * 100, 1), "arah": "naik" if p >= 0.5 else "turun",
-            "keyakinan": "tinggi" if p >= 0.6 or p <= 0.4 else "sedang" if p >= 0.55 or p <= 0.45 else "rendah",
-            "perkiraan_pct": perkiraan(p), "j": bool(r["j"]), "likuid": bool(s.get("likuid")),
+            "kode": r["kode"],
+            "p": round(p * 100, 1), "arah": "naik" if p >= 0.5 else "turun", "keyakinan": yakin(p),
+            "perkiraan_pct": perkiraan(p, tepi_abs, desil_abs),
+            "p_rel": round(pr * 100, 1), "arah_rel": "unggul" if pr >= 0.5 else "tertinggal", "keyakinan_rel": yakin(pr),
+            "perkiraan_rel_pct": perkiraan(pr, tepi_rel, desil_rel),
+            "j": bool(r["j"]), "likuid": bool(s.get("likuid")),
             "rsi": round(float(r["rsi"]), 1) if pd.notna(r["rsi"]) else None,
         })
-    prediksi.sort(key=lambda x: -x["p"])
+    prediksi.sort(key=lambda x: -x["p_rel"])
     out = {
         "dibuat": datetime.now(WIB).strftime("%Y-%m-%d %H:%M WIB"), "tanggal": tanggal[-1], "horizon": H,
-        "validasi": validasi, "penting": penting, "prediksi": prediksi,
+        "validasi": val_abs, "validasi_rel": val_rel, "penting": penting, "prediksi": prediksi,
     }
     (k / "model.json").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")))
-    print(f"Model: uji {validasi['periode']}: akurasi {validasi['akurasi']}% (dasar {validasi['dasar']}%), "
-          f"AUC {validasi['auc']}, {len(prediksi)} saham diperkirakan.")
+    print(f"Model arah: uji {val_abs['periode']}: akurasi {val_abs['akurasi']}% (dasar {val_abs['dasar']}%), AUC {val_abs['auc']}.")
+    print(f"Model relatif: akurasi {val_rel['akurasi']}% (dasar {val_rel['dasar']}%), AUC {val_rel['auc']}, "
+          f"20% teratas {val_rel['atas20_hasil']:+.2f}% vs 20% terbawah {val_rel['bawah20_hasil']:+.2f}% (selisih vs pasar, 3 hari); "
+          f"unggul {sum(x['arah_rel'] == 'unggul' for x in prediksi)} dari {len(prediksi)} saham.")
 
 
 if __name__ == "__main__":
