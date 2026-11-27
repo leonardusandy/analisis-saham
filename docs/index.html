@@ -1674,6 +1674,8 @@ function kartuUnggulan(){
   if(!u)return'<div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Saham potensial</h3><div class="kosong">Daftar potensial muncul setelah pembaruan harian berikutnya.</div></div>';
   const baris=Object.fromEntries([...SP.uptrend,...SP.sideways].map(b=>[b.kode,b])),NSx={up:"uptrend",side:"sideways"};
   return`<div class="kartu" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:baseline"><h3 style="margin:0">Saham potensial · ${u.daftar.length} dari maks ${u.aturan.maks}</h3><span class="redup" style="font-size:13px">data ${tglPendek(u.tanggal)}${u.pembanding?` · dibanding ${tglPendek(u.pembanding)}`:""}</span></div>
+    ${(()=>{const h=(PRD?.harian||[]).filter(x=>x.potensial?.length).pop();if(!h)return"";const pt=h.potensial,n=pt.filter(x=>x.benar).length,uu=pt.filter(x=>x.unggul).length;
+      return`<div class="pita" style="margin:8px 0"><b>Hasil daftar ${tglPendek(h.tanggal)}</b> pada penutupan ${tglPendek(h.dinilai)}: ${n} dari ${pt.length} naik, ${uu} mengalahkan pasar (rata-rata semua saham ${pct(h.potensial_pasar)}). ${pt.map(x=>`${x.kode} <span class="${kelas(x.pct)}">${pct(x.pct)}</span>`).join(", ")}. <a href="#evaluasi">Evaluasi lengkap →</a></div>`})()}
     <p class="redup" style="margin:6px 0 10px;font-size:13px">Diurutkan menurut skor strategi B (momentum 20 hari + model peringkat). <b>Masuk</b> bila peringkat ≤ ${u.aturan.masuk} dan harga di atas MA20; <b>bertahan</b> selama peringkat ≤ ${u.aturan.bertahan} dan masih di atas MA20; selain itu <b>keluar</b>. Jumlahnya bisa kurang dari ${u.aturan.maks} bila saham yang memenuhi syarat sedikit.</p>
     <div class="gulir"><table class="pk-tabel"><thead><tr><th>#</th><th style="text-align:left">Kode</th><th>Status</th><th>Skor</th><th>Harga</th><th>20 hari</th><th>Tren</th><th>S/R</th></tr></thead><tbody>${u.daftar.map((x,i)=>{const b=baris[x.kode];return`<tr class="klik" data-k="${x.kode}">
       <td>${i+1}</td><td style="text-align:left"><b>${x.kode}</b> <span class="redup">${esc(x.sektor||"")}</span>${x.distribusi?' <span class="lencana" title="Ada candle merah bervolume besar 5 hari terakhir" style="background:var(--kuning);color:#222">distribusi</span>':""}</td>
@@ -1687,7 +1689,7 @@ let SP=null;
 async function tampilPilihan(){
   const el=$("pk-isi");
   try{SP??=await ambil("data/stockpick.json")}catch(e){el.innerHTML='<div class="kartu kosong">Data pilihan harian belum tersedia. Dibuat setiap hari bursa pukul 17.30.</div>';return}
-  await muatStrategi();
+  await muatStrategi();await muatPrediksi();
   const tanda=b=>`${"^".repeat(b.tingkat||0)}`;
   const kodeSel=b=>`<b>${b.kode}${tanda(b)}</b>${b.sk?` <span class="redup">(${b.sk})</span>`:""}${b.murah?' <span title="Murah">◌</span>':""}`;
   const sr=b=>`${fmt(b.support)}${b.kuat?"*":""}/${fmt(b.resistance)}`;
@@ -1781,12 +1783,33 @@ function isiTabelModel(){
 }
 
 // ================= Penilaian penutupan berikutnya =================
+// patokan uji mundur aturan daftar potensial (riset_model7, 2024–2026)
+const PATOKAN_POTENSIAL={naik:44.7,unggul:50.4,selisih1:0.21,rata5:0.72,acak_naik:40.7,acak_unggul:45.1,selisih3:0.44,selisih5:0.65};
+function kartuEvalPotensial(p){
+  const s=p?.semua,baris=(nm,x)=>x?`<tr><td style="text-align:left">${nm}</td><td>${x.n}</td><td>${fmt(x.naik,1)}%</td><td>${x.unggul==null?"–":fmt(x.unggul,1)+"%"}</td><td class="${kelas(x.rata1)}">${pct(x.rata1)}</td><td class="${kelas(x.selisih1)}">${x.selisih1==null?"–":pct(x.selisih1)}</td><td class="${kelas(x.rata3)}">${x.rata3==null?"–":pct(x.rata3)}</td><td class="${kelas(x.selisih3)}">${x.selisih3==null?"–":pct(x.selisih3)}</td><td class="${kelas(x.rata5)}">${x.rata5==null?"–":pct(x.rata5)}</td></tr>`:"";
+  const P=PATOKAN_POTENSIAL;
+  return`<div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Saham potensial: benar atau salah?</h3>
+    <p class="redup" style="margin:0 0 10px;font-size:13px">Setiap hari daftar saham potensial (maks 10) disimpan, lalu dinilai dengan harga sebenarnya: penutupan besok (naik/turun dan dibanding rata-rata semua saham), serta 3 dan 5 hari bursa kemudian. Dicatat sejak 26 Nov 2026.</p>${P?`<div class="pita" style="margin:0 0 10px;font-size:13px"><b>Cara membaca:</b> dalam uji mundur 2024–2026, daftar ini hanya naik besoknya <b>${fmt(P.naik,1)}%</b> (saham acak ${fmt(P.acak_naik,1)}%), karena arah satu hari sangat acak dan banyak saham tidak bergerak. Keunggulannya ada pada <b>selisih rata-rata dengan pasar</b>: ${pct(P.selisih1)} besok, ${pct(P.selisih3)} dalam 3 hari, ${pct(P.selisih5)} dalam 5 hari, dan mengalahkan pasar ${fmt(P.unggul,1)}% (acak ${fmt(P.acak_unggul,1)}%). Model dinilai andal bila angka nyata di bawah ini mendekati patokan tersebut setelah cukup banyak hari (minimal 20–30 hari).</div>`:""}
+    ${s?`<div class="statistik" style="margin-bottom:10px">
+      <div><span class="label">Naik besoknya</span><b>${fmt(s.naik,1)}%</b><span class="redup" style="font-size:12px;display:block">${s.n} saham · ${p.hari} hari${P?` · patokan ${fmt(P.naik,1)}%`:""}</span></div>
+      <div><span class="label">Mengalahkan pasar besoknya</span><b>${s.unggul==null?"–":fmt(s.unggul,1)+"%"}</b><span class="redup" style="font-size:12px;display:block">${P?`patokan ${fmt(P.unggul,1)}% · acak ${fmt(P.acak_unggul,1)}%`:""}</span></div>
+      <div><span class="label">Rata-rata besok vs pasar</span><b class="${kelas(s.selisih1)}">${s.selisih1==null?"–":pct(s.selisih1)}</b><span class="redup" style="font-size:12px;display:block">rata-rata ${pct(s.rata1)}${P?` · patokan ${pct(P.selisih1)}`:""}</span></div>
+      <div><span class="label">Rata-rata 5 hari</span><b class="${kelas(s.rata5)}">${s.rata5==null?"menunggu":pct(s.rata5)}</b><span class="redup" style="font-size:12px;display:block">${s.n5} saham sudah 5 hari${P?` · patokan ${pct(P.rata5)}`:""}</span></div></div>
+    <div class="gulir"><table class="pk-tabel"><thead><tr><th style="text-align:left">Kelompok</th><th>n</th><th>Naik besok</th><th>Unggul pasar</th><th>Besok</th><th>vs pasar</th><th>3 hari</th><th>vs pasar</th><th>5 hari</th></tr></thead><tbody>
+      ${baris("Semua",s)}${baris("Baru masuk",p.per_status.baru)}${baris("Bertahan",p.per_status.bertahan)}${baris("Peringkat 1–3",p.per_peringkat["1-3"])}${baris("Peringkat 4–10",p.per_peringkat["4-10"])}${baris("Peringkat 11–20",p.per_peringkat["11-20"])}${baris("Saat IHSG > MA20",p.per_pasar["IHSG > MA20"])}${baris("Saat IHSG < MA20",p.per_pasar["IHSG < MA20"])}</tbody></table></div>
+    <h4 style="margin:12px 0 6px">Per hari</h4><div class="gulir" style="max-height:300px"><table class="pk-tabel"><thead><tr><th style="text-align:left">Tanggal daftar</th><th>Saham</th><th>Naik besok</th><th>Unggul pasar</th><th>Rata-rata besok</th><th>Pasar (rata-rata)</th><th>3 hari</th><th>5 hari</th></tr></thead><tbody>
+      ${[...p.harian].reverse().map(x=>`<tr><td style="text-align:left">${tglPendek(x.t)}</td><td>${x.n}</td><td>${fmt(x.naik,0)}%</td><td>${x.unggul==null?"–":fmt(x.unggul,0)+"%"}</td><td class="${kelas(x.rata1)}">${pct(x.rata1)}</td><td class="${kelas(x.pasar1)}">${x.pasar1==null?"–":pct(x.pasar1)}</td><td class="${kelas(x.rata3)}">${x.rata3==null?"–":pct(x.rata3)}</td><td class="${kelas(x.rata5)}">${x.rata5==null?"–":pct(x.rata5)}</td></tr>`).join("")}</tbody></table></div>`
+    :'<div class="kosong">Penilaian pertama muncul setelah penutupan hari bursa berikutnya.</div>'}</div>`;
+}
 function kartuPenilaian(h){
   if(!h)return"";
   const m=h.model,t=h.tren,b=h.beli||[];
   const ok=v=>v?'<span class="naik">✓</span>':'<span class="turun">✗</span>';
   const bar=[],ps=h.posisi||[];
   const KP={jual:"jual",waspada:"waspada",tahan:"tahan"};
+  const pt=h.potensial||[];
+  if(pt.length){const n=pt.filter(x=>x.benar).length,u=pt.filter(x=>x.unggul).length;
+    bar.push(`<div><span class="label">Saham potensial</span><b>${n} dari ${pt.length} naik</b><span class="redup" style="font-size:12px;display:block">${u} mengalahkan pasar (rata-rata semua saham ${pct(h.potensial_pasar)})</span>${pt.map(x=>`<div style="font-size:13px;margin-top:2px">${ok(x.benar)} <a href="#saham/${x.kode}"><b>${x.kode}</b></a> <span class="${kelas(x.pct)}">${pct(x.pct)}</span>${x.unggul?' <span class="redup" title="mengalahkan rata-rata semua saham">▲pasar</span>':""}</div>`).join("")}</div>`)}
   if(ps.length)bar.push(`<div><span class="label">Keputusan posisi Anda</span>${ps.map(x=>`<div style="font-size:13px;margin-top:2px">${ok(x.benar)} <b>${x.kode}</b> ${KP[x.keputusan]} → harga <span class="${kelas(x.pct)}">${pct(x.pct)}</span></div>`).join("")}<span class="redup" style="font-size:12px">jual/waspada benar bila harga turun; tahan benar bila naik/tetap</span></div>`);
   if(b.length)bar.push(`<div><span class="label">Rekomendasi beli</span>${b.map(x=>`<div style="font-size:13px;margin-top:2px">${ok(x.benar)} <a href="#saham/${x.kode}"><b>${x.kode}</b></a> <span class="${kelas(x.pct)}">${pct(x.pct)}</span>${x.dipilih?.length?"":' <span class="redup">(sinyal J)</span>'}${x.entry?` <span class="redup">· ${x.bisa_beli?"harga sempat masuk rentang entry":"tidak sempat masuk rentang entry"}</span>`:""}</div>`).join("")}</div>`);
   if(m)bar.push(`<div><span class="label">Model: arah naik/turun</span><b>${fmt(m.arah_benar,1)}% tepat</b><span class="redup" style="font-size:12px;display:block">diperkirakan naik ${m.naik_diperkirakan}, yang benar naik ${m.naik_nyata} dari ${m.n}</span></div>`);
@@ -1808,6 +1831,7 @@ async function tampilEvaluasi(){
   el.innerHTML=`
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin:0">Evaluasi analisis & rekomendasi</h3>
      <p class="redup" style="margin:6px 0 0">Setiap hari bursa pukul 17.30 (setelah bursa tutup), web mencatat semua rekomendasi dan perkiraan hari itu, lalu menilai catatan hari-hari sebelumnya dengan harga sebenarnya. Data ini menjadi bahan untuk memperbaiki aturan dan model. Tercatat ${fmt(n.hari)} hari, ${fmt(n.beli)} sinyal beli, ${fmt(n.tren)} perkiraan tren, ${fmt(n.model||0)} perkiraan model; ${fmt(n.menunggu)} masih menunggu hasil. Diperbarui ${PRD.dibuat}.</p></div>
+   ${kartuEvalPotensial(st.potensial)}
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Uji kertas per strategi</h3>
      ${st.potensial_h1?`<p style="margin:0 0 8px"><b>Saham potensial, arah penutupan besok:</b> naik pada <b>${fmt(st.potensial_h1.naik,1)}%</b> dari ${st.potensial_h1.n} catatan, rata-rata <span class="${kelas(st.potensial_h1.rata)}">${pct(st.potensial_h1.rata)}</span> per hari.</p>`:'<p class="redup" style="margin:0 0 8px">Saham potensial mulai dicatat 27 Nov 2026; penilaian pertama muncul setelah penutupan hari bursa berikutnya.</p>'}
      <p class="redup" style="margin:0 0 10px">Setiap pilihan dinilai dengan cara trading Anda: antrean beli di harga penutupan (hanya dihitung bila antrean terisi), batas rugi −5%, tahan selama penutupan di atas MA10 (maks 20 hari), setelah biaya. Hasil uji 2024–2026 dengan cara ini: B +3,2%, A +2,8% per transaksi.${st.antrean?` Antrean terisi ${st.antrean.terisi}, tidak terisi ${st.antrean.tidak_terisi}.`:""}</p>

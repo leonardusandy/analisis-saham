@@ -131,7 +131,15 @@ def penilaian_harian(semua: list[dict]) -> list[dict]:
         beli = [c for c in v if c["jenis"] == "beli"]
         tren = [c for c in v if c["jenis"] == "tren"]
         pos = [c for c in v if c["jenis"] == "posisi"]
+        pot = [c for c in v if c["jenis"] == "potensial"]
         d = {"tanggal": t, "dinilai": v[0]["h1"]["t"]}
+        if pot:
+            med = float(np.mean([c["h1"]["pct"] for c in v if c["jenis"] == "model"])) if any(c["jenis"] == "model" for c in v) else None
+            d["potensial"] = [{"kode": c["kode"], "status": c["daftar"].get("status"), "peringkat": c["daftar"].get("peringkat"),
+                               "pct": c["h1"]["pct"], "benar": c["h1"]["pct"] > 0,
+                               "unggul": (c["h1"]["pct"] > med) if med is not None else None}
+                              for c in sorted(pot, key=lambda c: c["daftar"].get("urutan") or 99)]
+            d["potensial_pasar"] = round(med, 2) if med is not None else None
         if pos:
             d["posisi"] = [{"kode": c["kode"], "keputusan": c["keputusan"], "pct": c["h1"]["pct"], "benar": c.get("benar")}
                            for c in pos]
@@ -267,6 +275,38 @@ def nilai_model(c: dict, L: list) -> None:
         c["status"] = "berjalan"
 
 
+def catat_potensial(st: dict) -> list[dict]:
+    """Daftar "Saham potensial" (maks 10) hari ini, untuk dinilai dengan penutupan besok, 3 dan 5 hari."""
+    u = (st or {}).get("unggulan") or {}
+    t = u.get("tanggal")
+    if not t or t != (st or {}).get("tanggal"):
+        return []
+    naik = bool(st.get("pasar_mendukung"))
+    return [{"id": f"{t}|{x['kode']}|potensial", "jenis": "potensial", "tanggal": t, "kode": x["kode"], "status": "menunggu",
+             "daftar": {"status": x.get("status"), "peringkat": x.get("peringkat"), "dari": x.get("dari"), "skor": x.get("skor"),
+                        "sejak": x.get("sejak"), "urutan": i + 1},
+             "tutup": x.get("tutup"), "fitur": {"ihsg_naik": naik, "r20": x.get("r20"), "distribusi": x.get("distribusi")}}
+            for i, x in enumerate(u.get("daftar") or [])]
+
+
+def nilai_potensial(c: dict, L: list) -> None:
+    """Perubahan penutupan 1, 3, dan 5 hari bursa setelah tanggal daftar (dibanding penutupan hari daftar)."""
+    tgl = [x["t"] for x in L]
+    if c["tanggal"] not in tgl:
+        return
+    i = tgl.index(c["tanggal"])
+    ke = L[i + 1:i + 6]
+    if not ke:
+        c["status"] = "menunggu"
+        return
+    dasar = L[i]["c"]
+    h = {f"pct{n}": round((ke[n - 1]["c"] / dasar - 1) * 100, 2) for n in (1, 3, 5) if len(ke) >= n}
+    h["sampai"] = ke[-1]["t"]
+    c["hasil"] = h
+    c["benar"] = h["pct1"] > 0
+    c["status"] = "selesai" if len(ke) >= 5 else "berjalan"
+
+
 def catat_swing(sw: dict) -> list[dict]:
     """Pilihan swing fundamental hari ini (utama + cadangan) untuk uji kertas."""
     if not sw or not sw.get("pilihan"):
@@ -367,6 +407,56 @@ def ringkas(arr: list[dict]) -> dict | None:
     return {"n": len(r), "menang": round(len(m) / len(r) * 100, 1), "rata": round(sum(r) / len(r), 2),
             "pf": round(sum(m) / -sum(k), 2) if k and sum(k) else None,
             "rata_menang": round(sum(m) / len(m), 2) if m else 0, "rata_kalah": round(sum(k) / len(k), 2) if k else 0}
+
+
+def tolok_ukur(cat: list[dict]) -> dict:
+    """Rata-rata perubahan semua saham per tanggal (sama dengan pembanding uji mundur riset_model7) (dari perkiraan model yang mencakup semua saham): 1 dan 3 hari."""
+    per = defaultdict(lambda: {"h1": [], "h3": []})
+    for c in cat:
+        if c["jenis"] != "model":
+            continue
+        if c.get("h1"):
+            per[c["tanggal"]]["h1"].append(c["h1"]["pct"])
+        if c.get("status") == "selesai" and c.get("hasil"):
+            per[c["tanggal"]]["h3"].append(c["hasil"]["pct"])
+    return {t: {k: (float(np.mean(v)) if len(v) >= 20 else None) for k, v in d.items()} for t, d in per.items()}
+
+
+def statistik_potensial(cat: list[dict], tu: dict) -> dict:
+    pot = [c for c in cat if c["jenis"] == "potensial" and c.get("hasil", {}).get("pct1") is not None]
+
+    def ring(arr):
+        if not arr:
+            return None
+        p1 = [c["hasil"]["pct1"] for c in arr]
+        ex1 = [c["hasil"]["pct1"] - tu[c["tanggal"]]["h1"] for c in arr if (tu.get(c["tanggal"]) or {}).get("h1") is not None]
+        a3 = [c for c in arr if "pct3" in c["hasil"]]
+        ex3 = [c["hasil"]["pct3"] - tu[c["tanggal"]]["h3"] for c in a3 if (tu.get(c["tanggal"]) or {}).get("h3") is not None]
+        a5 = [c["hasil"]["pct5"] for c in arr if "pct5" in c["hasil"]]
+        r = lambda v: round(sum(v) / len(v), 2) if v else None  # noqa: E731
+        return {"n": len(arr), "naik": round(sum(x > 0 for x in p1) / len(p1) * 100, 1),
+                "turun": round(sum(x < 0 for x in p1) / len(p1) * 100, 1),
+                "unggul": round(sum(x > 0 for x in ex1) / len(ex1) * 100, 1) if ex1 else None,
+                "rata1": r(p1), "selisih1": r(ex1), "n3": len(a3), "rata3": r([c["hasil"]["pct3"] for c in a3]), "selisih3": r(ex3),
+                "n5": len(a5), "rata5": r(a5)}
+    per_tgl = defaultdict(list)
+    for c in pot:
+        per_tgl[c["tanggal"]].append(c)
+    harian = []
+    for t in sorted(per_tgl):
+        x = ring(per_tgl[t])
+        harian.append({"t": t, **{k: x[k] for k in ("n", "naik", "unggul", "rata1", "selisih1", "rata3", "rata5")},
+                       "pasar1": round(tu[t]["h1"], 2) if (tu.get(t) or {}).get("h1") is not None else None})
+    return {
+        "semua": ring(pot), "hari": len(per_tgl),
+        "per_status": {s: ring([c for c in pot if c["daftar"].get("status") == s]) for s in ("baru", "bertahan")},
+        "per_peringkat": {"1-3": ring([c for c in pot if (c["daftar"].get("peringkat") or 99) <= 3]),
+                          "4-10": ring([c for c in pot if 3 < (c["daftar"].get("peringkat") or 99) <= 10]),
+                          "11-20": ring([c for c in pot if (c["daftar"].get("peringkat") or 0) > 10])},
+        "per_pasar": {"IHSG > MA20": ring([c for c in pot if c["fitur"].get("ihsg_naik")]),
+                      "IHSG < MA20": ring([c for c in pot if not c["fitur"].get("ihsg_naik")])},
+        "harian": harian[-120:],
+    }
 
 
 def statistik(cat: list[dict]) -> dict:
@@ -472,10 +562,12 @@ def statistik(cat: list[dict]) -> dict:
                  "r2": round(sum(c["hasil"]["kena_r2"] for c in r1) / len(r1) * 100, 1) if r1 else None,
                  "cl": round(sum(c["hasil"]["kena_cl"] for c in r1) / len(r1) * 100, 1) if r1 else None},
         "per_ciri": per_ciri, "akurasi_tren": akurasi_tren, "kurva": kurva, "model": model, "posisi": posisi,
+        "potensial": statistik_potensial(cat, tolok_ukur(cat)),
         "jumlah": {"beli": len(beli), "tren": len(tren), "model": sum(c["jenis"] == "model" for c in cat),
                    "hari": len({c["tanggal"] for c in cat}),
                    "menunggu": sum(c["status"] in ("menunggu", "berjalan") for c in cat if c["jenis"] != "model"),
-                   "swing": sum(c["jenis"] == "swing" for c in cat)},
+                   "swing": sum(c["jenis"] == "swing" for c in cat),
+                   "potensial": sum(c["jenis"] == "potensial" for c in cat)},
     }
 
 
@@ -503,7 +595,7 @@ def main():
             c["status"] = "menunggu"
     # 0b) proses ulang untuk tanggal data yang sama: catatan yang belum dinilai diganti yang terbaru
     for cid in [cid for cid, c in cat.items()
-                if c["tanggal"] == t_data and c["jenis"] in ("beli", "tren", "model", "swing") and "h1" not in c]:
+                if c["tanggal"] == t_data and c["jenis"] in ("beli", "tren", "model", "swing", "potensial") and "h1" not in c]:
         del cat[cid]
     # 1) nilai catatan yang belum selesai
     simpan = {}
@@ -516,12 +608,12 @@ def main():
         nilai_h1(c, L)
         if c["status"] != "selesai":
             {"beli": nilai_beli, "tren": nilai_tren, "model": nilai_model, "posisi": nilai_posisi,
-             "swing": lambda c, L: nilai_beli(c, L, 0.08, 50, 40)}[c["jenis"]](c, L)
+             "swing": lambda c, L: nilai_beli(c, L, 0.08, 50, 40), "potensial": nilai_potensial}[c["jenis"]](c, L)
 
     # 2) tambah catatan hari ini (id unik: data tanggal yang sama tidak terhitung dua kali)
     n_baru = 0
     for c in (catat_hari_ini(rk, sp, fund, baca(k / "strategi.json", {})) + catat_model(baca(k / "model.json"))
-              + catat_swing(baca(k / "swing.json", {}))):
+              + catat_swing(baca(k / "swing.json", {})) + catat_potensial(baca(k / "strategi.json", {}))):
         if c["id"] not in cat:
             cat[c["id"]] = c
             n_baru += 1
