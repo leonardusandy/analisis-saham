@@ -24,6 +24,7 @@ import sentimen as snt  # noqa: E402
 BERKAS = cfg.KELUAR / "berita.json"
 WIB = timezone(timedelta(hours=7))
 UMUR_MAKS_HARI = 14
+UMUR_TERPERCAYA_HARI = 92  # berita per saham dari media terpercaya disimpan ±3 bulan
 AGEN = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
 
 GN = "https://news.google.com/rss/search?hl=id&gl=ID&ceid=ID:id&q="
@@ -142,13 +143,16 @@ def kunci_judul(b: dict) -> str:
     return re.sub(r"\W+", "", b["judul"].lower())[:80]
 
 
-def gabung(baru: list[dict], lama: list[dict], batas: int) -> list[dict]:
+def gabung(baru: list[dict], lama: list[dict], batas: int, panjang: bool = False) -> list[dict]:
+    """panjang=True: berita dari media terpercaya disimpan hingga UMUR_TERPERCAYA_HARI, lainnya UMUR_MAKS_HARI."""
     batas_waktu = (datetime.now(WIB) - timedelta(days=UMUR_MAKS_HARI)).strftime("%Y-%m-%dT%H:%M:%S")
+    batas_tp = (datetime.now(WIB) - timedelta(days=UMUR_TERPERCAYA_HARI)).strftime("%Y-%m-%dT%H:%M:%S")
     analisis_lama = {kunci_judul(b): b for b in lama if "analisis" in b}
     terlihat, hasil = set(), []
     for b in sorted(baru + lama, key=lambda x: x["waktu"], reverse=True):
         kunci = kunci_judul(b)
-        if kunci in terlihat or b["waktu"] < batas_waktu:
+        tp = panjang and bool(TERPERCAYA.search(b.get("sumber") or ""))
+        if kunci in terlihat or b["waktu"] < (batas_tp if tp else batas_waktu):
             continue
         terlihat.add(kunci)
         if "analisis" not in b and kunci in analisis_lama:
@@ -207,16 +211,26 @@ def main():
         mulai = 0
     PER_JALAN = 55
     giliran = [urutan[(mulai + i) % len(urutan)] for i in range(min(PER_JALAN, len(urutan)))]
-    berkas_giliran.write_text(json.dumps({"mulai": (mulai + len(giliran)) % max(1, len(urutan))}))
+
     print(f"  giliran saham {mulai + 1}–{mulai + len(giliran)} dari {len(urutan)}")
+    try:
+        sudah90 = set(json.loads(berkas_giliran.read_text()).get("isi90", []))
+    except Exception:  # noqa: BLE001
+        sudah90 = set()
     for kode in giliran:
-        q = f'"{kode}" saham when:7d'
+        awal = kode not in sudah90  # sekali per saham: ambil 3 bulan ke belakang, hanya media terpercaya yang disimpan
+        q = f'"{kode}" saham when:{"90d" if awal else "7d"}'
         hasil = baca_rss("Google News", GN + quote_plus(q))
+        if awal:
+            hasil = [h for h in hasil if TERPERCAYA.search(h.get("sumber") or "")]
+            sudah90.add(kode)
         for h in hasil:
             if kode not in h["kode"]:
                 h["kode"] = [kode] + h["kode"]
         per_saham[kode] = hasil
         time.sleep(2)
+
+    berkas_giliran.write_text(json.dumps({"mulai": (mulai + len(giliran)) % max(1, len(urutan)), "isi90": sorted(sudah90)}))
 
     # Berita pasar yang menyebut kode saham juga masuk ke daftar saham itu
     for b in pasar:
@@ -227,7 +241,7 @@ def main():
     pasar_akhir = gabung(pasar, lama.get("pasar", []), 120)
     per_saham_akhir = {
         k: v for k in sorted(set(per_saham) | set(lama.get("per_saham", {})))
-        if (v := gabung(per_saham.get(k, []), lama.get("per_saham", {}).get(k, []), 25))
+        if (v := gabung(per_saham.get(k, []), lama.get("per_saham", {}).get(k, []), 40, panjang=True))
     }
     semua = {kunci_judul(b): b for b in pasar_akhir}
     for v in per_saham_akhir.values():
