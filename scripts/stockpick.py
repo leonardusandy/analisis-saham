@@ -148,6 +148,7 @@ def main():
             "support": bulatkan(support, "bawah"), "resistance": bulatkan(r1, "atas"), "r2": bulatkan(r2, "atas"),
             "kuat": sentuh >= 3, "murah": murah, "sejak": df.index[-lama], "hari": lama,
             "warna": warna, "sinyal": sinyal, "tutup": c, "ubah": s.get("perubahan_pct"), "atr": round(float(atr), 1),
+            "ma10": round(float(df["c"].tail(10).mean()), 1),
             "skor": s.get("skor"), "rasio_vol": rv, "macd": bool(s.get("sinyal_macd")),
             "bahaya": f.get("bahaya") or [], "kualitas": bool(f.get("lolos_kualitas")),
         })
@@ -185,10 +186,11 @@ def main():
         r1 = b["resistance"] if b["resistance"] > hi * 1.01 else bulatkan(hi + b["atr"], "atas")
         r2 = b["r2"] if b["r2"] > r1 * 1.01 else bulatkan(r1 + b["atr"], "atas")
         cl = bulatkan(hi * (1 - cfg.STOP_PERSEN), "atas")  # batas rugi 5% dari harga beli, sesuai uji
+        t3 = bulatkan(hi + 3 * (hi - cl), "atas")  # sasaran minimal rasio 1:3 (acuan, bukan perintah jual)
         untung, rugi = r1 / hi - 1, 1 - cl / hi
         analisa.append({
             "kode": b["kode"], "sk": b["sk"], "status": b["status"], "tingkat": b["tingkat"],
-            "entry": [lo, hi], "r1": r1, "r2": r2, "cl": cl,
+            "entry": [lo, hi], "r1": r1, "r2": r2, "cl": cl, "t3": t3, "ma10": b["ma10"],
             "untung_r1_pct": round(untung * 100, 1), "rugi_cl_pct": round(-rugi * 100, 1), "rasio": round(untung / rugi, 2),
             "macd": b["macd"], "kualitas": b["kualitas"], "utama": sx["utama"], "urutan": sx["urutan"],
             "alasan": f"naik {sx['r20']:+.0f}% dalam 20 hari (peringkat {sx['pk_r20']:.0f}), model peringkat {sx['pk_model']:.0f}"

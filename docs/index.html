@@ -631,7 +631,7 @@ ul.alasan{margin:6px 0;padding-left:18px;font-size:13px}ul.alasan li.peringatan{
           <li><b>Analisa Mandiri</b>: grafik TradingView dengan indikator pilihan Anda; pengaturan, templat, dan catatan tersimpan di perangkat ini.</li>
           <li>Selalu pasang batas rugi dan jangan menurunkannya setelah masuk.</li>
           <li>Risiko per transaksi maksimal 2% dari modal; satu saham maksimal 40% modal.</li>
-          <li>Batas rugi −5% dari harga beli; jual paling lambat penutupan hari ke-3.</li>
+          <li>Beli dengan <b>antrean</b> di rentang harga beli (jangan kejar harga). Batas rugi −5% dari harga beli. Tahan selama harga penutupan di atas <b>MA10</b>; jual di pembukaan berikutnya bila penutupan turun di bawah MA10. Paling lama 20 hari bursa.</li>
           <li>Rekomendasi beli memakai <b>strategi B</b>: momentum 20 hari (maks +100%) + model peringkat antarsaham, hasil riset data 5 tahun. Aturan J lama tidak dipakai lagi karena rugi pada uji 2024–2026. Strategi B sedang diuji kertas; pantau hasilnya di halaman Evaluasi.</li>
           <li>Saringan pengaman fundamental: rugi bersih, arus kas operasi negatif, dan Piotroski F-Score ≤ 2 dibuang; Beneish M-Score di atas −1,78 diberi peringatan.</li>
           <li>Saat IHSG di bawah MA20, tunda pembelian baru.</li>
@@ -1350,29 +1350,27 @@ function nilaiPosisi(p){
   if(!s)return{keputusan:"data",judul:"Data tidak ada",alasan:["Saham ini tidak ada di semesta analisis web."],s:null};
   const sp=SP&&[...SP.uptrend,...SP.sideways].find(x=>x.kode===p.kode),m=MD?.prediksi?.find(x=>x.kode===p.kode),f=F[p.kode]||{};
   const c=s.tutup,untung=(c/p.beli-1)*100,bersih=(c*(1-0.0025))/(p.beli*(1+0.0015))*100-100;
-  const hari=hariBursaAntara(p.tgl,R.tanggal_data),atr=s.atr||c*0.03;
-  const stopAwal=p.stop||bulatHarga(p.beli*0.95,"atas");
-  let stop=stopAwal;
-  if(untung>=4)stop=Math.max(stop,bulatHarga(p.beli*1.005,"atas"));         // impas setelah untung 4%
-  if(untung>=8)stop=Math.max(stop,bulatHarga(c-1.5*atr,"bawah"));             // ikuti kenaikan
-  const target=sp&&sp.resistance>c*1.005?sp.resistance:bulatHarga(c+2*atr,"atas");
+  const hari=hariBursaAntara(p.tgl,R.tanggal_data),ma10=s.sma10;
+  const stopAwal=p.stop||bulatHarga(p.beli*0.95,"atas"),stop=stopAwal;
+  const target=bulatHarga(p.beli+3*(p.beli-stopAwal),"atas");   // sasaran minimal 1:3 (acuan)
   const brt=beritaSaham(p.kode),neg=brt.filter(b=>b.sn==="negatif"),pos=brt.filter(b=>b.sn==="positif");
-  const kuat=s.sinyal_j||(sp&&sp.status==="up"&&sp.tingkat===3&&m?.arah_rel==="unggul");
   const tanda=[];
-  if(c<s.sma20)tanda.push(`harga ${fmt(c)} di bawah MA20 (${fmt(s.sma20)})`);
   if(!sp)tanda.push("sudah tidak termasuk saham uptrend/sideways");
+  if(s.distribusi5&&s.perubahan_pct<0)tanda.push("ada candle merah bervolume besar (tanda distribusi)");
   if(m&&m.arah_rel==="tertinggal"&&m.keyakinan_rel!=="rendah")tanda.push(`model memperkirakan tertinggal dari pasar (peluang unggul ${fmt(m.p_rel,1)}%)`);
   if(neg.length)tanda.push(`${neg.length} berita bernada negatif dalam 1,5 hari terakhir`);
   if((f.bahaya||[]).length)tanda.push("fundamental: "+f.bahaya.join(", "));
   let keputusan,judul,alasan=[],sebab="";
+  const sisaHari=Math.max(0,20-hari);
   if(c<=stop){keputusan="jual";judul="Jual saat pembukaan";sebab="batas rugi tersentuh";alasan.push(`Harga penutupan ${fmt(c)} sudah di bawah batas rugi ${fmt(stop)}. Jual di pembukaan, jangan menunggu harga kembali.`)}
-  else if(s.distribusi5&&s.perubahan_pct<0){keputusan="jual";judul="Jual";sebab="tanda distribusi";alasan.push("Muncul candle merah bervolume besar (tanda distribusi): pemegang besar kemungkinan sedang melepas saham.")}
-  else if(hari>=3&&!kuat){keputusan="jual";judul="Jual";sebab=`sudah ${hari} hari, tren tidak kuat`;alasan.push(`Sudah ${hari} hari bursa dipegang. Sesuai strategi (pegang maksimal 3 hari), jual pada hari bursa berikutnya kecuali ada alasan kuat untuk bertahan.`)}
-  else if(tanda.length>=2||(tanda.length&&untung<0)){keputusan="waspada";judul="Waspada: siap jual";alasan.push(`Pasang order jual otomatis di ${fmt(stop)}. Jual juga bila hari itu tidak naik.`)}
-  else{keputusan="tahan";judul=hari>=3?"Pertahankan (tren masih kuat)":"Pertahankan";
-    alasan.push(hari>=3?`Sudah ${hari} hari, tetapi tren masih kuat${s.sinyal_j?" (sinyal aturan J muncul lagi)":""}. Boleh diperpanjang dengan batas rugi dinaikkan ke ${fmt(stop)}.`
-      :`Masih sesuai rencana. Jual paling lambat penutupan ${tglPendek(tambahHariBursa(p.tgl,3))} bila tidak ada perkembangan.`)}
-  return{keputusan,judul,sebab,alasan,tanda,s,sp,m,c,untung,bersih,hari,stop,stopAwal,target,brt,pos,neg};
+  else if(hari>=1&&ma10&&c<ma10){keputusan="jual";judul="Jual saat pembukaan";sebab=`tutup di bawah MA10 (${fmt(ma10)})`;alasan.push(`Harga penutupan ${fmt(c)} di bawah MA10 (${fmt(ma10)}): kenaikannya sudah melemah. Sesuai aturan, jual di pembukaan${untung>0?` dan amankan untung ${pct(untung)}`:""}.`)}
+  else if(hari>=20){keputusan="jual";judul="Jual";sebab="sudah 20 hari bursa";alasan.push(`Sudah ${hari} hari bursa dipegang (batas 20 hari). Jual di pembukaan.`)}
+  else if(tanda.length>=2&&untung<0){keputusan="waspada";judul="Waspada";alasan.push(`Tetap tahan sesuai aturan, tetapi ada beberapa tanda lemah. Pastikan order jual otomatis di ${fmt(stop)} terpasang.`)}
+  else{keputusan="tahan";judul="Pertahankan";
+    alasan.push(hari===0?`Baru dibeli. Mulai besok, tahan selama harga penutupan tetap di atas MA10 (sekarang ${fmt(ma10)}).`
+      :`Harga penutupan ${fmt(c)} masih di atas MA10 (${fmt(ma10)}), kenaikan masih berjalan. Tahan; jual di pembukaan bila suatu hari penutupan turun di bawah MA10. Paling lama ${sisaHari} hari bursa lagi.`);
+    if(c>=target)alasan.push(`Sasaran 1:3 (${fmt(target)}) sudah tercapai. Jangan buru-buru jual: biarkan untung berjalan selama masih di atas MA10.`)}
+  return{keputusan,judul,sebab,alasan,tanda,s,sp,m,c,untung,bersih,hari,stop,stopAwal,target,ma10,brt,pos,neg};
 }
 async function tampilMalam(){
   if(!SP){try{SP=await ambil("data/stockpick.json")}catch(e){SP={uptrend:[],sideways:[],analisa:[],sektor:[]}}}
@@ -1397,9 +1395,8 @@ async function tampilMalam(){
    <div class="kartu ml-rencana" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><h3 style="margin:0">Yang dilakukan ${sebut}</h3><button class="tombol kedua chip" id="ml-salin">Salin rencana</button></div>
      <ol id="ml-daftar-rencana">${[
        ...nilai.filter(x=>x.keputusan==="jual").map(x=>`<li><b class="turun">JUAL ${x.p.kode}</b> ${x.p.lot} lot saat pembukaan <span class="redup">(${esc(x.sebab)})</span></li>`),
-       ...nilai.filter(x=>x.keputusan==="waspada").map(x=>`<li><b style="color:var(--kuning)">${x.p.kode}</b>: pasang jual otomatis di ${fmt(x.stop)}; jual bila melemah</li>`),
-       ...nilai.filter(x=>x.keputusan==="tahan").map(x=>`<li><b class="naik">TAHAN ${x.p.kode}</b>: batas rugi ${fmt(x.stop)}, ambil untung di ${fmt(x.target)}</li>`),
-       ...(R.pasar_mendukung?beli.slice(0,3).map(b=>`<li><b style="color:var(--aksen)">BELI ${b.kode}</b> di ${fmt(b.entry[0])}${b.entry[1]!==b.entry[0]?"–"+fmt(b.entry[1]):""}, ${fmt(hitungLot(b.entry[1],b.cl).lot)} lot; batas rugi ${fmt(b.cl)}, target ${fmt(b.r1)}</li>`):[]),
+       ...nilai.filter(x=>x.keputusan==="waspada"||x.keputusan==="tahan").map(x=>`<li><b class="${x.keputusan==="tahan"?"naik":""}" ${x.keputusan==="waspada"?'style="color:var(--kuning)"':""}>TAHAN ${x.p.kode}</b>: order jual otomatis di ${fmt(x.stop)}; jual bila penutupan di bawah MA10 ${fmt(x.ma10)}${x.keputusan==="waspada"?' <span class="redup">(waspada)</span>':""}</li>`),
+       ...(R.pasar_mendukung?beli.slice(0,3).map(b=>`<li><b style="color:var(--aksen)">ANTRE BELI ${b.kode}</b> di ${fmt(b.entry[0])}${b.entry[1]!==b.entry[0]?"–"+fmt(b.entry[1]):""}, ${fmt(hitungLot(b.entry[1],b.cl).lot)} lot; batas rugi ${fmt(b.cl)}, sasaran 1:3 ${fmt(b.t3)}, tahan selama di atas MA10</li>`):[]),
      ].join("")||'<li class="redup">Tidak ada tindakan: belum ada posisi dan tidak ada saham yang memenuhi syarat beli.</li>'}</ol>
      ${!R.pasar_mendukung&&beli.length?'<p class="redup" style="margin:0">Ada saham yang memenuhi aturan, tetapi pasar sedang lemah. Menurut aturan, pembelian baru ditunda.</p>':""}</div>
 
@@ -1420,15 +1417,16 @@ async function tampilMalam(){
          <span class="ml-putusan" style="background:${WARNA[x.keputusan]}">${esc(x.judul)}</span></div>
        ${s?`<div class="ml-angka"><div><span class="label">Penutupan</span><b>${fmt(x.c)}</b><span class="${kelas(s.perubahan_pct)}">${pct(s.perubahan_pct)} hari ini</span></div>
          <div><span class="label">Untung/rugi</span><b class="${kelas(x.untung)}">${pct(x.untung)}</b><span class="${kelas(x.untung)}">Rp${fmt(Math.round(x.p.lot*100*(x.c-x.p.beli)))}</span><span class="redup" title="Setelah biaya beli 0,15% dan jual 0,25%">bersih ${pct(x.bersih)} · Rp${fmt(Math.round(x.p.lot*100*(x.c*(1-0.0025)-x.p.beli*(1+0.0015))))}</span></div>
-         <div><span class="label">Batas rugi</span><b class="turun">${fmt(x.stop)}</b><span class="redup">${x.stop>x.stopAwal?"dinaikkan dari "+fmt(x.stopAwal):"−5% dari harga beli"}</span></div>
-         <div><span class="label">Target ambil untung</span><b class="naik">${fmt(x.target)}</b><span class="redup">${pct((x.target/x.c-1)*100)} dari penutupan</span></div></div>`:""}
+         <div><span class="label">Jual bila tutup di bawah</span><b>${fmt(x.ma10)}</b><span class="redup">MA10 hari ini${x.ma10?" · "+pct((x.ma10/x.c-1)*100)+" dari penutupan":""}</span></div>
+         <div><span class="label">Batas rugi</span><b class="turun">${fmt(x.stop)}</b><span class="redup">pasang order jual otomatis</span></div>
+         <div><span class="label">Sasaran 1:3</span><b class="naik">${fmt(x.target)}</b><span class="redup">${x.c>=x.target?"sudah tercapai":pct((x.target/x.c-1)*100)+" lagi"}</span></div></div>`:""}
        <ul class="ml-alasan">${x.alasan.map(a=>`<li>${esc(a)}</li>`).join("")}${x.tanda.map(a=>`<li class="redup">Perhatikan: ${esc(a)}</li>`).join("")}</ul>
        ${x.brt?.length?`<div class="ml-berita">${x.brt.slice(0,3).map(b=>`<a href="${esc(b.tautan)}" target="_blank" rel="noopener"><span class="kode-kecil sn-${b.sn}">${b.sn}</span> ${esc(b.judul)}</a>`).join("")}</div>`:""}
        <div class="ml-aksi"><button class="tombol kedua chip" data-jual="${x.ix}">Sudah dijual</button><button class="tombol kedua chip" data-ubah="${x.ix}">Ubah</button><button class="tombol kedua chip" data-hapus-pos="${x.ix}">Hapus</button></div>
        <div class="ml-jual" id="ml-jual-${x.ix}" hidden><label>Harga jual<input type="number" step="any" min="1" id="ml-hjual-${x.ix}" value="${x.c||""}"></label><label>Tanggal jual<input type="date" id="ml-tjual-${x.ix}"></label><button class="tombol" data-catat="${x.ix}">Catat ke jurnal</button></div>
      </div>`}).join("")||'<div class="kosong">Belum ada posisi. Setelah membeli saham, klik <b>Tambah posisi</b> (atau tombol <b>Saya beli ini</b> di bawah). Setiap malam web akan menilai: pertahankan atau jual pada hari bursa berikutnya.</div>'}</div>
      <p class="redup" style="font-size:13px;margin:10px 0 0" id="ml-kirim"></p>
-     <p class="redup" style="font-size:12px;margin:10px 0 0">Posisi tersimpan di peramban perangkat ini. Aturan: jual bila penutupan di bawah batas rugi, ada tanda distribusi, atau sudah 3 hari tanpa tren kuat. Batas rugi naik ke harga beli setelah untung 4%, lalu mengikuti harga setelah untung 8%.</p></div>
+     <p class="redup" style="font-size:12px;margin:10px 0 0">Posisi tersimpan di peramban perangkat ini. Aturan (hasil uji 5 tahun): jual bila batas rugi −5% tersentuh, atau bila harga penutupan turun di bawah MA10 (dijual di pembukaan besoknya), atau sudah 20 hari bursa. Selama masih di atas MA10, saham ditahan walaupun sasaran 1:3 sudah tercapai.</p></div>
 
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Saham potensial dibeli ${sebut}</h3>
      ${!R.pasar_mendukung?'<div class="pita waspada" style="margin-bottom:10px"><b>Pasar lemah (IHSG di bawah MA20).</b> Menurut uji 3 tahun, membeli saat pasar lemah lebih sering rugi. Daftar ini hanya untuk dipantau.</div>':""}
@@ -1436,13 +1434,14 @@ async function tampilMalam(){
        <div class="ml-atas"><div><a href="#saham/${b.kode}" class="ml-kode">${b.kode}</a> <span class="redup">${esc(b.sektor||"")}</span></div>${b.lencana}</div>
        <div class="ml-angka"><div><span class="label">Beli di</span><b>${fmt(b.entry[0])}${b.entry[1]!==b.entry[0]?"–"+fmt(b.entry[1]):""}</b></div>
          <div><span class="label">Batas rugi</span><b class="turun">${fmt(b.cl)}</b><span class="redup">${pct((b.cl/b.entry[1]-1)*100)}</span></div>
-         <div><span class="label">Target</span><b class="naik">${fmt(b.r1)}</b><span class="redup">${pct((b.r1/b.entry[1]-1)*100)}${b.r2?" · R2 "+fmt(b.r2):""}</span></div>
+         <div><span class="label">Sasaran 1:3</span><b class="naik">${fmt(b.t3)}</b><span class="redup">${pct((b.t3/b.entry[1]-1)*100)} · resistance ${fmt(b.r1)}</span></div>
          <div><span class="label">Jumlah</span><b>${fmt(u.lot)} lot</b><span class="redup">Rp${fmt(u.nilai)}</span></div></div>
+       <div class="redup" style="font-size:13px;margin:6px 0">Pasang <b>antrean beli</b> di rentang ini (jangan kejar harga di atasnya). Setelah terbeli: tahan selama penutupan di atas MA10, jual di pembukaan bila turun di bawahnya; batas rugi otomatis ${fmt(b.cl)}.</div>
        <ul class="ml-alasan">${b.alasan.map(a=>`<li>${esc(a)}</li>`).join("")}</ul>
        ${br.length?`<div class="ml-berita">${br.slice(0,2).map(n=>`<a href="${esc(n.tautan)}" target="_blank" rel="noopener"><span class="kode-kecil sn-${n.sn}">${n.sn}</span> ${esc(n.judul)}</a>`).join("")}</div>`:""}
        <div class="ml-aksi"><button class="tombol chip" data-beli="${b.kode}" data-harga="${b.entry[1]}" data-lot="${u.lot||1}" data-cl="${b.cl}">Saya beli ini</button></div>
      </div>`}).join("")||`<div class="kosong">Hari ini tidak ada saham yang memenuhi aturan beli. Tidak membeli juga keputusan yang baik.${MD?" Saham terkuat menurut model (hanya pantauan): "+MD.prediksi.filter(x=>{const s=PETA[x.kode]?G(x.kode):null;return x.likuid&&x.keyakinan_rel!=="rendah"&&x.arah_rel==="unggul"&&s&&s.tanggal===R.tanggal_data&&s.tutup>=50&&(s.rasio_vol||0)>0&&!(F[x.kode]?.bahaya||[]).length}).slice(0,5).map(x=>`<a href="#saham/${x.kode}">${x.kode}</a>`).join(", "):""}</div>`}</div>
-     <p class="redup" style="font-size:12px;margin:10px 0 0">Sumber: strategi B (momentum 20 hari + model peringkat, 3 pilihan utama + 2 cadangan), disaring dari saham bermasalah fundamental. Jual paling lambat penutupan hari ke-3. Strategi ini masih <b>diuji kertas</b> sejak 27 Nov 2026; lihat hasilnya di halaman Evaluasi. Ini informasi, bukan perintah; keputusan tetap pada Anda.</p></div>
+     <p class="redup" style="font-size:12px;margin:10px 0 0">Sumber: strategi B (momentum 20 hari + model peringkat, 3 pilihan utama + 2 cadangan), disaring dari saham bermasalah fundamental. Beli dengan antrean; tahan selama di atas MA10. Strategi ini masih <b>diuji kertas</b> sejak 27 Nov 2026; lihat hasilnya di halaman Evaluasi. Ini informasi, bukan perintah; keputusan tetap pada Anda.</p></div>
 
    <div class="kartu"><h3 style="margin-top:0">Berita pasar terbaru</h3><div class="daftar-berita">${daftarBerita((B?.pasar||[]).slice(0,6))}</div>
      <p class="redup" style="font-size:12px;margin:6px 0 0">${sekM.length?"Sektor menguat: "+sekM.join(", ")+". ":""}${sekL.length?"Sektor melemah: "+sekL.join(", ")+".":""}</p></div>`;
@@ -1475,7 +1474,7 @@ async function kirimPosisi(nilai,paksa=false){
 function rekomendasiBeli(){
   const peta=new Map(),analisa=Object.fromEntries((SP?.analisa||[]).map(a=>[a.kode,a]));
   (STR?.B||[]).forEach(x=>{if(!PETA[x.kode])return;const a=analisa[x.kode],l=G(x.kode).level||{};
-    peta.set(x.kode,{kode:x.kode,entry:a?a.entry:[l.masuk,l.masuk],r1:a?a.r1:l.target,r2:a?a.r2:null,cl:a?a.cl:l.stop,sumber:[x.utama?`Strategi B #${x.urutan}`:"Strategi B (cadangan)"],ib:x})});
+    peta.set(x.kode,{kode:x.kode,entry:a?a.entry:[l.masuk,l.masuk],r1:a?a.r1:l.target,r2:a?a.r2:null,cl:a?a.cl:l.stop,ma10:a?.ma10??G(x.kode).sma10,sumber:[x.utama?`Strategi B #${x.urutan}`:"Strategi B (cadangan)"],ib:x})});
   if(!STR)(SP?.analisa||[]).forEach(a=>peta.set(a.kode,{kode:a.kode,entry:a.entry,r1:a.r1,r2:a.r2,cl:a.cl,sumber:["Analisa harian"]}));
   return[...peta.values()].map(b=>{
     const s=G(b.kode),m=MD?.prediksi?.find(x=>x.kode===b.kode),f=F[b.kode]||{},br=beritaSaham(b.kode);
@@ -1489,7 +1488,8 @@ function rekomendasiBeli(){
     else if(pos)alasan.push(`${pos} berita positif terbaru.`);
     const skor=b.ib?(b.ib.utama?100:50)-b.ib.urutan:(m?m.p_rel:50)-neg*5;
     const lencana=b.ib?`<span class="lencana">${b.ib.utama?"Pilihan #"+b.ib.urutan:"Cadangan"}</span>`:`<span class="lencana" title="Peluang lebih kuat dari pasar">${m?"unggul "+fmt(m.p_rel,0)+"%":"model –"}</span>`;
-    return{...b,sektor:s.sektor,alasan,skor,lencana};
+    const hi=b.entry[1],t3=bulatHarga(hi+3*(hi-b.cl),"atas");
+    return{...b,t3,sektor:s.sektor,alasan,skor,lencana};
   }).sort((a,b)=>b.skor-a.skor);
 }
 function pasangMalam(){
@@ -1542,7 +1542,7 @@ async function tampilPilihan(){
        <div>R1: <b class="naik">${fmt(a.r1)}</b> <span class="redup">(${pct(a.untung_r1_pct)})</span> · R2: <b class="naik">${fmt(a.r2)}</b></div>
        <div>CL: <b class="turun">${fmt(a.cl)}</b> <span class="redup">(${pct(a.rugi_cl_pct)})</span></div>
        <div style="font-size:13px;margin-top:4px">${(()=>{const u=hitungLot(a.entry[1],a.cl);return`≈ <b>${fmt(u.lot)} lot</b> <span class="redup">(Rp${fmt(u.nilai)}, rugi maks Rp${fmt(u.rugi)})</span>`})()}</div>
-       <div class="redup" style="font-size:12px;margin-top:4px">${a.macd?'<span class="lencana">MACD</span> ':""}${a.kualitas?'<span class="lencana">Kualitas ✓</span> ':""}${esc(a.alasan)} · jual paling lambat penutupan hari ke-3</div></div>`).join("")||'<div class="redup">Tidak ada saham yang memenuhi syarat hari ini.</div>'}</div></div>
+       <div class="redup" style="font-size:12px;margin-top:4px">${a.macd?'<span class="lencana">MACD</span> ':""}${a.kualitas?'<span class="lencana">Kualitas ✓</span> ':""}${esc(a.alasan)} · sasaran 1:3 ${fmt(a.t3)} · tahan selama di atas MA10 (${fmt(a.ma10)})</div></div>`).join("")||'<div class="redup">Tidak ada saham yang memenuhi syarat hari ini.</div>'}</div></div>
    <div class="kisi2" style="margin-bottom:14px">${tabel("Saham uptrend",SP.uptrend)}${tabel("Saham sideways",SP.sideways)}</div>
    <div class="kisi" style="margin-bottom:14px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))">
      <div class="kartu" style="padding:12px"><h3 style="margin:0 0 6px">Keluar tabel hari ini</h3>${SP.keluar.map(x=>`<span class="kode-kecil klik" data-k="${x.kode}" style="cursor:pointer;margin-bottom:4px">${x.kode}${x.sektor?" ("+x.sektor+")":""} <span class="redup">${NS[x.dari]} → ${NS[x.ke]}</span></span>`).join(" ")||'<div class="redup">Tidak ada.</div>'}</div>
@@ -1637,12 +1637,12 @@ async function tampilEvaluasi(){
   const r=(x,j)=>x?`<div><span class="label">${j}</span><b class="${kelas(x.rata)}">${pct(x.rata)}</b><span class="redup" style="font-size:12px;display:block">${fmt(x.n)} transaksi · menang ${fmt(x.menang,0)}%${x.pf?` · PF ${fmt(x.pf,2)}`:""}</span></div>`:`<div><span class="label">${j}</span><b class="redup">menunggu</b></div>`;
   const akr=(x,j)=>`<div><span class="label">${j}</span><b>${x?.benar==null?"–":fmt(x.benar,1)+"%"}</b><span class="redup" style="font-size:12px;display:block">${fmt(x?.n||0)} dinilai</span></div>`;
   const ciri=Object.entries(st.per_ciri).map(([nama,g])=>`<tr><td colspan="5" style="background:var(--hover);font-weight:700">${esc(nama)}</td></tr>${Object.entries(g).map(([k,x])=>`<tr><td>${esc(k)}</td><td>${x?fmt(x.n):"0"}</td><td>${x?fmt(x.menang,0)+"%":"–"}</td><td class="${kelas(x?.rata)}">${x?pct(x.rata):"–"}</td><td>${x?.pf?fmt(x.pf,2):"–"}</td></tr>`).join("")}`).join("");
-  const status=c=>c.status==="selesai"?`<b class="${kelas(c.hasil.pct)}">${pct(c.hasil.pct)}</b> <span class="redup">${esc(c.hasil.cara)}</span>`:c.status==="berjalan"?`<span class="redup">berjalan: ${pct(c.hasil?.pct)}</span>`:'<span class="redup">menunggu harga besok</span>';
+  const status=c=>c.status==="selesai"?`<b class="${kelas(c.hasil.pct)}">${pct(c.hasil.pct)}</b> <span class="redup">${esc(c.hasil.cara)}</span>`:c.status==="berjalan"?`<span class="redup">berjalan: ${pct(c.hasil?.pct)}</span>`:c.status==="tidak terisi"?'<span class="redup">antrean tidak terisi</span>':'<span class="redup">menunggu harga besok</span>';
   el.innerHTML=`
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin:0">Evaluasi analisis & rekomendasi</h3>
      <p class="redup" style="margin:6px 0 0">Setiap hari bursa pukul 17.30 (setelah bursa tutup), web mencatat semua rekomendasi dan perkiraan hari itu, lalu menilai catatan hari-hari sebelumnya dengan harga sebenarnya. Data ini menjadi bahan untuk memperbaiki aturan dan model. Tercatat ${fmt(n.hari)} hari, ${fmt(n.beli)} sinyal beli, ${fmt(n.tren)} perkiraan tren, ${fmt(n.model||0)} perkiraan model; ${fmt(n.menunggu)} masih menunggu hasil. Diperbarui ${PRD.dibuat}.</p></div>
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Uji kertas per strategi</h3>
-     <p class="redup" style="margin:0 0 10px">Setiap pilihan dinilai dengan cara trading yang sama: beli di pembukaan, batas rugi −5%, jual hari ke-3, setelah biaya. Bandingkan dengan hasil uji 2024–2026: B +0,60%, A +0,95%, aturan J −0,23% per transaksi.</p>
+     <p class="redup" style="margin:0 0 10px">Setiap pilihan dinilai dengan cara trading Anda: antrean beli di harga penutupan (hanya dihitung bila antrean terisi), batas rugi −5%, tahan selama penutupan di atas MA10 (maks 20 hari), setelah biaya. Hasil uji 2024–2026 dengan cara ini: B +3,2%, A +2,8% per transaksi.${st.antrean?` Antrean terisi ${st.antrean.terisi}, tidak terisi ${st.antrean.tidak_terisi}.`:""}</p>
      <div class="statistik">${[["B","Strategi B (utama)"],["B_saat_pasar_naik","B saat IHSG > MA20"],["A","Strategi A (pembanding)"],["J","Aturan J (lama)"]].map(([k,n])=>r(st.per_strategi?.[k],n)).join("")}</div></div>
 
    <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Penilaian di penutupan berikutnya</h3>
@@ -1656,9 +1656,9 @@ async function tampilEvaluasi(){
        <h4 style="margin:14px 0 6px">Rincian penilaian terakhir (${tglPendek(PRD.harian.at(-1).tanggal)} → ${tglPendek(PRD.harian.at(-1).dinilai)})</h4>${kartuPenilaian(PRD.harian.at(-1))}`
        :'<div class="kosong">Penilaian pertama muncul setelah penutupan hari bursa berikutnya.</div>'}</div>
 
-   <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Hasil rekomendasi beli (beli di pembukaan, batas rugi −5%, jual hari ke-3)</h3>
+   <div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Hasil rekomendasi beli (antrean, batas rugi −5%, tahan selama di atas MA10)</h3>
      <div class="statistik">${r(st.beli_analisa,"Analisa harian")}${r(st.beli_dipilih,"Analisa + Kandidat Besok")}${r(st.beli_semua,"Semua sinyal aturan J")}
-       <div><span class="label">Tersentuh dalam 3 hari</span><b>R1 ${st.kena.r1==null?"–":fmt(st.kena.r1,0)+"%"}</b><span class="redup" style="font-size:12px;display:block">R2 ${st.kena.r2==null?"–":fmt(st.kena.r2,0)+"%"} · CL ${st.kena.cl==null?"–":fmt(st.kena.cl,0)+"%"}</span></div></div>
+       <div><span class="label">Tersentuh selama dipegang</span><b>R1 ${st.kena.r1==null?"–":fmt(st.kena.r1,0)+"%"}</b><span class="redup" style="font-size:12px;display:block">R2 ${st.kena.r2==null?"–":fmt(st.kena.r2,0)+"%"} · CL ${st.kena.cl==null?"–":fmt(st.kena.cl,0)+"%"}</span></div></div>
      <div style="height:220px;margin-top:12px" id="g-eval"></div><p class="redup" style="font-size:12px">Kurva: jumlah kumulatif rata-rata hasil rekomendasi per hari sinyal (dalam %).</p></div>
    <div class="kisi2" style="margin-bottom:14px">
      <div class="kartu"><h3 style="margin-top:0">Ketepatan analisis tren & model</h3>
@@ -1967,8 +1967,8 @@ function teksStrategi(){
   const u=STR?.uji,ps=PRD?.statistik?.per_strategi||{};
   const nyata=(x,n)=>x?`${n}: rata-rata <span class="${kelas(x.rata)}">${pct(x.rata)}</span>, menang ${fmt(x.menang,0)}% (${x.n} transaksi)`:`${n}: belum ada yang selesai dinilai`;
   return`<div class="kartu" style="margin-bottom:14px"><h3 style="margin-top:0">Strategi yang dipakai: B (momentum + model peringkat)</h3>
-    <p style="margin:4px 0">Dari saham ramai yang kenaikan 20 harinya <b>tidak lebih dari 100%</b>, dipilih 3 teratas menurut <b>peringkat kenaikan 20 hari + peringkat model antarsaham</b> (dilatih ulang setiap hari dengan data 5 tahun). Beli di pembukaan, <b>batas rugi −5%</b>, jual paling lambat <b>penutupan hari ke-3</b>. Hanya saat IHSG di atas MA20. Saham bermasalah fundamental dibuang.</p>
-    ${u?`<p class="redup" style="margin:4px 0">Uji ${u.periode} (semesta bebas bias, setelah biaya): <b>B</b> +${fmt(u.B.rata,2)}% per transaksi, menang ${u.B.menang}% · pembanding <b>A</b> (momentum murni) +${fmt(u.A.rata,2)}%, menang ${u.A.menang}% · aturan J lama ${fmt(u.J.rata,2)}%.</p>`:""}
+    <p style="margin:4px 0">Dari saham ramai yang kenaikan 20 harinya <b>tidak lebih dari 100%</b>, dipilih 3 teratas menurut <b>peringkat kenaikan 20 hari + peringkat model antarsaham</b> (dilatih ulang setiap hari dengan data 5 tahun). Beli dengan <b>antrean</b> di harga penutupan atau lebih rendah, <b>batas rugi −5%</b>, lalu <b>tahan selama penutupan di atas MA10</b> (paling lama 20 hari). Hanya saat IHSG di atas MA20. Saham bermasalah fundamental dibuang.</p>
+    ${u?`<p class="redup" style="margin:4px 0">Uji ${u.periode} (semesta bebas bias, setelah biaya): <b>B</b> +${fmt(u.B.rata,2)}% per transaksi, menang ${u.B.menang}%${u.B.rata_untung?`, rata-rata untung +${fmt(u.B.rata_untung,1)}% vs rugi ${fmt(u.B.rata_rugi,1)}% (≈1:${fmt(u.B.rata_untung/-u.B.rata_rugi,1)})`:""} · pembanding <b>A</b> +${fmt(u.A.rata,2)}%, menang ${u.A.menang}% · aturan J lama ${fmt(u.J.rata,2)}%.${u.catatan?" "+esc(u.catatan):""}</p>`:""}
     <p class="redup" style="margin:4px 0"><b>Uji kertas sejak 27 Nov 2026</b> (dinilai otomatis dengan harga sebenarnya): ${nyata(ps.B,"B")} · ${nyata(ps.A,"A")} · ${nyata(ps.J,"aturan J")}.</p></div>`;
 }
 async function tampilKandidat(){
@@ -1987,7 +1987,7 @@ async function tampilKandidat(){
       ${ib?`<div style="margin:4px 0"><span class="lencana">${ib.utama?"Pilihan #"+ib.urutan:"Cadangan"}</span> <span class="redup">naik ${pct(ib.r20)} dalam 20 hari (peringkat ${fmt(ib.pk_r20,0)}) · model peringkat ${fmt(ib.pk_model,0)}${ib.distribusi?" · ada jejak distribusi":""}</span></div>`:""}${(f.peringatan||[]).length?`<div style="color:var(--kuning);font-size:12px">⚠ ${esc(f.peringatan.join("; "))}</div>`:""}
       <div>${fmt(s.tutup)} <span class="${kelas(s.perubahan_pct)}">${pct(s.perubahan_pct)}</span> <span class="redup">· vol ${fmt(s.rasio_vol,1)}× · RSI ${fmt(s.rsi,0)}${s.asing5!=null?` · asing 5h <span class="${kelas(s.asing5)}">${rp(s.asing5)}</span>`:""}</span></div>
       <div class="level"><div><span class="label">Masuk</span><b>${fmt(l.masuk)}</b></div><div><span class="label">Target acuan</span><b class="naik">${fmt(l.target)}</b><span class="redup">${pct(l.untung_bersih_pct)}</span></div><div><span class="label">Batas rugi (−5%)</span><b class="turun">${fmt(l.stop)}</b><span class="redup">${pct(l.rugi_bersih_pct)}</span></div></div>
-      <div class="redup">Jual paling lambat penutupan hari ke-3 setelah beli.</div>
+      <div class="redup">Antre beli di harga ${fmt(l.masuk)} atau lebih rendah. Tahan selama penutupan di atas MA10 (${fmt(s.sma10)}); paling lama 20 hari.</div>
       <div class="redup">Ukuran disarankan <b style="color:var(--teks)">${fmt(uk.lot)} lot</b> (≈Rp${fmt(uk.nilai)}; rugi maks ≈Rp${fmt(uk.rugi)})</div>
       <ul class="alasan">${s.alasan.map(a=>`<li class="${a.startsWith("Peringatan")?"peringatan":""}">${a}</li>`).join("")}</ul>
       <div class="redup">Uji balik saham ini: ${u.jumlah?`${u.jumlah} sinyal, menang ${fmt(u.persen_menang,0)}%, rata-rata <span class="${kelas(u.rata_hasil_pct)}">${pct(u.rata_hasil_pct)}</span>`:"belum ada sinyal"}</div></div>`}).join("");

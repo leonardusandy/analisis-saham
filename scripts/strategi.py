@@ -4,17 +4,21 @@ Strategi B (utama)  : di antara saham layak (nilai transaksi rata-rata 20 hari >
                       ada transaksi) yang kenaikan 20 harinya <= 100%, urutkan dengan
                       peringkat(kenaikan 20 hari) + peringkat(model peringkat antarsaham). Ambil 3 teratas.
 Strategi A (pembanding): kenaikan 20 hari terbesar (<= 100%) tanpa jejak distribusi 5 hari. Ambil 3 teratas.
-Keduanya hanya dibeli saat IHSG di atas MA20. Beli di pembukaan, batas rugi -5%, jual paling lambat
-penutupan hari ke-3.
+Keduanya hanya dibeli saat IHSG di atas MA20. Cara trading (riset putaran 4): antrean beli di harga penutupan
+atau lebih rendah (hanya terisi bila harga besok turun ke sana), batas rugi -5%, tahan selama penutupan di atas
+MA10; bila penutupan di bawah MA10 (mulai hari kedua) dijual di pembukaan berikutnya; paling lama 20 hari.
 
 Model peringkat: HistGradientBoostingRegressor, sasaran = peringkat hasil transaksi (cara di atas) di antara
 saham pada hari yang sama, hanya memakai ciri saham (tanpa ciri pasar/global). Dilatih ulang setiap hari
 dengan seluruh riwayat 5 tahun yang sudah diketahui hasilnya.
 
-Hasil uji (per transaksi, setelah biaya):
-  B: rata-rata +0,60%, menang 49%, untung total/rugi total 1,41; 2024 -0,18%, 2025 +1,42%, 2026 +0,21%
-  A: rata-rata +0,95%, menang 38%, untung total/rugi total 1,32; 2024 +0,55%, 2025 +2,04%, 2026 -0,38%
-  Aturan J (lama): rata-rata -0,23%, menang 36%.
+Hasil uji dengan cara di atas (per transaksi, setelah biaya; riset_model4/4b):
+  B: rata-rata +3,18%, menang 38%, rata-rata untung +13,3% vs rugi -3,0% (~1:4,5), PF 2,73;
+     portofolio 3 slot: 2024 +34%, 2025 +182%, 2026 -4%. Tanpa 5% transaksi terbaik rata-rata ~0%.
+  A: rata-rata +2,79%, menang 31%, PF 1,82.
+  Pembanding cara lama (beli pembukaan, jual hari ke-3): B +0,60%, A +0,95%, aturan J -0,23%.
+  Target tetap 1:1/1:2/1:3 selalu lebih buruk daripada keluar di bawah MA10. Pola candlestick tidak
+  menambah ketepatan (model + pola: +0,26% vs +0,60%).
 Hasil: <DATA_KELUAR>/strategi.json
 """
 from __future__ import annotations
@@ -35,10 +39,13 @@ import riset_model as rm  # noqa: E402
 WIB = timezone(timedelta(hours=7))
 K_UTAMA, K_CADANGAN = 3, 2
 UJI = {
-    "B": {"rata": 0.60, "menang": 49, "pf": 1.41, "tahun": {"2024": -0.18, "2025": 1.42, "2026": 0.21}},
-    "A": {"rata": 0.95, "menang": 38, "pf": 1.32, "tahun": {"2024": 0.55, "2025": 2.04, "2026": -0.38}},
+    "B": {"rata": 3.18, "menang": 38, "pf": 2.73, "rata_untung": 13.3, "rata_rugi": -3.0,
+          "tahun": {"2024": 34.0, "2025": 181.7, "2026": -4.1}},
+    "A": {"rata": 2.79, "menang": 31, "pf": 1.82},
     "J": {"rata": -0.23, "menang": 36, "pf": 0.91},
     "periode": "Jan 2024 – Nov 2026",
+    "catatan": "Untung berasal dari sedikit saham yang naik besar: tanpa 5% transaksi terbaik rata-rata sekitar 0%, "
+               "dan 7 dari 12 kuartal rugi kecil. 2026 sejauh ini -4%.",
 }
 
 

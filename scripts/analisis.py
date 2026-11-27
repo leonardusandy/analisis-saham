@@ -63,6 +63,7 @@ def atr(df: pd.DataFrame, n: int = 14) -> pd.Series:
 def tambah_indikator(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     c = df["Close"]
+    df["SMA10"] = c.rolling(10).mean()
     df["SMA20"] = c.rolling(20).mean()
     df["SMA50"] = c.rolling(50).mean()
     df["EMA12"] = c.ewm(span=12, adjust=False).mean()
@@ -293,6 +294,7 @@ def analisis_saham(kode: str, df: pd.DataFrame) -> tuple[dict, dict] | None:
         "nilai_rata20_miliar": _f(akhir["NILAI_RATA20"] / 1e9, 1),
         "rsi": _f(akhir["RSI"], 1),
         "atr": _f(akhir["ATR"], 1),
+        "sma10": _f(akhir["SMA10"], 1),
         "sma20": _f(akhir["SMA20"], 0),
         "sma50": _f(akhir["SMA50"], 0),
         "ubah_5h": _ubah(df, 5), "ubah_20h": _ubah(df, 20), "ubah_60h": _ubah(df, 60),

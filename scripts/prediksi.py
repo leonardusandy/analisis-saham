@@ -33,7 +33,7 @@ import config as cfg  # noqa: E402
 
 WIB = timezone(timedelta(hours=7))
 SITUS = os.environ.get("SITUS_WEB", "https://leonardusandy.github.io/analisis-saham/")
-HARI_BELI, HARI_TREN = 3, 5
+HARI_BELI, HARI_MODEL, HARI_TREN = 20, 3, 5
 
 
 def baca(p: Path, bawaan=None):
@@ -170,6 +170,10 @@ def penilaian_harian(semua: list[dict]) -> list[dict]:
 
 
 def nilai_beli(c: dict, L: list) -> None:
+    """Cara trading (hasil riset putaran 4): antrean beli di batas atas rentang beli (harga penutupan hari
+    sinyal). Antrean hanya terisi bila harga besok turun sampai harga antrean; harga beli = min(pembukaan,
+    harga antrean). Batas rugi -5% dari harga beli. Saham ditahan selama penutupan >= MA10; bila penutupan
+    di bawah MA10 (mulai hari kedua), dijual di pembukaan hari berikutnya. Paling lama 20 hari bursa."""
     tgl = [x["t"] for x in L]
     if c["tanggal"] not in tgl:
         return
@@ -178,32 +182,47 @@ def nilai_beli(c: dict, L: list) -> None:
     if not ke:
         c["status"] = "menunggu"
         return
-    beli = ke[0]["o"]
-    if not beli:
-        return
-    stop = beli * (1 - cfg.STOP_PERSEN)
     r = c.get("rencana") or {}
-    keluar, cara = None, None
+    antrean = ((r.get("entry") or [None, None])[1]) or L[i]["c"]
+    d1 = ke[0]
+    if not d1["o"] or d1["l"] > antrean:
+        c["hasil"] = {"terisi": False, "antrean": antrean, "sampai": d1["t"]}
+        c["status"] = "tidak terisi"
+        c.pop("benar", None)
+        return
+    beli = min(d1["o"], antrean)
+    stop = beli * (1 - cfg.STOP_PERSEN)
+    keluar, cara, hari_keluar = None, None, None
     for n, x in enumerate(ke):
+        j = i + 1 + n
         if n > 0 and x["o"] <= stop:
-            keluar, cara = x["o"], "batas rugi (buka di bawah)"
+            keluar, cara, hari_keluar = x["o"], "batas rugi (buka di bawah)", x["t"]
             break
         if x["l"] <= stop:
-            keluar, cara = stop, "batas rugi"
+            keluar, cara, hari_keluar = stop, "batas rugi", x["t"]
             break
-    selesai = keluar is not None or len(ke) >= HARI_BELI
+        if n > 0 and j >= 9:
+            ma10 = sum(y["c"] for y in L[j - 9:j + 1]) / 10
+            if x["c"] < ma10:
+                if j + 1 < len(L):
+                    keluar, cara, hari_keluar = L[j + 1]["o"], "tutup di bawah MA10", L[j + 1]["t"]
+                else:
+                    cara = "jual besok (tutup di bawah MA10)"
+                break
+    selesai = keluar is not None or (cara is None and len(ke) >= HARI_BELI)
     if keluar is None:
-        keluar, cara = ke[-1]["c"], ("jual hari ke-3" if selesai else f"berjalan hari ke-{len(ke)}")
+        keluar, hari_keluar = ke[-1]["c"], ke[-1]["t"]
+        if cara is None:
+            cara = "batas 20 hari" if selesai else f"berjalan hari ke-{len(ke)}"
     hasil = (keluar * (1 - cfg.BIAYA_JUAL)) / (beli * (1 + cfg.BIAYA_BELI)) - 1
     tinggi = max(x["h"] for x in ke)
     c["hasil"] = {
-        "beli": beli, "keluar": round(keluar, 1), "cara": cara, "pct": round(hasil * 100, 2),
-        "naik_maks_pct": round((tinggi / beli - 1) * 100, 2),
-        "sesuai_entry": bool(r.get("entry") and beli <= r["entry"][1] * 1.005),
+        "terisi": True, "beli": round(beli, 1), "keluar": round(keluar, 1), "cara": cara, "pct": round(hasil * 100, 2),
+        "naik_maks_pct": round((tinggi / beli - 1) * 100, 2), "sesuai_entry": True,
         "kena_r1": bool(r.get("r1") and tinggi >= r["r1"]),
         "kena_r2": bool(r.get("r2") and tinggi >= r["r2"]),
         "kena_cl": cara.startswith("batas rugi"),
-        "sampai": ke[-1]["t"],
+        "sampai": hari_keluar if selesai else ke[-1]["t"], "aturan": "antrean+MA10",
     }
     c["status"] = "selesai" if selesai else "berjalan"
     if selesai:
@@ -235,12 +254,12 @@ def nilai_model(c: dict, L: list) -> None:
     if c["tanggal"] not in tgl:
         return
     i = tgl.index(c["tanggal"])
-    ke = L[i + 1:i + 1 + HARI_BELI]
+    ke = L[i + 1:i + 1 + HARI_MODEL]
     if not ke:
         return
     ubah = (ke[-1]["c"] / L[i]["c"] - 1) * 100
     c["hasil"] = {"pct": round(ubah, 2), "hari": len(ke), "sampai": ke[-1]["t"]}
-    if len(ke) >= HARI_BELI:
+    if len(ke) >= HARI_MODEL:
         c["status"] = "selesai"
         c["benar"] = (c["p"] >= 50) == (ubah > 0)
     else:
@@ -394,6 +413,8 @@ def statistik(cat: list[dict]) -> dict:
             "J": ringkas([c for c in beli if "J" in c.get("dipilih", []) or not any(x in c.get("dipilih", []) for x in ("A", "B", "A-cadangan", "B-cadangan"))]),
         },
         "beli_analisa": ringkas([c for c in beli if "analisa" in c.get("dipilih", [])]),
+        "antrean": {"terisi": sum(c.get("status") in ("selesai", "berjalan") for c in pilih),
+                    "tidak_terisi": sum(c.get("status") == "tidak terisi" for c in pilih)},
         "kena": {"r1": round(sum(c["hasil"]["kena_r1"] for c in r1) / len(r1) * 100, 1) if r1 else None,
                  "r2": round(sum(c["hasil"]["kena_r2"] for c in r1) / len(r1) * 100, 1) if r1 else None,
                  "cl": round(sum(c["hasil"]["kena_cl"] for c in r1) / len(r1) * 100, 1) if r1 else None},
