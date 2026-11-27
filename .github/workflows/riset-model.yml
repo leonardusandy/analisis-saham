@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       skrip:
-        description: "riset_model atau riset_model2"
+        description: "riset_model, riset_model2, atau riset_model3"
         default: riset_model2
 permissions:
   contents: read
