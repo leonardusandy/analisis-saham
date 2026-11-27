@@ -144,6 +144,7 @@ def ciri_saham(df: pd.DataFrame) -> pd.DataFrame:
     for nama, kw in VARIASI_KELUAR.items():
         f["hasil" if not kw else "hk_" + nama] = hasil_transaksi(*arr, atr=atr_abs, **kw)
     f["tutup"] = c
+    f["buka"], f["tinggi"], f["rendah"] = o, h, l  # harga mentah untuk simulasi (bukan ciri model)
     return f
 
 
@@ -217,7 +218,8 @@ def bangun_data(pakai_global: bool = True):
     d["hari"] = d["t"].dt.dayofweek
     d = d.replace([np.inf, -np.inf], np.nan)
 
-    CIRI = [c for c in d.columns if c not in ("t", "kode", "sektor", "layak", "hasil", "tutup") and not c.startswith("hk_")]
+    CIRI = [c for c in d.columns if c not in ("t", "kode", "sektor", "layak", "hasil", "tutup", "buka", "tinggi", "rendah")
+            and not c.startswith("hk_")]
     KELOMPOK = {
         "global": [c for c in CIRI if c.startswith("g_")],
         "akumulasi": ["cmf20", "obv10", "ad20"],
